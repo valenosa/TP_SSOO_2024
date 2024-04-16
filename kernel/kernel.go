@@ -16,8 +16,9 @@ type BodyIniciarProceso struct {
 	Path string `json:"path"`
 }
 
-type ResponseIniciarProceso struct {
-	Pid int `json:"pid"`
+type ResponseProceso struct {
+	Pid    int    `json:"pid"`
+	Estado string `json:"estado"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,7 +84,7 @@ func iniciar_proceso() {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var response ResponseIniciarProceso
+	var response ResponseProceso
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
 	err = json.NewDecoder(respuesta.Body).Decode(&response)
