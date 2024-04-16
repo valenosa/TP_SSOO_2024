@@ -12,8 +12,8 @@ func main() {
 		read(GET, body) => que hay que hacer
 		res
 		switch res
-		iniciar_proceso()
 	*/
+	iniciar_proceso()
 }
 
 type BodyIniciarProceso struct {
@@ -25,7 +25,7 @@ type ResponseIniciarProceso struct {
 	Pid string `json:"pid"`
 }
 
-func inciar_proceso() {
+func iniciar_proceso() {
 
 	// Establecer ip y puerto
 	ip := "localhost"
