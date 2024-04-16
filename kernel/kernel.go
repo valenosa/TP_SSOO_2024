@@ -22,7 +22,7 @@ type BodyIniciarProceso struct {
 }
 
 type ResponseIniciarProceso struct {
-	Pid string `json:"pid"`
+	Pid int `json:"pid"`
 }
 
 func iniciar_proceso() {
@@ -33,11 +33,12 @@ func iniciar_proceso() {
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(BodyIniciarProceso{
-		Path: "",
+		Path: "string",
 	})
 	// Error Handler de la codificación
 	if err != nil {
 		fmt.Printf("error codificando body: %s", err.Error())
+		return
 	}
 
 	// Se declara un nuevo cliente
@@ -51,7 +52,8 @@ func iniciar_proceso() {
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip:%s puerto:%d", ip, puerto)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, puerto)
+		return
 	}
 
 	// Se establecen los headers
@@ -62,12 +64,14 @@ func iniciar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip:%s puerto:%d", ip, puerto)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, puerto)
+		return
 	}
 
 	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
 	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d", respuesta.StatusCode)
+		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
+		return
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
@@ -78,11 +82,12 @@ func iniciar_proceso() {
 
 	// Error Handler para al decodificación
 	if err != nil {
-		fmt.Printf("Error decodificando")
+		fmt.Printf("Error decodificando\n")
+		return
 	}
 
 	// Imprime pid (parámetro de la estructura)
-	fmt.Println(response.Pid)
+	fmt.Printf("pid: %d\n", response.Pid)
 }
 
 func finalizar_proceso() {
