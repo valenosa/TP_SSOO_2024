@@ -44,8 +44,8 @@ func iniciar_proceso() {
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
-	// Se declara la url a utilizar (depende de una ip y un puerto)
-	url := fmt.Sprintf("http://%s:%d/paquetes", ip, puerto)
+	// Se declara la url a utilizar (depende de una ip y un puerto).
+	url := fmt.Sprintf("http://%s:%d/process", ip, puerto)
 
 	// Se crea una request donde se "efectúa" un PUT hacia url, enviando el Body anteriormente mencionado
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
