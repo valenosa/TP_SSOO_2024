@@ -46,17 +46,21 @@ func iniciar_proceso() {
 	// Se declara la url a utilizar (depende de una ip y un puerto)
 	url := fmt.Sprintf("http://%s:%d/paquetes", ip, puerto)
 
-	// Se envía una request donde se acciona un PUT hacia url, enviando el Body anteriormente mencionado
+	// Se crea una request donde se "efectúa" un PUT hacia url, enviando el Body anteriormente mencionado
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
 
-	// Error Handler de la request
+	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creado request a ip:%s puerto:%d", ip, puerto)
+		fmt.Printf("error creando request a ip:%s puerto:%d", ip, puerto)
 	}
 
 	// Se establecen los headers
 	req.Header.Set("Content-Type", "application/json")
+
+	// Se envía el request al servidor
 	respuesta, err := cliente.Do(req)
+
+	// Error handler de la request
 	if err != nil {
 		fmt.Printf("error enviando request a ip:%s puerto:%d", ip, puerto)
 	}
