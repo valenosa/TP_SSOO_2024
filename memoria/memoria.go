@@ -13,9 +13,10 @@ type BodyIniciarProceso struct {
 }
 
 // Declaración temporal. Próximamente las estructuras compartidas se encontrarán unificadas en un archivo
-type ResponseIniciarProceso struct {
-	Pid int `json:"pid"`
-	//state string //READY, EXEC, BLOCK, EXIT
+// La cambio porque se necesita para varias respuestas, no solo para iniciar proceso
+type ResponseProceso struct {
+	Pid    int    `json:"pid"`
+	Estado string `json:"estado"`
 }
 
 func main() {
@@ -24,6 +25,7 @@ func main() {
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
 	http.HandleFunc("PUT /process", handler_iniciar_proceso)
 	http.HandleFunc("DELETE /process/{pid}", handler_finalizar_proceso)
+	http.HandleFunc("GET /process/{pid}", handler_estado_proceso)
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -46,7 +48,7 @@ func handler_iniciar_proceso(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Request path: %s\n", request)
 
 	//Crea una variable tipo ResponseIniciarProceso (para confeccionar una respuesta)
-	var respBody ResponseIniciarProceso = ResponseIniciarProceso{Pid: 0}
+	var respBody ResponseProceso = ResponseProceso{Pid: 0}
 
 	// Codificar Response en un array de bytes (formato json)
 	respuesta, err := json.Marshal(respBody)
@@ -62,6 +64,8 @@ func handler_iniciar_proceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
+// primera versión de finalizar proceso, com no recive ni devuelve solo le mandamos status ok.
+// Cuando haya  procesos se busca por el %s del path {pid}
 func handler_finalizar_proceso(w http.ResponseWriter, r *http.Request) {
 	res, err := json.Marshal("")
 
@@ -71,4 +75,21 @@ func handler_finalizar_proceso(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
+}
+
+// primera versión de estado proceso, como es GET no necesita recibir nada
+// Cuando haya  procesos se busca por el %s del path {pid}
+func handler_estado_proceso(w http.ResponseWriter, r *http.Request) {
+	//usando el struct de ResponseProceso envío el estado del proceso
+	var respBody ResponseProceso = ResponseProceso{Estado: "ready"}
+
+	respuesta, err := json.Marshal(respBody)
+
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
 }
