@@ -2,35 +2,67 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
-type Proceso struct {
-	pID int `json:"pid"`
+// Declaración temporal. Próximamente las estructuras compartidas se encontrarán unificadas en un archivo
+type BodyIniciarProceso struct {
+	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
+	Path string `json:"path"`
+}
+
+// Declaración temporal. Próximamente las estructuras compartidas se encontrarán unificadas en un archivo
+type ResponseIniciarProceso struct {
+	Pid int `json:"pid"`
 	//state string //READY, EXEC, BLOCK, EXIT
 }
 
 func main() {
-	http.HandleFunc("PUT /process", iniciar_proceso)
-	http.HandleFunc("DELETE /process/{pid}", finalizar_proceso)
+	// Declaración temporal.
+
+	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
+	http.HandleFunc("PUT /process", handler_iniciar_proceso)
+	http.HandleFunc("DELETE /process/{pid}", handler_finalizar_proceso)
 	http.ListenAndServe(":8080", nil)
 }
 
-func iniciar_proceso(w http.ResponseWriter, r *http.Request) {
+func handler_iniciar_proceso(w http.ResponseWriter, r *http.Request) {
 
-	p := Proceso{pID: 0}
+	//Crea uan variable tipo BodyIniciarProceso (para interpretar lo que se recibe de la request)
+	var request BodyIniciarProceso
 
-	res, err := json.Marshal(p)
+	// Decodifica el request (codificado en formato json)
+	err := json.NewDecoder(r.Body).Decode(&request)
 
+	// Error Handler de la decodificación
 	if err != nil {
-		http.Error(w, "fallo", http.StatusInternalServerError)
+		fmt.Printf("Error al decodificar request body: ")
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Imprime el request por consola (del lado del server)
+	fmt.Printf("Request path: %s\n", request)
+
+	//Crea una variable tipo ResponseIniciarProceso (para confeccionar una respuesta)
+	var respBody ResponseIniciarProceso = ResponseIniciarProceso{Pid: 0}
+
+	// Codificar Response en un array de bytes (formato json)
+	respuesta, err := json.Marshal(respBody)
+
+	// Error Handler de la codificación
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+	w.Write(respuesta)
 }
 
-func finalizar_proceso(w http.ResponseWriter, r *http.Request) {
+func handler_finalizar_proceso(w http.ResponseWriter, r *http.Request) {
 	res, err := json.Marshal("")
 
 	if err != nil {
