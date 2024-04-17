@@ -133,7 +133,7 @@ func finalizar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port_memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
 		return
 	}
 
