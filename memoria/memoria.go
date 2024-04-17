@@ -72,17 +72,27 @@ func handler_iniciar_proceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-// primera versión de finalizar proceso, com no recive ni devuelve solo le mandamos status ok.
-// Cuando haya  procesos se busca por el %s del path {pid}
+// primera versión de finalizar proceso, no recibe body (solo un path por medio de la url) y envía una respuesta vacía (mandamos status ok y hacemos que printee el valor del pid recibido para ver que ha sido llamada).
+// Cuando haya  procesos se busca por el path {pid}
 func handler_finalizar_proceso(w http.ResponseWriter, r *http.Request) {
-	res, err := json.Marshal("")
+
+	//es posible que en un futuro sea necesario convertir esta string a un int
+	pid := r.PathValue("pid")
+
+	// Imprime el pid (solo para pruebas)
+	fmt.Printf("pid: %s", pid)
+
+	// Respuesta vacía significa que manda una respuesta vacía, o que no hay respuesta?
+	respuesta, err := json.Marshal("")
 
 	if err != nil {
-		http.Error(w, "fallo", http.StatusInternalServerError)
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
 		return
 	}
+
+	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+	w.Write(respuesta)
 }
 
 // primera versión de estado proceso, como es GET no necesita recibir nada
