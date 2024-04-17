@@ -115,7 +115,7 @@ func finalizar_proceso() {
 	url := fmt.Sprintf("http://%s:%d/process/%d", ip, puerto, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
