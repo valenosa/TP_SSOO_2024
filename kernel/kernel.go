@@ -29,7 +29,9 @@ func main() {
 		res
 		switch res
 	*/
-	finalizar_proceso()
+	//finalizar_proceso()
+	detener_planificacion()
+	iniciar_planificacion()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,9 +39,9 @@ func main() {
 // Solamente esqueleto
 func iniciar_proceso() {
 
-	// Establecer ip y puerto (hardcodeado)
-	ip := "localhost"
-	puerto := 8080
+	// Establecer ip_memory y puerto (hardcodeado)
+	ip_memory := "localhost"
+	port_memory := 8002
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(BodyIniciarProceso{
@@ -55,14 +57,14 @@ func iniciar_proceso() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", ip, puerto)
+	url := fmt.Sprintf("http://%s:%d/process", ip_memory, port_memory)
 
 	// Se crea una request donde se "efectúa" un PUT hacia url, enviando el Body anteriormente mencionado
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, puerto)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip_memory, port_memory)
 		return
 	}
 
@@ -74,7 +76,7 @@ func iniciar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, puerto)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
 		return
 	}
 
@@ -104,22 +106,22 @@ func iniciar_proceso() {
 func finalizar_proceso() {
 
 	// Establecer ip, puerto y pid (hardcodeado)
-	ip := "localhost"
-	puerto := 8080
+	ip_memory := "localhost"
+	port_memory := 8002
 	pid := 0
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", ip, puerto, pid)
+	url := fmt.Sprintf("http://%s:%d/process/%d", ip_memory, port_memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
 	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, puerto)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip_memory, port_memory)
 		return
 	}
 
@@ -131,7 +133,7 @@ func finalizar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, puerto)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port_memory)
 		return
 	}
 
@@ -150,7 +152,7 @@ func iniciar_planificacion() {
 
 	// Establecer ip_cpu y puerto
 	ip_cpu := "localhost"
-	port_cpu := 8081
+	port_cpu := 8006
 
 	cliente := &http.Client{}
 
@@ -191,7 +193,7 @@ func iniciar_planificacion() {
 func detener_planificacion() {
 	// Establecer ip_cpu y puerto
 	ip_cpu := "localhost"
-	port_cpu := 8082
+	port_cpu := 8006
 
 	cliente := &http.Client{}
 
