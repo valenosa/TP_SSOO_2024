@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +100,14 @@ func handler_finalizar_proceso(w http.ResponseWriter, r *http.Request) {
 // Cuando haya  procesos se busca por el %s del path {pid}
 func handler_estado_proceso(w http.ResponseWriter, r *http.Request) {
 	//usando el struct de ResponseProceso envío el estado del proceso
-	var respBody ResponseProceso = ResponseProceso{Estado: "ready"}
+
+	pid, error := strconv.Atoi(r.PathValue("pid"))
+
+	if error != nil {
+		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+		return
+	}
+	var respBody ResponseProceso = ResponseProceso{Pid: pid, Estado: "ready"}
 
 	respuesta, err := json.Marshal(respBody)
 
