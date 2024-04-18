@@ -22,6 +22,12 @@ type ResponseProceso struct {
 	Estado string `json:"estado"`
 }
 
+// Puertos e ip's de memoria y cpu (luego mover a config.json)
+var ip_memory string = "localhost"
+var port_memory int = 8002
+var ip_cpu string = "localhost"
+var port_cpu int = 8006
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
@@ -31,18 +37,15 @@ func main() {
 		switch res
 	*/
 	//finalizar_proceso()
-	detener_planificacion()
-	iniciar_planificacion()
+	//detener_planificacion()
+	//iniciar_planificacion()
+	listar_proceso()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Solamente esqueleto
 func iniciar_proceso() {
-
-	// Establecer ip_memory y puerto (hardcodeado)
-	ip_memory := "localhost"
-	port_memory := 8002
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(BodyIniciarProceso{
@@ -106,9 +109,7 @@ func iniciar_proceso() {
 // Solamente esqueleto
 func finalizar_proceso() {
 
-	// Establecer ip, puerto y pid (hardcodeado)
-	ip_memory := "localhost"
-	port_memory := 8002
+	// Establecer pid (hardcodeado)
 	pid := 0
 
 	// Se declara un nuevo cliente
@@ -146,8 +147,8 @@ func finalizar_proceso() {
 }
 
 func estado_proceso() {
-	ip_memory := "localhost"
-	port_memory := 8002
+
+	// Establecer pid (hardcodeado)
 	pid := 0
 
 	// Se declara un nuevo cliente
@@ -185,10 +186,6 @@ func estado_proceso() {
 }
 
 func iniciar_planificacion() {
-
-	// Establecer ip_cpu y puerto
-	ip_cpu := "localhost"
-	port_cpu := 8006
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
@@ -228,10 +225,6 @@ func iniciar_planificacion() {
 }
 
 func detener_planificacion() {
-
-	// Establecer ip y puerto del cpu
-	ip_cpu := "localhost"
-	port_cpu := 8006
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
@@ -275,10 +268,6 @@ Se encargará de mostrar por consola y retornar por la api el listado de proceso
 que se encuentran en el sistema con su respectivo estado dentro de cada uno de ellos.
 */
 func listar_proceso() {
-
-	// Establecer ip y puerto de la memoria.
-	ip_memory := "localhost"
-	port_memory := 8002
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
