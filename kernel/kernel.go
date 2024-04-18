@@ -145,7 +145,42 @@ func finalizar_proceso() {
 }
 
 func estado_proceso() {
-	//implementar
+	ip_memory := "localhost"
+	port_memory := 8002
+	pid := 0
+
+	// Se declara un nuevo cliente
+	cliente := &http.Client{}
+
+	// Se declara la url a utilizar (depende de una ip y un puerto).
+	url := fmt.Sprintf("http://%s:%d/process/%d", ip_memory, port_memory, pid)
+
+	// Se crea una request donde se "efectúa" un GET hacia la url
+	req, err := http.NewRequest("DELETE", url, nil)
+
+	// Error Handler de la construcción de la request
+	if err != nil {
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		return
+	}
+
+	// Se establecen los headers
+	req.Header.Set("Content-Type", "application/json")
+
+	// Se envía el request al servidor
+	respuesta, err := cliente.Do(req)
+
+	// Error handler de la request
+	if err != nil {
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		return
+	}
+
+	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
+	if respuesta.StatusCode != http.StatusOK {
+		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
+		return
+	}
 }
 
 func iniciar_planificacion() {
