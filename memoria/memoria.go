@@ -33,6 +33,7 @@ func main() {
 	http.HandleFunc("PUT /process", handler_iniciar_proceso)
 	http.HandleFunc("DELETE /process/{pid}", handler_finalizar_proceso)
 	http.HandleFunc("GET /process/{pid}", handler_estado_proceso)
+	http.HandleFunc("GET /process", handler_listar_procesos)
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -116,6 +117,28 @@ func handler_estado_proceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+func handler_listar_procesos(w http.ResponseWriter, r *http.Request) {
+
+	//Harcodea una lista de procesos, más adelante deberá ser dinámico.
+	var listaDeProcesos []ResponseProceso = []ResponseProceso{
+		{Pid: 0, Estado: "READY"},
+		{Pid: 1, Estado: "BLOCK"},
+	}
+
+	//Paso a formato JSON la lista de procesos.
+	respuesta, err := json.Marshal(listaDeProcesos)
+
+	//Check si hubo algún error al parsear el JSON.
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta (con estatus como header) al cliente.
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
 }
