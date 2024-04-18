@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -189,6 +190,7 @@ func iniciar_planificacion() {
 	ip_cpu := "localhost"
 	port_cpu := 8006
 
+	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
@@ -213,7 +215,7 @@ func iniciar_planificacion() {
 	}
 
 	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	//defer respuesta.Body.Close()
+	defer respuesta.Body.Close()
 
 	// Check response recibida.
 	if respuesta.StatusCode != http.StatusOK {
@@ -226,10 +228,12 @@ func iniciar_planificacion() {
 }
 
 func detener_planificacion() {
-	// Establecer ip_cpu y puerto
+
+	// Establecer ip y puerto del cpu
 	ip_cpu := "localhost"
 	port_cpu := 8006
 
+	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
@@ -254,7 +258,7 @@ func detener_planificacion() {
 	}
 
 	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	// defer respuesta.Body.Close()
+	defer respuesta.Body.Close()
 
 	// Check response recibida.
 	if respuesta.StatusCode != http.StatusOK {
@@ -266,8 +270,54 @@ func detener_planificacion() {
 	fmt.Println("Planificación detenida exitosamente.")
 }
 
+/*
+Se encargará de mostrar por consola y retornar por la api el listado de procesos
+que se encuentran en el sistema con su respectivo estado dentro de cada uno de ellos.
+*/
 func listar_proceso() {
-	//implementar
+
+	// Establecer ip y puerto de la memoria.
+	ip_memory := "localhost"
+	port_memory := 8002
+
+	// Se declara un nuevo cliente
+	cliente := &http.Client{}
+
+	// Se declara la url a utilizar (depende de una ip y un puerto).
+	url := fmt.Sprintf("http://%s:%d/process", ip_memory, port_memory)
+
+	// Genera una petición HTTP.
+	req, err := http.NewRequest("GET", url, nil)
+
+	// Check error generando una request.
+	if err != nil {
+		fmt.Printf("Error creando request: %s\n", err.Error())
+		return
+	}
+
+	// Se envía la request al servidor.
+	respuesta, err := cliente.Do(req)
+
+	// Check request enviada.
+	if err != nil {
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		return
+	}
+
+	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
+	defer respuesta.Body.Close()
+
+	if respuesta.StatusCode != http.StatusOK {
+		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return
+	}
+
+	fmt.Println(string(bodyBytes))
 }
 
 func dispatch() {
