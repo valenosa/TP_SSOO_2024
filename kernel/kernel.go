@@ -61,7 +61,7 @@ func main() {
 
 	printConfig(*config)
 
-	estado_proceso(*config)
+	listar_proceso(*config)
 
 }
 
@@ -331,13 +331,13 @@ func detener_planificacion() {
 Se encargará de mostrar por consola y retornar por la api el listado de procesos
 que se encuentran en el sistema con su respectivo estado dentro de cada uno de ellos.
 */
-func listar_proceso() {
+func listar_proceso(config KernelConfig) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", Ip_Memory, Port_Memory)
+	url := fmt.Sprintf("http://%s:%d/process", config.Ip_Memory, config.Port_Memory)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("GET", url, nil)
@@ -353,7 +353,7 @@ func listar_proceso() {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
 		return
 	}
 
