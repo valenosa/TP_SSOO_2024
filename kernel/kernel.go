@@ -61,7 +61,7 @@ func main() {
 
 	printConfig(*config)
 
-	iniciar_planificacion(*config)
+	detener_planificacion(*config)
 
 }
 
@@ -288,13 +288,13 @@ func iniciar_planificacion(config KernelConfig) {
 	fmt.Println("Planificación iniciada exitosamente.")
 }
 
-func detener_planificacion() {
+func detener_planificacion(config KernelConfig) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", Ip_CPU, Port_CPU)
+	url := fmt.Sprintf("http://%s:%d/plani", config.Ip_CPU, config.Port_CPU)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("DELETE", url, nil)
@@ -310,7 +310,7 @@ func detener_planificacion() {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_CPU, Port_CPU)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_CPU, config.Port_CPU)
 		return
 	}
 
