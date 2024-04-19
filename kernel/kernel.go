@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +29,20 @@ var port_memory int = 8002
 var ip_cpu string = "localhost"
 var port_cpu int = 8006
 
+// Estructura cuyo formato concuerda con el del archivo config.json del kernel
+type KernelConfig struct {
+	Port               int      `json:"port"`
+	Ip_Memory          string   `json:"ip_memory"`
+	Port_Memory        int      `json:"port_memory"`
+	Ip_CPU             string   `json:"ip_cpu"`
+	Port_CPU           int      `json:"port_cpu"`
+	Planning_Algorithm string   `json:"planning_algorithm"`
+	Quantum            int      `json:"quantum"`
+	Resources          []string `json:"resources"`          // Está bien el tipo de dato?
+	Resource_Instances []int    `json:"resource_instances"` // Está bien el tipo de dato?
+	Multiprogramming   int      `json:"multiprogramming"`
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
@@ -36,10 +51,57 @@ func main() {
 		res
 		switch res
 	*/
+
 	//finalizar_proceso()
 	//detener_planificacion()
 	//iniciar_planificacion()
-	listar_proceso()
+	//listar_proceso()
+
+	config := iniciarConfiguracion("config.json")
+
+	printConfig(*config)
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////FUNCIONES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Me gustaría hacer que pueda recibir cualquier struct (como cuando usabamos template<typename T> en C++), pero todavía no estoy seguro de como hacerlo.
+// De ser así, podríamos usar una sola función para extraer la info de todos los archivos config.json
+func iniciarConfiguracion(filePath string) *KernelConfig {
+	//En el tp0 usan punteros y guardan la variable en un archivo "globals".
+	// No estoy seguro del motivo, y por ahora no lo veo necesario
+	var config *KernelConfig
+
+	// Abre el archivo
+	configFile, err := os.Open(filePath)
+	if err != nil {
+		// log.Fatal(err.Error())
+		fmt.Println("Error: ", err)
+	}
+	// Cierra el archivo una vez que la función termina (ejecuta el return)
+	defer configFile.Close()
+
+	// Decodifica la info del json en la variable config
+	jsonParser := json.NewDecoder(configFile)
+	jsonParser.Decode(&config)
+
+	// Devuelve config
+	return config
+}
+
+// Utilizado para testear "IniciarConfiguracion()"
+func printConfig(config KernelConfig) {
+
+	fmt.Println("port: ", config.Port)
+	fmt.Println("ip_memory: ", config.Ip_Memory)
+	fmt.Println("port_memory: ", config.Port_Memory)
+	fmt.Println("ip_cpu: ", config.Ip_CPU)
+	fmt.Println("port_cpu: ", config.Port_CPU)
+	fmt.Println("planning_algorithm: ", config.Planning_Algorithm)
+	fmt.Println("quantum: ", config.Quantum)
+	fmt.Println("resources: ", config.Resources)
+	fmt.Println("resource_instances: ", config.Resource_Instances)
+	fmt.Println("multiprogramming: ", config.Multiprogramming)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
