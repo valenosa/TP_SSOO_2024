@@ -61,7 +61,7 @@ func main() {
 
 	printConfig(*config)
 
-	iniciar_proceso(*config)
+	finalizar_proceso(*config)
 
 }
 
@@ -171,7 +171,7 @@ func iniciar_proceso(config KernelConfig) {
 }
 
 // Solamente esqueleto
-func finalizar_proceso() {
+func finalizar_proceso(config KernelConfig) {
 
 	// Establecer pid (hardcodeado)
 	pid := 0
@@ -180,14 +180,14 @@ func finalizar_proceso() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", Ip_Memory, Port_Memory, pid)
+	url := fmt.Sprintf("http://%s:%d/process/%d", config.Ip_Memory, config.Port_Memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
 	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
 		return
 	}
 
@@ -199,7 +199,7 @@ func finalizar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
 		return
 	}
 
