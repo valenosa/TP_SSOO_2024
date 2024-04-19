@@ -23,12 +23,6 @@ type ResponseProceso struct {
 	Estado string `json:"estado"`
 }
 
-// Puertos e ip's de memoria y cpu (luego mover a config.json)
-var Ip_Memory string = "localhost"
-var Port_Memory int = 8002
-var Ip_CPU string = "localhost"
-var Port_CPU int = 8006
-
 // Estructura cuyo formato concuerda con el del archivo config.json del kernel
 type KernelConfig struct {
 	Port               int      `json:"port"`
