@@ -26,8 +26,8 @@ type ResponseProceso struct {
 // Puertos e ip's de memoria y cpu (luego mover a config.json)
 var Ip_Memory string = "localhost"
 var Port_Memory int = 8002
-var ip_cpu string = "localhost"
-var port_cpu int = 8006
+var Ip_CPU string = "localhost"
+var Port_CPU int = 8006
 
 // Estructura cuyo formato concuerda con el del archivo config.json del kernel
 type KernelConfig struct {
@@ -61,7 +61,7 @@ func main() {
 
 	printConfig(*config)
 
-	listar_proceso(*config)
+	iniciar_planificacion(*config)
 
 }
 
@@ -249,13 +249,13 @@ func estado_proceso(config KernelConfig) {
 	}
 }
 
-func iniciar_planificacion() {
+func iniciar_planificacion(config KernelConfig) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", ip_cpu, port_cpu)
+	url := fmt.Sprintf("http://%s:%d/plani", config.Ip_CPU, config.Port_CPU)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("PUT", url, nil)
@@ -271,7 +271,7 @@ func iniciar_planificacion() {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_cpu, port_cpu)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_CPU, config.Port_CPU)
 		return
 	}
 
@@ -294,7 +294,7 @@ func detener_planificacion() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", ip_cpu, port_cpu)
+	url := fmt.Sprintf("http://%s:%d/plani", Ip_CPU, Port_CPU)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("DELETE", url, nil)
@@ -310,7 +310,7 @@ func detener_planificacion() {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_cpu, port_cpu)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_CPU, Port_CPU)
 		return
 	}
 
