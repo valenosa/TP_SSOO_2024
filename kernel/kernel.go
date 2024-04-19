@@ -24,8 +24,8 @@ type ResponseProceso struct {
 }
 
 // Puertos e ip's de memoria y cpu (luego mover a config.json)
-var ip_memory string = "localhost"
-var port_memory int = 8002
+var Ip_Memory string = "localhost"
+var Port_Memory int = 8002
 var ip_cpu string = "localhost"
 var port_cpu int = 8006
 
@@ -60,6 +60,8 @@ func main() {
 	config := iniciarConfiguracion("config.json")
 
 	printConfig(*config)
+
+	iniciar_proceso(*config)
 
 }
 
@@ -107,7 +109,7 @@ func printConfig(config KernelConfig) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Solamente esqueleto
-func iniciar_proceso() {
+func iniciar_proceso(config KernelConfig) {
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(BodyIniciarProceso{
@@ -123,14 +125,14 @@ func iniciar_proceso() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", ip_memory, port_memory)
+	url := fmt.Sprintf("http://%s:%d/process", config.Ip_Memory, config.Port_Memory)
 
 	// Se crea una request donde se "efectúa" un PUT hacia url, enviando el Body anteriormente mencionado
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
 		return
 	}
 
@@ -142,7 +144,7 @@ func iniciar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
 		return
 	}
 
@@ -178,14 +180,14 @@ func finalizar_proceso() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", ip_memory, port_memory, pid)
+	url := fmt.Sprintf("http://%s:%d/process/%d", Ip_Memory, Port_Memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
 	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
 		return
 	}
 
@@ -197,7 +199,7 @@ func finalizar_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
 		return
 	}
 
@@ -217,14 +219,14 @@ func estado_proceso() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", ip_memory, port_memory, pid)
+	url := fmt.Sprintf("http://%s:%d/process/%d", Ip_Memory, Port_Memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
 	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
 		return
 	}
 
@@ -236,7 +238,7 @@ func estado_proceso() {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
 		return
 	}
 
@@ -335,7 +337,7 @@ func listar_proceso() {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", ip_memory, port_memory)
+	url := fmt.Sprintf("http://%s:%d/process", Ip_Memory, Port_Memory)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("GET", url, nil)
@@ -351,7 +353,7 @@ func listar_proceso() {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip_memory, port_memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", Ip_Memory, Port_Memory)
 		return
 	}
 
