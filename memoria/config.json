@@ -1,0 +1,7 @@
+{
+    "port": 8002,
+    "memory_size": 4096,
+    "page_size": 16,
+    "instructions_path": "/home/utnso/mappa-pruebas",
+    "delay_response": 1000
+}
