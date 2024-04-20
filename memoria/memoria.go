@@ -6,18 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 )
 
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 type MemoriaConfig struct {
 	Port              int    `json:"port"`
 	Memory_Size       int    `json:"memory_size"`
 	Page_Size         int    `json:"page_size"`
 	Instructions_Path string `json:"instructions_path"`
-	Delay_response    int    `json:"delay_response"`
+	Delay_Response    int    `json:"delay_response"`
 }
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Declaración temporal. Próximamente las estructuras compartidas se encontrarán unificadas en un archivo
 type BodyIniciarProceso struct {
@@ -42,7 +42,42 @@ func main() {
 	http.HandleFunc("DELETE /process/{pid}", handler_finalizar_proceso)
 	http.HandleFunc("GET /process/{pid}", handler_estado_proceso)
 	http.HandleFunc("GET /process", handler_listar_procesos)
-	http.ListenAndServe(":8002", nil)
+
+	// Extrae info de config.json
+	config := iniciarConfiguracion("config.json")
+
+	// declaro puerto
+	port := ":" + strconv.Itoa(config.Port)
+
+	// Listen and serve con info del config.json
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al esuchar en el puerto " + port)
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////FUNCIONES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func iniciarConfiguracion(filePath string) *MemoriaConfig {
+	//En el tp0 usan punteros y guardan la variable en un archivo "globals".
+	// No estoy seguro del motivo, y por ahora no lo veo necesario
+	var config *MemoriaConfig
+
+	// Abre el archivo
+	configFile, err := os.Open(filePath)
+	if err != nil {
+		// log.Fatal(err.Error())
+		fmt.Println("Error: ", err)
+	}
+	// Cierra el archivo una vez que la función termina (ejecuta el return)
+	defer configFile.Close()
+
+	// Decodifica la info del json en la variable config
+	jsonParser := json.NewDecoder(configFile)
+	jsonParser.Decode(&config)
+
+	// Devuelve config
+	return config
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////HANDLERS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +100,7 @@ func handler_iniciar_proceso(w http.ResponseWriter, r *http.Request) {
 	// Imprime el request por consola (del lado del server)
 	fmt.Printf("Request path: %s\n", request)
 
-	//Crea una variable tipo ResponseIniciarProceso (para confeccionar una respuesta)
+	//Crea una variable tipo ResponseProceso (para confeccionar una respuesta)
 	var respBody ResponseProceso = ResponseProceso{Pid: 0}
 
 	// Codificar Response en un array de bytes (formato json)
@@ -116,14 +151,18 @@ func handler_estado_proceso(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
 		return
 	}
-	var respBody ResponseProceso = ResponseProceso{Pid: pid, Estado: "ready"}
+	//Crea una variable tipo ResponseProceso (para confeccionar una respuesta)
+	var respBody ResponseProceso = ResponseProceso{Pid: pid, Estado: "ejemplo"}
 
+	// Codificar Response en un array de bytes (formato json)
 	respuesta, err := json.Marshal(respBody)
 
+	// Error Handler de la codificación
 	if err != nil {
 		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
 		return
 	}
+
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)

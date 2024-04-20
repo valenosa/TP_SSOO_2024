@@ -46,15 +46,14 @@ func main() {
 		switch res
 	*/
 
-	//finalizar_proceso()
-	//detener_planificacion()
-	//iniciar_planificacion()
-	//listar_proceso()
-
 	config := iniciarConfiguracion("config.json")
 
 	iniciar_proceso(*config)
+	finalizar_proceso(*config)
+	estado_proceso(*config)
 	detener_planificacion(*config)
+	iniciar_planificacion(*config)
+	listar_proceso(*config)
 
 }
 
@@ -214,7 +213,7 @@ func estado_proceso(config KernelConfig) {
 	// Se declara la url a utilizar (depende de una ip y un puerto).
 	url := fmt.Sprintf("http://%s:%d/process/%d", config.Ip_Memory, config.Port_Memory, pid)
 
-	// Se crea una request donde se "efectúa" un GET hacia la url
+	// Se crea una request donde se "efectúa" un DELETE hacia la url
 	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
@@ -240,6 +239,28 @@ func estado_proceso(config KernelConfig) {
 		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
 		return
 	}
+
+	/*Por algún motivo no funciona la decidificación; error: json: cannot unmarshal string into Go value of type main.ResponseProceso
+
+	// Se declara una nueva variable que contendrá la respuesta del servidor
+	var response ResponseProceso
+
+	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
+	err = json.NewDecoder(respuesta.Body).Decode(&response)
+
+	fmt.Println(respuesta.Body)
+
+	// Error Handler para al decodificación
+	if err != nil {
+		fmt.Printf("Error decodificando\n")
+		fmt.Println(err)
+		return
+	}
+
+	// Imprime pid (parámetro de la estructura)
+	fmt.Println(response)
+	*/
+
 }
 
 func iniciar_planificacion(config KernelConfig) {
