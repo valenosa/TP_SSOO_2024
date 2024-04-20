@@ -9,24 +9,23 @@ import (
 )
 
 type inputOutpConfig struct {
-	Port               int      `json:"port"`
-	Ip_Memory          string   `json:"ip_memory"`
-	Port_Memory        int      `json:"port_memory"`
-	Ip_CPU             string   `json:"ip_cpu"`
-	Port_CPU           int      `json:"port_cpu"`
-	Planning_Algorithm string   `json:"planning_algorithm"`
-	Quantum            int      `json:"quantum"`
-	Resources          []string `json:"resources"`          // Está bien el tipo de dato?
-	Resource_Instances []int    `json:"resource_instances"` // Está bien el tipo de dato?
-	Multiprogramming   int      `json:"multiprogramming"`
+	Port               int    `json:"port"`
+	Type               string `json:"type"`
+	Unit_Work_Time     int    `json:"unit_work_time"`
+	Ip_Kernel          string `json:"ip_kernel"`
+	Port_Kernel        int    `json:"port_kernel"`
+	Ip_Memory          string `json:"ip_memory"`
+	Port_Memory        int    `json:"port_memory"`
+	Dialfs_Path        string `json:"dialfs_path"`
+	Dialfs_Block_Size  int    `json:"dialfs_block_size"`
+	Dialfs_Block_Count int    `json:"dialfs_block_count"`
 }
 
 func main() {
 
 	config := iniciarConfiguracion("config.json")
-	printConfig(*config)
 
-	http.HandleFunc("GET", entradaSalida)
+	http.HandleFunc("GET /holamundo", entradaSalida)
 
 	port := ":" + strconv.Itoa(config.Port)
 	err := http.ListenAndServe(port, nil)
@@ -63,20 +62,17 @@ func iniciarConfiguracion(filePath string) *inputOutpConfig {
 	return config
 }
 
-func printConfig(config inputOutpConfig) {
-
-	fmt.Println("port: ", config.Port)
-	fmt.Println("ip_memory: ", config.Ip_Memory)
-	fmt.Println("port_memory: ", config.Port_Memory)
-	fmt.Println("ip_cpu: ", config.Ip_CPU)
-	fmt.Println("port_cpu: ", config.Port_CPU)
-	fmt.Println("planning_algorithm: ", config.Planning_Algorithm)
-	fmt.Println("quantum: ", config.Quantum)
-	fmt.Println("resources: ", config.Resources)
-	fmt.Println("resource_instances: ", config.Resource_Instances)
-	fmt.Println("multiprogramming: ", config.Multiprogramming)
-}
-
 func entradaSalida(w http.ResponseWriter, r *http.Request) {
+
+	respuesta, err := json.Marshal("Hello world! Soy una consola de I/O")
+
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+
 	fmt.Println("Hello world! Soy una consola de I/O")
 }
