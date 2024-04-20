@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-type inputOutpConfig struct {
+type InputOutConfig struct {
 	Port               int    `json:"port"`
 	Type               string `json:"type"`
 	Unit_Work_Time     int    `json:"unit_work_time"`
@@ -40,10 +40,10 @@ func main() {
 	PARA LOS LOGS*/
 }
 
-func iniciarConfiguracion(filePath string) *inputOutpConfig {
+func iniciarConfiguracion(filePath string) *InputOutConfig {
 	//En el tp0 usan punteros y guardan la variable en un archivo "globals".
 	// No estoy seguro del motivo, y por ahora no lo veo necesario
-	var config *inputOutpConfig
+	var config *InputOutConfig
 
 	// Abre el archivo
 	configFile, err := os.Open(filePath)
