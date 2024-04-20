@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,14 +47,27 @@ func main() {
 		switch res
 	*/
 
+	// Extrae info de config.json
 	config := iniciarConfiguracion("config.json")
 
-	iniciar_proceso(*config)
-	finalizar_proceso(*config)
-	estado_proceso(*config)
-	detener_planificacion(*config)
-	iniciar_planificacion(*config)
-	listar_proceso(*config)
+	// Establezco petición
+	http.HandleFunc("GET /holamundo", kernel)
+
+	// declaro puerto
+	port := ":" + strconv.Itoa(config.Port)
+
+	// Listen and serve con info del config.json
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al esuchar en el puerto " + port)
+	}
+
+	// iniciar_proceso(*config)
+	// finalizar_proceso(*config)
+	// estado_proceso(*config)
+	// detener_planificacion(*config)
+	// iniciar_planificacion(*config)
+	// listar_proceso(*config)
 
 }
 
@@ -96,6 +110,21 @@ func printConfig(config KernelConfig) {
 	fmt.Println("resources: ", config.Resources)
 	fmt.Println("resource_instances: ", config.Resource_Instances)
 	fmt.Println("multiprogramming: ", config.Multiprogramming)
+}
+
+func kernel(w http.ResponseWriter, r *http.Request) {
+
+	respuesta, err := json.Marshal("Hello world! Soy una consola del kernel")
+
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+
+	fmt.Println("Hello world! Soy una consola del kernel")
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
