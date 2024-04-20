@@ -9,6 +9,14 @@ import (
 	"strconv"
 )
 
+type MemoriaConfig struct {
+	Port              int    `json:"port"`
+	Memory_Size       int    `json:"memory_size"`
+	Page_Size         int    `json:"page_size"`
+	Instructions_Path string `json:"instructions_path"`
+	Delay_response    int    `json:"delay_response"`
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Declaración temporal. Próximamente las estructuras compartidas se encontrarán unificadas en un archivo

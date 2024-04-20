@@ -53,8 +53,7 @@ func main() {
 
 	config := iniciarConfiguracion("config.json")
 
-	printConfig(*config)
-
+	iniciar_proceso(*config)
 	detener_planificacion(*config)
 
 }
