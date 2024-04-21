@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,26 +41,9 @@ type KernelConfig struct {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
-	/*
-		read(GET, body) => que hay que hacer
-		res
-		switch res
-	*/
 
 	// Extrae info de config.json
 	config := iniciarConfiguracion("config.json")
-
-	// Establezco petición
-	// http.HandleFunc("GET /holamundo", kernel)
-
-	// // declaro puerto
-	// port := ":" + strconv.Itoa(config.Port)
-
-	// // Listen and serve con info del config.json
-	// err := http.ListenAndServe(port, nil)
-	// if err != nil {
-	// 	fmt.Println("Error al esuchar en el puerto " + port)
-	// }
 
 	iniciar_proceso(*config)
 	finalizar_proceso(*config)
@@ -67,6 +51,18 @@ func main() {
 	detener_planificacion(*config)
 	iniciar_planificacion(*config)
 	listar_proceso(*config)
+
+	// Establezco petición
+	http.HandleFunc("GET /holamundo", kernel)
+
+	// declaro puerto
+	port := ":" + strconv.Itoa(config.Port)
+
+	// Listen and serve con info del config.json
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al esuchar en el puerto " + port)
+	}
 
 }
 
