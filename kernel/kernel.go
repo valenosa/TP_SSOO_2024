@@ -46,16 +46,27 @@ func main() {
 		switch res
 	*/
 
-	//finalizar_proceso()
-	//detener_planificacion()
-	//iniciar_planificacion()
-	//listar_proceso()
-
+	// Extrae info de config.json
 	config := iniciarConfiguracion("config.json")
 
-	printConfig(*config)
+	// Establezco petición
+	// http.HandleFunc("GET /holamundo", kernel)
 
+	// // declaro puerto
+	// port := ":" + strconv.Itoa(config.Port)
+
+	// // Listen and serve con info del config.json
+	// err := http.ListenAndServe(port, nil)
+	// if err != nil {
+	// 	fmt.Println("Error al esuchar en el puerto " + port)
+	// }
+
+	iniciar_proceso(*config)
+	finalizar_proceso(*config)
+	estado_proceso(*config)
 	detener_planificacion(*config)
+	iniciar_planificacion(*config)
+	listar_proceso(*config)
 
 }
 
@@ -98,6 +109,21 @@ func printConfig(config KernelConfig) {
 	fmt.Println("resources: ", config.Resources)
 	fmt.Println("resource_instances: ", config.Resource_Instances)
 	fmt.Println("multiprogramming: ", config.Multiprogramming)
+}
+
+func kernel(w http.ResponseWriter, r *http.Request) {
+
+	respuesta, err := json.Marshal("Hello world! Soy una consola del kernel")
+
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+
+	fmt.Println("Hello world! Soy una consola del kernel")
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,7 +242,7 @@ func estado_proceso(config KernelConfig) {
 	url := fmt.Sprintf("http://%s:%d/process/%d", config.Ip_Memory, config.Port_Memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
@@ -241,6 +267,23 @@ func estado_proceso(config KernelConfig) {
 		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
 		return
 	}
+
+	// Se declara una nueva variable que contendrá la respuesta del servidor
+	var response ResponseProceso
+
+	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
+	err = json.NewDecoder(respuesta.Body).Decode(&response)
+
+	// Error Handler para al decodificación
+	if err != nil {
+		fmt.Printf("Error decodificando\n")
+		fmt.Println(err)
+		return
+	}
+
+	// Imprime pid (parámetro de la estructura)
+	fmt.Println(response)
+
 }
 
 func iniciar_planificacion(config KernelConfig) {
