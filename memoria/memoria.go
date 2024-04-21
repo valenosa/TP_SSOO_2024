@@ -152,7 +152,7 @@ func handler_estado_proceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//Crea una variable tipo ResponseProceso (para confeccionar una respuesta)
-	var respBody ResponseProceso = ResponseProceso{Pid: pid, Estado: "ejemplo"}
+	var respBody ResponseProceso = ResponseProceso{Pid: pid, Estado: "READY"}
 
 	// Codificar Response en un array de bytes (formato json)
 	respuesta, err := json.Marshal(respBody)

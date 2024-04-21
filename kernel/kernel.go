@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 )
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,23 +50,23 @@ func main() {
 	config := iniciarConfiguracion("config.json")
 
 	// Establezco petición
-	http.HandleFunc("GET /holamundo", kernel)
+	// http.HandleFunc("GET /holamundo", kernel)
 
-	// declaro puerto
-	port := ":" + strconv.Itoa(config.Port)
+	// // declaro puerto
+	// port := ":" + strconv.Itoa(config.Port)
 
-	// Listen and serve con info del config.json
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Error al esuchar en el puerto " + port)
-	}
+	// // Listen and serve con info del config.json
+	// err := http.ListenAndServe(port, nil)
+	// if err != nil {
+	// 	fmt.Println("Error al esuchar en el puerto " + port)
+	// }
 
-	// iniciar_proceso(*config)
-	// finalizar_proceso(*config)
-	// estado_proceso(*config)
-	// detener_planificacion(*config)
-	// iniciar_planificacion(*config)
-	// listar_proceso(*config)
+	iniciar_proceso(*config)
+	finalizar_proceso(*config)
+	estado_proceso(*config)
+	detener_planificacion(*config)
+	iniciar_planificacion(*config)
+	listar_proceso(*config)
 
 }
 
@@ -242,8 +241,8 @@ func estado_proceso(config KernelConfig) {
 	// Se declara la url a utilizar (depende de una ip y un puerto).
 	url := fmt.Sprintf("http://%s:%d/process/%d", config.Ip_Memory, config.Port_Memory, pid)
 
-	// Se crea una request donde se "efectúa" un DELETE hacia la url
-	req, err := http.NewRequest("DELETE", url, nil)
+	// Se crea una request donde se "efectúa" un GET hacia la url
+	req, err := http.NewRequest("GET", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
@@ -269,15 +268,11 @@ func estado_proceso(config KernelConfig) {
 		return
 	}
 
-	/*Por algún motivo no funciona la decidificación; error: json: cannot unmarshal string into Go value of type main.ResponseProceso
-
 	// Se declara una nueva variable que contendrá la respuesta del servidor
 	var response ResponseProceso
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
 	err = json.NewDecoder(respuesta.Body).Decode(&response)
-
-	fmt.Println(respuesta.Body)
 
 	// Error Handler para al decodificación
 	if err != nil {
@@ -288,7 +283,6 @@ func estado_proceso(config KernelConfig) {
 
 	// Imprime pid (parámetro de la estructura)
 	fmt.Println(response)
-	*/
 
 }
 
