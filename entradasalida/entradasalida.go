@@ -23,21 +23,20 @@ type InputOutConfig struct {
 
 func main() {
 
-	config := iniciarConfiguracion("config.json")
-
+	// Establezco petición
 	http.HandleFunc("GET /holamundo", entradaSalida)
 
+	// Extrae info de config.json
+	config := iniciarConfiguracion("config.json")
+
+	// declaro puerto
 	port := ":" + strconv.Itoa(config.Port)
+
+	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		fmt.Println("Error al esuchar en el puerto " + port)
 	}
-	/*if err == nil {
-		fmt.Println("Estoy escuchando en el puerto " + port)
-	} else {
-		fmt.Println("Error al esuchar en el puerto " + port)
-	}
-	PARA LOS LOGS*/
 }
 
 func iniciarConfiguracion(filePath string) *InputOutConfig {
