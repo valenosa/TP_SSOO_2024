@@ -43,14 +43,20 @@ type KernelConfig struct {
 func main() {
 
 	// Extrae info de config.json
-	config := iniciarConfiguracion("config.json")
 
-	iniciar_proceso(*config)
-	finalizar_proceso(*config)
-	estado_proceso(*config)
-	detener_planificacion(*config)
-	iniciar_planificacion(*config)
-	listar_proceso(*config)
+	var config KernelConfig
+	err := iniciarConfiguracion("config.json", &config)
+
+	if err != nil {
+		fmt.Println("Error al iniciar configuración: ", err)
+	}
+
+	iniciar_proceso(config)
+	finalizar_proceso(config)
+	estado_proceso(config)
+	detener_planificacion(config)
+	iniciar_planificacion(config)
+	listar_proceso(config)
 
 	// Establezco petición
 	http.HandleFunc("GET /holamundo", kernel)
@@ -59,7 +65,7 @@ func main() {
 	port := ":" + strconv.Itoa(config.Port)
 
 	// Listen and serve con info del config.json
-	err := http.ListenAndServe(port, nil)
+	err = http.ListenAndServe(port, nil)
 	if err != nil {
 		fmt.Println("Error al esuchar en el puerto " + port)
 	}
@@ -68,28 +74,25 @@ func main() {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////FUNCIONES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Me gustaría hacer que pueda recibir cualquier struct (como cuando usabamos template<typename T> en C++), pero todavía no estoy seguro de como hacerlo.
-// De ser así, podríamos usar una sola función para extraer la info de todos los archivos config.json
-func iniciarConfiguracion(filePath string) *KernelConfig {
-	//En el tp0 usan punteros y guardan la variable en un archivo "globals".
-	// No estoy seguro del motivo, y por ahora no lo veo necesario
-	var config *KernelConfig
-
+// Se implementó el uso de interface{} a la función. De esta manera, la misma puede recibir distintos tipos de datos, o en este caso, estructuras (polimorfismo).
+// Gracias a esta implementación, luego la función podrá ser trasladada a un paquete aparte y ser utilizada por todos los módulos.
+func iniciarConfiguracion(filePath string, config interface{}) error {
 	// Abre el archivo
 	configFile, err := os.Open(filePath)
 	if err != nil {
-		// log.Fatal(err.Error())
-		fmt.Println("Error: ", err)
+		return err
 	}
 	// Cierra el archivo una vez que la función termina (ejecuta el return)
 	defer configFile.Close()
 
 	// Decodifica la info del json en la variable config
 	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
+	err = jsonParser.Decode(config)
+	if err != nil {
+		return err
+	}
 
-	// Devuelve config
-	return config
+	return nil
 }
 
 // Utilizado para testear "IniciarConfiguracion()"
