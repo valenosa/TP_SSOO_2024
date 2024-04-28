@@ -6,18 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
+
+	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-type MemoriaConfig struct {
-	Port              int    `json:"port"`
-	Memory_Size       int    `json:"memory_size"`
-	Page_Size         int    `json:"page_size"`
-	Instructions_Path string `json:"instructions_path"`
-	Delay_Response    int    `json:"delay_response"`
-}
 
 // Declaración temporal. Próximamente las estructuras compartidas se encontrarán unificadas en un archivo
 type BodyIniciarProceso struct {
@@ -44,10 +38,12 @@ func main() {
 	http.HandleFunc("GET /process", handler_listar_procesos)
 
 	// Extrae info de config.json
-	config := iniciarConfiguracion("config.json")
+	var configJson config.Memoria
+
+	config.Iniciar("config.json", &configJson)
 
 	// declaro puerto
-	port := ":" + strconv.Itoa(config.Port)
+	port := ":" + strconv.Itoa(configJson.Port)
 
 	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
@@ -57,28 +53,6 @@ func main() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////FUNCIONES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func iniciarConfiguracion(filePath string) *MemoriaConfig {
-	//En el tp0 usan punteros y guardan la variable en un archivo "globals".
-	// No estoy seguro del motivo, y por ahora no lo veo necesario
-	var config *MemoriaConfig
-
-	// Abre el archivo
-	configFile, err := os.Open(filePath)
-	if err != nil {
-		// log.Fatal(err.Error())
-		fmt.Println("Error: ", err)
-	}
-	// Cierra el archivo una vez que la función termina (ejecuta el return)
-	defer configFile.Close()
-
-	// Decodifica la info del json en la variable config
-	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
-
-	// Devuelve config
-	return config
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////HANDLERS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

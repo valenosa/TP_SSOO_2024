@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
+
+	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,48 +25,30 @@ type ResponseProceso struct {
 	Estado string `json:"estado"`
 }
 
-// Estructura cuyo formato concuerda con el del archivo config.json del kernel
-type KernelConfig struct {
-	Port               int      `json:"port"`
-	Ip_Memory          string   `json:"ip_memory"`
-	Port_Memory        int      `json:"port_memory"`
-	Ip_CPU             string   `json:"ip_cpu"`
-	Port_CPU           int      `json:"port_cpu"`
-	Planning_Algorithm string   `json:"planning_algorithm"`
-	Quantum            int      `json:"quantum"`
-	Resources          []string `json:"resources"`          // Está bien el tipo de dato?
-	Resource_Instances []int    `json:"resource_instances"` // Está bien el tipo de dato?
-	Multiprogramming   int      `json:"multiprogramming"`
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
 
 	// Extrae info de config.json
+	var configJson config.Kernel
 
-	var config KernelConfig
-	err := iniciarConfiguracion("config.json", &config)
+	config.Iniciar("config.json", &configJson)
 
-	if err != nil {
-		fmt.Println("Error al iniciar configuración: ", err)
-	}
-
-	iniciar_proceso(config)
-	finalizar_proceso(config)
-	estado_proceso(config)
-	detener_planificacion(config)
-	iniciar_planificacion(config)
-	listar_proceso(config)
+	iniciar_proceso(configJson)
+	finalizar_proceso(configJson)
+	estado_proceso(configJson)
+	detener_planificacion(configJson)
+	iniciar_planificacion(configJson)
+	listar_proceso(configJson)
 
 	// Establezco petición
 	http.HandleFunc("GET /holamundo", kernel)
 
 	// declaro puerto
-	port := ":" + strconv.Itoa(config.Port)
+	port := ":" + strconv.Itoa(configJson.Port)
 
 	// Listen and serve con info del config.json
-	err = http.ListenAndServe(port, nil)
+	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		fmt.Println("Error al esuchar en el puerto " + port)
 	}
@@ -73,42 +56,6 @@ func main() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////FUNCIONES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Se implementó el uso de interface{} a la función. De esta manera, la misma puede recibir distintos tipos de datos, o en este caso, estructuras (polimorfismo).
-// Gracias a esta implementación, luego la función podrá ser trasladada a un paquete aparte y ser utilizada por todos los módulos.
-func iniciarConfiguracion(filePath string, config interface{}) error {
-	// Abre el archivo
-	configFile, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	// Cierra el archivo una vez que la función termina (ejecuta el return)
-	defer configFile.Close()
-
-	// Decodifica la info del json en la variable config
-	jsonParser := json.NewDecoder(configFile)
-	err = jsonParser.Decode(config)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Utilizado para testear "IniciarConfiguracion()"
-func printConfig(config KernelConfig) {
-
-	fmt.Println("port: ", config.Port)
-	fmt.Println("ip_memory: ", config.Ip_Memory)
-	fmt.Println("port_memory: ", config.Port_Memory)
-	fmt.Println("ip_cpu: ", config.Ip_CPU)
-	fmt.Println("port_cpu: ", config.Port_CPU)
-	fmt.Println("planning_algorithm: ", config.Planning_Algorithm)
-	fmt.Println("quantum: ", config.Quantum)
-	fmt.Println("resources: ", config.Resources)
-	fmt.Println("resource_instances: ", config.Resource_Instances)
-	fmt.Println("multiprogramming: ", config.Multiprogramming)
-}
 
 func kernel(w http.ResponseWriter, r *http.Request) {
 
@@ -128,7 +75,7 @@ func kernel(w http.ResponseWriter, r *http.Request) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////API's//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Solamente esqueleto
-func iniciar_proceso(config KernelConfig) {
+func iniciar_proceso(configJson config.Kernel) {
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(BodyIniciarProceso{
@@ -144,14 +91,14 @@ func iniciar_proceso(config KernelConfig) {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", config.Ip_Memory, config.Port_Memory)
+	url := fmt.Sprintf("http://%s:%d/process", configJson.Ip_Memory, configJson.Port_Memory)
 
 	// Se crea una request donde se "efectúa" un PUT hacia url, enviando el Body anteriormente mencionado
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 
@@ -163,7 +110,7 @@ func iniciar_proceso(config KernelConfig) {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 
@@ -190,7 +137,7 @@ func iniciar_proceso(config KernelConfig) {
 }
 
 // Solamente esqueleto
-func finalizar_proceso(config KernelConfig) {
+func finalizar_proceso(configJson config.Kernel) {
 
 	// Establecer pid (hardcodeado)
 	pid := 0
@@ -199,14 +146,14 @@ func finalizar_proceso(config KernelConfig) {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", config.Ip_Memory, config.Port_Memory, pid)
+	url := fmt.Sprintf("http://%s:%d/process/%d", configJson.Ip_Memory, configJson.Port_Memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
 	req, err := http.NewRequest("DELETE", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 
@@ -218,7 +165,7 @@ func finalizar_proceso(config KernelConfig) {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 
@@ -229,7 +176,7 @@ func finalizar_proceso(config KernelConfig) {
 	}
 }
 
-func estado_proceso(config KernelConfig) {
+func estado_proceso(configJson config.Kernel) {
 
 	// Establecer pid (hardcodeado)
 	pid := 0
@@ -238,14 +185,14 @@ func estado_proceso(config KernelConfig) {
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", config.Ip_Memory, config.Port_Memory, pid)
+	url := fmt.Sprintf("http://%s:%d/process/%d", configJson.Ip_Memory, configJson.Port_Memory, pid)
 
 	// Se crea una request donde se "efectúa" un GET hacia la url
 	req, err := http.NewRequest("GET", url, nil)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 
@@ -257,7 +204,7 @@ func estado_proceso(config KernelConfig) {
 
 	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 
@@ -285,13 +232,13 @@ func estado_proceso(config KernelConfig) {
 
 }
 
-func iniciar_planificacion(config KernelConfig) {
+func iniciar_planificacion(configJson config.Kernel) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", config.Ip_CPU, config.Port_CPU)
+	url := fmt.Sprintf("http://%s:%d/plani", configJson.Ip_CPU, configJson.Port_CPU)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("PUT", url, nil)
@@ -307,7 +254,7 @@ func iniciar_planificacion(config KernelConfig) {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_CPU, config.Port_CPU)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_CPU, configJson.Port_CPU)
 		return
 	}
 
@@ -324,13 +271,13 @@ func iniciar_planificacion(config KernelConfig) {
 	fmt.Println("Planificación iniciada exitosamente.")
 }
 
-func detener_planificacion(config KernelConfig) {
+func detener_planificacion(configJson config.Kernel) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", config.Ip_CPU, config.Port_CPU)
+	url := fmt.Sprintf("http://%s:%d/plani", configJson.Ip_CPU, configJson.Port_CPU)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("DELETE", url, nil)
@@ -346,7 +293,7 @@ func detener_planificacion(config KernelConfig) {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_CPU, config.Port_CPU)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_CPU, configJson.Port_CPU)
 		return
 	}
 
@@ -367,13 +314,13 @@ func detener_planificacion(config KernelConfig) {
 Se encargará de mostrar por consola y retornar por la api el listado de procesos
 que se encuentran en el sistema con su respectivo estado dentro de cada uno de ellos.
 */
-func listar_proceso(config KernelConfig) {
+func listar_proceso(configJson config.Kernel) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", config.Ip_Memory, config.Port_Memory)
+	url := fmt.Sprintf("http://%s:%d/process", configJson.Ip_Memory, configJson.Port_Memory)
 
 	// Genera una petición HTTP.
 	req, err := http.NewRequest("GET", url, nil)
@@ -389,7 +336,7 @@ func listar_proceso(config KernelConfig) {
 
 	// Check request enviada.
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", config.Ip_Memory, config.Port_Memory)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
 		return
 	}
 

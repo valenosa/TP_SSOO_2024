@@ -6,18 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
-)
 
-// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////STRUCTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-type CpuConfig struct {
-	Port               int    `json:"port"`
-	Ip_Memory          string `json:"ip_memory"`
-	Port_Memory        int    `json:"port_memory"`
-	Number_Felling_tlb int    `json: "number_felling_tlb"`
-	Algorithm_tlb      string `json: "algorithm_tlb"`
-}
+	"github.com/sisoputnfrba/tp-golang/utils/config"
+)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,10 +20,12 @@ func main() {
 	http.HandleFunc("DELETE /plani", handler_detener_planificacion)
 
 	// Extrae info de config.json
-	config := iniciarConfiguracion("config.json")
+	var configJson config.Cpu
+
+	config.Iniciar("config.json", &configJson)
 
 	// declaro puerto
-	port := ":" + strconv.Itoa(config.Port)
+	port := ":" + strconv.Itoa(configJson.Port)
 
 	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
@@ -41,28 +35,6 @@ func main() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////FUNCIONES/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func iniciarConfiguracion(filePath string) *CpuConfig {
-	//En el tp0 usan punteros y guardan la variable en un archivo "globals".
-	// No estoy seguro del motivo, y por ahora no lo veo necesario
-	var config *CpuConfig
-
-	// Abre el archivo
-	configFile, err := os.Open(filePath)
-	if err != nil {
-		// log.Fatal(err.Error())
-		fmt.Println("Error: ", err)
-	}
-	// Cierra el archivo una vez que la función termina (ejecuta el return)
-	defer configFile.Close()
-
-	// Decodifica la info del json en la variable config
-	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
-
-	// Devuelve config
-	return config
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////HANDLERS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
