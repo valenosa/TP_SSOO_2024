@@ -50,6 +50,8 @@ type Memoria struct {
 	Delay_Response    int    `json:"delay_response"`
 }
 
+//FUNCIONES PARA EXTRAER INFO DEL config.json////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Se implementó el uso de interface{} a la función. De esta manera, la misma puede recibir distintos tipos de datos, o en este caso, estructuras (polimorfismo).
 // Gracias a esta implementación, luego la función podrá ser trasladada a un paquete aparte y ser utilizada por todos los módulos.
 func Decode(filePath string, configJson interface{}) error {
@@ -79,6 +81,8 @@ func Iniciar(filePath string, configJson interface{}) {
 		fmt.Println("Error al iniciar configuración: ", err)
 	}
 }
+
+//FUNCIONES PARA TESTEAR////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Utilizado para testear "IniciarConfiguracion()"
 func printConfig(configJson Kernel) {
