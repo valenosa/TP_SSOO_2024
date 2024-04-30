@@ -20,6 +20,46 @@ type BodyIniciar struct {
 	Path string `json:"path"`
 }
 
+//--FUNCIONES AUX--
+
+func enviarBodyRequest(metodo string, query string, body []byte, port int, ip string) *http.Response {
+	// Se declara un nuevo cliente
+	cliente := &http.Client{}
+
+	// Se declara la url a utilizar (depende de una ip y un puerto).
+	url := fmt.Sprintf("http://%s:%d/%s", ip, port, query)
+
+	// Se crea una request donde se "efectúa" el metodo (PUT / DELETE / GET / POST) hacia url, enviando el Body si lo hay
+	req, err := http.NewRequest(metodo, url, bytes.NewBuffer(body))
+
+	// Error Handler de la construcción de la request
+	if err != nil {
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, port)
+		return nil
+	}
+
+	// Se establecen los headers
+	req.Header.Set("Content-Type", "application/json")
+
+	// Se envía el request al servidor
+	respuesta, err := cliente.Do(req)
+
+	// Error handler de la request
+	if err != nil {
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port)
+		return nil
+	}
+
+	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
+	if respuesta.StatusCode != http.StatusOK {
+		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
+		return nil
+	}
+
+	fmt.Printf("%s %s exitoso. \n", metodo, query)
+	return respuesta
+}
+
 //--CALLS--
 
 // Solamente esqueleto
@@ -35,39 +75,12 @@ func Iniciar(configJson config.Kernel) {
 		return
 	}
 
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
+	respuesta := enviarBodyRequest("PUT", "process", body, configJson.Port_Memory, configJson.Ip_Memory)
 
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", configJson.Ip_Memory, configJson.Port_Memory)
-
-	// Se crea una request donde se "efectúa" un PUT hacia url, enviando el Body anteriormente mencionado
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
-
-	// Error Handler de la construcción de la request
-	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
 		return
 	}
-
-	// Se establecen los headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Se envía el request al servidor
-	respuesta, err := cliente.Do(req)
-
-	// Error handler de la request
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
-		return
-	}
-
-	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return
-	}
-
 	// Se declara una nueva variable que contendrá la respuesta del servidor
 	var response Response
 

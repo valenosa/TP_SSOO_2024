@@ -14,82 +14,51 @@ import (
 
 ////CALLS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func Iniciar(configJson config.Kernel) {
-
+func enviarRequest(metodo string, query string, port int, ip string) {
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
 
 	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", configJson.Ip_CPU, configJson.Port_CPU)
+	url := fmt.Sprintf("http://%s:%d/%s", ip, port, query)
 
-	// Genera una petición HTTP.
-	req, err := http.NewRequest("PUT", url, nil)
+	// Se crea una request donde se "efectúa" el metodo (PUT / DELETE / GET / POST) hacia url, enviando el Body si lo hay
+	req, err := http.NewRequest(metodo, url, nil)
 
-	// Check error generando una request.
+	// Error Handler de la construcción de la request
 	if err != nil {
-		fmt.Printf("Error creando request: %s\n", err.Error())
+		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, port)
 		return
 	}
 
-	// Se envía la request al servidor.
+	// Se establecen los headers
+	req.Header.Set("Content-Type", "application/json")
+
+	// Se envía el request al servidor
 	respuesta, err := cliente.Do(req)
 
-	// Check request enviada.
+	// Error handler de la request
 	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_CPU, configJson.Port_CPU)
+		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port)
 		return
 	}
 
-	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	defer respuesta.Body.Close()
-
-	// Check response recibida.
+	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
 	if respuesta.StatusCode != http.StatusOK {
 		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
 		return
 	}
 
-	// Todo salió bien, la planificación se inició correctamente.
-	fmt.Println("Planificación iniciada exitosamente.")
+	//Todo salió bien
+	fmt.Printf("%s %s exitoso \n", metodo, query)
+}
+
+func Iniciar(configJson config.Kernel) {
+	enviarRequest("PUT", "plani", configJson.Port_CPU, configJson.Ip_CPU)
 }
 
 func Detener(configJson config.Kernel) {
+	enviarRequest("DELETE", "plani", configJson.Port_CPU, configJson.Ip_CPU)
 
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", configJson.Ip_CPU, configJson.Port_CPU)
-
-	// Genera una petición HTTP.
-	req, err := http.NewRequest("DELETE", url, nil)
-
-	// Check error generando una request.
-	if err != nil {
-		fmt.Printf("Error creando request: %s\n", err.Error())
-		return
-	}
-
-	// Se envía la request al servidor.
-	respuesta, err := cliente.Do(req)
-
-	// Check request enviada.
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_CPU, configJson.Port_CPU)
-		return
-	}
-
-	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	defer respuesta.Body.Close()
-
-	// Check response recibida.
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return
-	}
-
-	// Todo salió bien, la planificación se detuvo correctamente.
-	fmt.Println("Planificación detenida exitosamente.")
 }
 
 //SERVER SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
