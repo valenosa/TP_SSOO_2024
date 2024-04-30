@@ -13,14 +13,14 @@ import (
 
 //CLIENT SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-////STRUCTS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//---VARIABLES && STRUCTS--
 
 type BodyIniciar struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
 	Path string `json:"path"`
 }
 
-////CALLS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//--CALLS--
 
 // Solamente esqueleto
 func Iniciar(configJson config.Kernel) {
@@ -223,14 +223,42 @@ func Listar(configJson config.Kernel) {
 
 //SERVER SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-////STRUCTS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//--VARIABLES && STRUCTS--
 
 type Response struct {
 	Pid    int    `json:"pid"`
 	Estado string `json:"estado"`
 }
 
-////HANDLERS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Estructura de los PCB
+type PCB struct {
+	PID     uint32
+	PC      uint32
+	Quantum uint16
+	RegistrosUsoGeneral
+}
+
+// Estructura de los registros de uso general (para tener info del contexto de ejecución de cada PCB)
+type RegistrosUsoGeneral struct {
+	AX  uint8
+	BX  uint8
+	CX  uint8
+	DX  uint8
+	EAX uint16
+	EBX uint16
+	ECX uint16
+	EDX uint16
+	SI  uint32
+	DI  uint32
+}
+
+// Variable global para llevar la cuenta de los procesos (y así poder nombrarlos de manera correcta)
+var Counter int = 0
+
+// Lista que contiene los PCBs (procesos)
+var listaPCB []PCB
+
+//--HANDLERS--
 
 func HandlerIniciar(w http.ResponseWriter, r *http.Request) {
 
@@ -251,7 +279,7 @@ func HandlerIniciar(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Request path: %s\n", request)
 
 	//Crea una variable tipo Response (para confeccionar una respuesta)
-	var respBody Response = Response{Pid: 0}
+	var respBody Response = Response{Pid: Counter}
 
 	// Codificar Response en un array de bytes (formato json)
 	respuesta, err := json.Marshal(respBody)
@@ -265,6 +293,19 @@ func HandlerIniciar(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+
+	// Crea un nuevo PCB
+	var nuevoPCB PCB
+	nuevoPCB.PID = uint32(Counter)
+
+	// Agrega el nuevo PCB a la lista de PCBs
+	listaPCB = append(listaPCB, nuevoPCB)
+	for _, pcb := range listaPCB {
+		fmt.Print(pcb.PID, "\n")
+	}
+
+	// Incrementa el contador de procesos
+	Counter++
 }
 
 // primera versión de finalizar proceso, no recibe body (solo un path por medio de la url) y envía una respuesta vacía (mandamos status ok y hacemos que printee el valor del pid recibido para ver que ha sido llamada).
