@@ -20,7 +20,7 @@ func asignarPCB(nuevoPCB PCB, respuesta Response) {
 	nuevoPCB.Estado = "READY"
 
 	// Agrega el nuevo PCB a la lista de PCBs
-	queuePCB = append(queuePCB, nuevoPCB)
+	ReadyQueue = append(ReadyQueue, nuevoPCB)
 	// for _, pcb := range queuePCB {
 	// 	fmt.Print(pcb.PID, "\n")
 	// }
@@ -59,7 +59,9 @@ type RegistrosUsoGeneral struct {
 }
 
 // Lista que contiene los PCBs (procesos)
-var queuePCB []PCB
+var ReadyQueue []PCB
+
+var BlockQueue []PCB
 
 //--CALLS--
 
@@ -129,7 +131,7 @@ func Iniciar(configJson config.Kernel) {
 	// Imprime pid (parámetro de la estructura)
 	fmt.Printf("pid: %d\n", response.Pid)
 
-	for _, pcb := range queuePCB {
+	for _, pcb := range ReadyQueue {
 		fmt.Print(pcb.PID, "\n")
 	}
 
