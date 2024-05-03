@@ -19,7 +19,7 @@ import (
 func main() {
 
 	// Configura el logger
-	config.Logger("memoria.log")
+	config.Logger("Memoria.log")
 
 	log.Printf("Soy un logeano")
 

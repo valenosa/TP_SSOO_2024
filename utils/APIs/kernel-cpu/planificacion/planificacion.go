@@ -15,7 +15,7 @@ import (
 
 func Iniciar(configJson config.Kernel) {
 	// Enviar request al servidor
-	respuesta := config.EnviarRequest("PUT", "plani", configJson.Port_CPU, configJson.Ip_CPU)
+	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "PUT", "plani")
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return
@@ -25,7 +25,7 @@ func Iniciar(configJson config.Kernel) {
 
 func Detener(configJson config.Kernel) {
 	// Enviar request al servidor
-	respuesta := config.EnviarRequest("DELETE", "plani", configJson.Port_CPU, configJson.Ip_CPU)
+	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "DELETE", "plani")
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return

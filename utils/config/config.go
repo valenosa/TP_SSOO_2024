@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"io"
 	"log"
+	"net/http"
 	"os"
 )
 
@@ -115,7 +115,7 @@ func printConfig(configJson Kernel) {
 //-------------ESTO NO VA ACA PERO ES GLOBAL Y LO USAN TODOS LOS MODULOS------------------------------------------
 
 // retorna true si la request fue exitosa, false en caso contrario
-func EnviarRequest(metodo string, query string, port int, ip string) *http.Response {
+func Request(port int, ip string, metodo string, query string, bodies ...[]byte) *http.Response {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
@@ -123,8 +123,10 @@ func EnviarRequest(metodo string, query string, port int, ip string) *http.Respo
 	// Se declara la url a utilizar (depende de una ip y un puerto).
 	url := fmt.Sprintf("http://%s:%d/%s", ip, port, query)
 
+	body := ifBody(bodies...)
+
 	// Se crea una request donde se "efectúa" el metodo (PUT / DELETE / GET / POST) hacia url, enviando el Body si lo hay
-	req, err := http.NewRequest(metodo, url, nil)
+	req, err := http.NewRequest(metodo, url, body)
 
 	// Error Handler de la construcción de la request
 	if err != nil {
@@ -155,40 +157,9 @@ func EnviarRequest(metodo string, query string, port int, ip string) *http.Respo
 	return respuesta
 }
 
-func EnviarBodyRequest(metodo string, query string, body []byte, port int, ip string) *http.Response {
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/%s", ip, port, query)
-
-	// Se crea una request donde se "efectúa" el metodo (PUT / DELETE / GET / POST) hacia url, enviando el Body si lo hay
-	req, err := http.NewRequest(metodo, url, bytes.NewBuffer(body))
-
-	// Error Handler de la construcción de la request
-	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, port)
+func ifBody(bodies ...[]byte) io.Reader {
+	if len(bodies) == 0 {
 		return nil
 	}
-
-	// Se establecen los headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Se envía el request al servidor
-	respuesta, err := cliente.Do(req)
-
-	// Error handler de la request
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port)
-		return nil
-	}
-
-	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return nil
-	}
-
-	fmt.Printf("%s %s exitoso. \n", metodo, query)
-	return respuesta
+	return bytes.NewBuffer(bodies[0])
 }

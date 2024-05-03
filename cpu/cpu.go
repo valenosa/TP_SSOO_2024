@@ -17,7 +17,7 @@ import (
 func main() {
 
 	// Configura el logger
-	config.Logger("cpu.log")
+	config.Logger("CPU.log")
 
 	log.Printf("Soy un logeano")
 
