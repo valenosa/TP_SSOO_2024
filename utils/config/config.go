@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"io"
 	"log"
+	"net/http"
 	"os"
 )
 
-//ESTRUCTURAS PARA EXTRAER INFO DEL config.json////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+// --------------------------| ESTRUCTURAS PARA EXTRAER INFO DEL config.json |-------------------------------------------------------------
 type Cpu struct {
 	Port               int    `json:"port"`
 	Ip_Memory          string `json:"ip_memory"`
@@ -54,7 +53,7 @@ type Memoria struct {
 	Delay_Response    int    `json:"delay_response"`
 }
 
-//FUNCIONES PARA EXTRAER INFO DEL config.json////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// --------------------------| FUNCIONES PARA EXTRAER INFO DEL config.json |-------------------------------------------------------------
 
 // Se implementó el uso de interface{} a la función. De esta manera, la misma puede recibir distintos tipos de datos, o en este caso, estructuras (polimorfismo).
 // Gracias a esta implementación, luego la función podrá ser trasladada a un paquete aparte y ser utilizada por todos los módulos.
@@ -95,7 +94,7 @@ func Logger(path string) {
 	log.SetOutput(mw)
 }
 
-//FUNCIONES PARA TESTEAR////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// --------------------------| FUNCIONES PARA TESTEAR |----------------------------------------------------------------
 
 // Utilizado para testear "IniciarConfiguracion()"
 func printConfig(configJson Kernel) {
@@ -112,7 +111,7 @@ func printConfig(configJson Kernel) {
 	fmt.Println("multiprogramming: ", configJson.Multiprogramming)
 }
 
-//-------------ESTO NO VA ACA PERO ES GLOBAL Y LO USAN TODOS LOS MODULOS------------------------------------------
+//------------- ESTO NO VA ACA PERO ES GLOBAL Y LO USAN TODOS LOS MODULOS ------------------------------------------
 
 // retorna true si la request fue exitosa, false en caso contrario
 func EnviarRequest(metodo string, query string, port int, ip string) *http.Response {

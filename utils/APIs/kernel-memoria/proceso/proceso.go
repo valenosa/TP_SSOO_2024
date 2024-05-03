@@ -10,7 +10,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
-//--ADJACENT FUNCTIONS--
+//-------------------------- ADJACENT FUNCTIONS ------------------------------------
 
 func asignarPCB(nuevoPCB PCB, respuesta Response) {
 	// Crea un nuevo PCB
@@ -25,17 +25,17 @@ func asignarPCB(nuevoPCB PCB, respuesta Response) {
 	// }
 }
 
-//CLIENT SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//=====================================| CLIENT SIDE |========================================================\\
 
-//--VARIABLES && STRUCTS--
+//-------------------------- VARIABLES && STRUCTS ------------------------------------
 
 type BodyIniciar struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
 	Path string `json:"path"`
 }
 
+//-------------------------- FUNCIONES AUX -------------------------------------------
 
-//--FUNCIONES AUX--
 // Estructura de los PCB
 type PCB struct {
 	PID     uint32
@@ -63,7 +63,7 @@ type RegistrosUsoGeneral struct {
 var ReadyQueue []PCB
 var BlockQueue []PCB
 
-//--CALLS--
+//-------------------------- CALS ------------------------------------------------------
 
 // Solamente esqueleto
 func Iniciar(configJson config.Kernel) {
@@ -78,14 +78,13 @@ func Iniciar(configJson config.Kernel) {
 		return
 	}
 
-
 	// Enviar request al servidor
 	respuesta := config.EnviarBodyRequest("PUT", "process", body, configJson.Port_Memory, configJson.Ip_Memory)
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return
 	}
-  	// Se crea un nuevo PCB en estado NEW
+	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB PCB
 	nuevoPCB.Estado = "NEW"
 
@@ -173,9 +172,9 @@ func Listar(configJson config.Kernel) {
 	fmt.Println(string(bodyBytes))
 }
 
-//SERVER SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//=====================================| SERVER SIDE |========================================================\\
 
-//--VARIABLES && STRUCTS--
+//-------------------------- VARIABLES && STRUCTS ------------------------------------
 
 type Response struct {
 	Pid    int    `json:"pid"`
@@ -185,7 +184,7 @@ type Response struct {
 // Variable global para llevar la cuenta de los procesos (y así poder nombrarlos de manera correcta)
 var Counter int = 0
 
-//--HANDLERS--
+//-------------------------- HANDLERS --------------------------------------------------
 
 func HandlerIniciar(w http.ResponseWriter, r *http.Request) {
 
