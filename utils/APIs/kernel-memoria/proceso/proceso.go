@@ -11,14 +11,57 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
+//--ADJACENT FUNCTIONS--
+
+func asignarPCB(nuevoPCB PCB, respuesta Response) {
+	// Crea un nuevo PCB
+
+	nuevoPCB.PID = uint32(respuesta.Pid)
+	nuevoPCB.Estado = "READY"
+
+	// Agrega el nuevo PCB a la lista de PCBs
+	ReadyQueue = append(ReadyQueue, nuevoPCB)
+	// for _, pcb := range queuePCB {
+	// 	fmt.Print(pcb.PID, "\n")
+	// }
+}
+
 //CLIENT SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//---VARIABLES && STRUCTS--
+//--VARIABLES && STRUCTS--
 
 type BodyIniciar struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
 	Path string `json:"path"`
 }
+
+// Estructura de los PCB
+type PCB struct {
+	PID     uint32
+	PC      uint32
+	Quantum uint16
+	Estado  string
+	RegistrosUsoGeneral
+}
+
+// Estructura de los registros de uso general (para tener info del contexto de ejecución de cada PCB)
+type RegistrosUsoGeneral struct {
+	AX  uint8
+	BX  uint8
+	CX  uint8
+	DX  uint8
+	EAX uint16
+	EBX uint16
+	ECX uint16
+	EDX uint16
+	SI  uint32
+	DI  uint32
+}
+
+// Lista que contiene los PCBs (procesos)
+var ReadyQueue []PCB
+
+var BlockQueue []PCB
 
 //--CALLS--
 
@@ -53,6 +96,10 @@ func Iniciar(configJson config.Kernel) {
 	// Se establecen los headers
 	req.Header.Set("Content-Type", "application/json")
 
+	// Se crea un nuevo PCB en estado NEW
+	var nuevoPCB PCB
+	nuevoPCB.Estado = "NEW"
+
 	// Se envía el request al servidor
 	respuesta, err := cliente.Do(req)
 
@@ -80,8 +127,15 @@ func Iniciar(configJson config.Kernel) {
 		return
 	}
 
+	asignarPCB(nuevoPCB, response)
 	// Imprime pid (parámetro de la estructura)
 	fmt.Printf("pid: %d\n", response.Pid)
+
+	for _, pcb := range ReadyQueue {
+		fmt.Print(pcb.PID, "\n")
+	}
+
+	fmt.Println("Counter:", Counter)
 }
 
 // Solamente esqueleto
@@ -230,33 +284,8 @@ type Response struct {
 	Estado string `json:"estado"`
 }
 
-// Estructura de los PCB
-type PCB struct {
-	PID     uint32
-	PC      uint32
-	Quantum uint16
-	RegistrosUsoGeneral
-}
-
-// Estructura de los registros de uso general (para tener info del contexto de ejecución de cada PCB)
-type RegistrosUsoGeneral struct {
-	AX  uint8
-	BX  uint8
-	CX  uint8
-	DX  uint8
-	EAX uint16
-	EBX uint16
-	ECX uint16
-	EDX uint16
-	SI  uint32
-	DI  uint32
-}
-
 // Variable global para llevar la cuenta de los procesos (y así poder nombrarlos de manera correcta)
 var Counter int = 0
-
-// Lista que contiene los PCBs (procesos)
-var listaPCB []PCB
 
 //--HANDLERS--
 
@@ -294,18 +323,9 @@ func HandlerIniciar(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
 
-	// Crea un nuevo PCB
-	var nuevoPCB PCB
-	nuevoPCB.PID = uint32(Counter)
-
-	// Agrega el nuevo PCB a la lista de PCBs
-	listaPCB = append(listaPCB, nuevoPCB)
-	for _, pcb := range listaPCB {
-		fmt.Print(pcb.PID, "\n")
-	}
-
-	// Incrementa el contador de procesos
+	// Luego sincronzar para que no se creen varios procesos a la vez
 	Counter++
+	fmt.Println("Counter:", Counter)
 }
 
 // primera versión de finalizar proceso, no recibe body (solo un path por medio de la url) y envía una respuesta vacía (mandamos status ok y hacemos que printee el valor del pid recibido para ver que ha sido llamada).

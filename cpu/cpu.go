@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -14,6 +15,11 @@ import (
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
+
+	// Configura el logger
+	config.Logger("cpu.log")
+
+	log.Printf("Soy un logeano")
 
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
 	http.HandleFunc("PUT /plani", planificacion.HandlerIniciar)

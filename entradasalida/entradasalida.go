@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,11 @@ import (
 )
 
 func main() {
+
+	// Configura el logger
+	config.Logger("IO.log")
+
+	log.Printf("Soy un logeano")
 
 	// Establezco petición
 	http.HandleFunc("GET /holamundo", entradaSalida)
