@@ -5,10 +5,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
-	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-cpu/planificacion"
 	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
@@ -19,17 +19,25 @@ import (
 
 func main() {
 
+	// Configura el logger
+	config.Logger("kernel.log")
+
+	log.Printf("Soy un logeano")
+
 	// Extrae info de config.json
 	var configJson config.Kernel
 
 	config.Iniciar("config.json", &configJson)
 
 	proceso.Iniciar(configJson)
-	proceso.Finalizar(configJson)
-	proceso.Estado(configJson)
-	proceso.Listar(configJson)
-	planificacion.Detener(configJson)
-	planificacion.Iniciar(configJson)
+	proceso.Iniciar(configJson)
+	proceso.Iniciar(configJson)
+	proceso.Iniciar(configJson)
+	// proceso.Finalizar(configJson)
+	// proceso.Estado(configJson)
+	// proceso.Listar(configJson)
+	// planificacion.Detener(configJson)
+	// planificacion.Iniciar(configJson)
 
 	//Establezco petición
 	http.HandleFunc("GET /holamundo", kernel)
