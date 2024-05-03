@@ -1,7 +1,6 @@
 package proceso
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,44 +21,6 @@ type BodyIniciar struct {
 
 //--FUNCIONES AUX--
 
-func enviarBodyRequest(metodo string, query string, body []byte, port int, ip string) *http.Response {
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/%s", ip, port, query)
-
-	// Se crea una request donde se "efectúa" el metodo (PUT / DELETE / GET / POST) hacia url, enviando el Body si lo hay
-	req, err := http.NewRequest(metodo, url, bytes.NewBuffer(body))
-
-	// Error Handler de la construcción de la request
-	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, port)
-		return nil
-	}
-
-	// Se establecen los headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Se envía el request al servidor
-	respuesta, err := cliente.Do(req)
-
-	// Error handler de la request
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port)
-		return nil
-	}
-
-	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return nil
-	}
-
-	fmt.Printf("%s %s exitoso. \n", metodo, query)
-	return respuesta
-}
-
 //--CALLS--
 
 // Solamente esqueleto
@@ -75,12 +36,13 @@ func Iniciar(configJson config.Kernel) {
 		return
 	}
 
-	respuesta := enviarBodyRequest("PUT", "process", body, configJson.Port_Memory, configJson.Ip_Memory)
-
+	// Enviar request al servidor
+	respuesta := config.EnviarBodyRequest("PUT", "process", body, configJson.Port_Memory, configJson.Ip_Memory)
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return
 	}
+
 	// Se declara una nueva variable que contendrá la respuesta del servidor
 	var response Response
 
@@ -103,38 +65,13 @@ func Finalizar(configJson config.Kernel) {
 	// Establecer pid (hardcodeado)
 	pid := 0
 
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", configJson.Ip_Memory, configJson.Port_Memory, pid)
-
-	// Se crea una request donde se "efectúa" un GET hacia la url
-	req, err := http.NewRequest("DELETE", url, nil)
-
-	// Error Handler de la construcción de la request
-	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
+	// Enviar request al servidor
+	respuesta := config.EnviarRequest("DELETE", fmt.Sprintf("process/%d", pid), configJson.Port_Memory, configJson.Ip_Memory)
+	// verificamos si hubo error en la request
+	if respuesta == nil {
 		return
 	}
 
-	// Se establecen los headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Se envía el request al servidor
-	respuesta, err := cliente.Do(req)
-
-	// Error handler de la request
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
-		return
-	}
-
-	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return
-	}
 }
 
 func Estado(configJson config.Kernel) {
@@ -142,36 +79,10 @@ func Estado(configJson config.Kernel) {
 	// Establecer pid (hardcodeado)
 	pid := 0
 
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process/%d", configJson.Ip_Memory, configJson.Port_Memory, pid)
-
-	// Se crea una request donde se "efectúa" un GET hacia la url
-	req, err := http.NewRequest("GET", url, nil)
-
-	// Error Handler de la construcción de la request
-	if err != nil {
-		fmt.Printf("error creando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
-		return
-	}
-
-	// Se establecen los headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Se envía el request al servidor
-	respuesta, err := cliente.Do(req)
-
-	// Error handler de la request
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
-		return
-	}
-
-	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
+	// Enviar request al servidor
+	respuesta := config.EnviarRequest("GET", fmt.Sprintf("process/%d", pid), configJson.Port_Memory, configJson.Ip_Memory)
+	// verificamos si hubo error en la request
+	if respuesta == nil {
 		return
 	}
 
@@ -179,7 +90,7 @@ func Estado(configJson config.Kernel) {
 	var response Response
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
-	err = json.NewDecoder(respuesta.Body).Decode(&response)
+	err := json.NewDecoder(respuesta.Body).Decode(&response)
 
 	// Error Handler para al decodificación
 	if err != nil {
@@ -194,35 +105,10 @@ func Estado(configJson config.Kernel) {
 
 func Listar(configJson config.Kernel) {
 
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/process", configJson.Ip_Memory, configJson.Port_Memory)
-
-	// Genera una petición HTTP.
-	req, err := http.NewRequest("GET", url, nil)
-
-	// Check error generando una request.
-	if err != nil {
-		fmt.Printf("Error creando request: %s\n", err.Error())
-		return
-	}
-
-	// Se envía la request al servidor.
-	respuesta, err := cliente.Do(req)
-
-	// Check request enviada.
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_Memory, configJson.Port_Memory)
-		return
-	}
-
-	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	defer respuesta.Body.Close()
-
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
+	// Enviar request al servidor
+	respuesta := config.EnviarRequest("GET", "process", configJson.Port_Memory, configJson.Ip_Memory)
+	// verificamos si hubo error en la request
+	if respuesta == nil {
 		return
 	}
 

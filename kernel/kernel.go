@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
+	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-cpu/planificacion"
 	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
@@ -23,23 +25,23 @@ func main() {
 	config.Iniciar("config.json", &configJson)
 
 	proceso.Iniciar(configJson)
-	// proceso.Finalizar(configJson)
-	// proceso.Estado(configJson)
-	// proceso.Listar(configJson)
-	//planificacion.Detener(configJson)
-	//planificacion.Iniciar(configJson)
+	proceso.Finalizar(configJson)
+	proceso.Estado(configJson)
+	proceso.Listar(configJson)
+	planificacion.Detener(configJson)
+	planificacion.Iniciar(configJson)
 
-	// Establezco petición
-	//http.HandleFunc("GET /holamundo", kernel)
+	//Establezco petición
+	http.HandleFunc("GET /holamundo", kernel)
 
-	// // declaro puerto
-	// port := ":" + strconv.Itoa(configJson.Port)
+	// declaro puerto
+	port := ":" + strconv.Itoa(configJson.Port)
 
-	// // Listen and serve con info del config.json
-	// err := http.ListenAndServe(port, nil)
-	// if err != nil {
-	// 	fmt.Println("Error al esuchar en el puerto " + port)
-	// }
+	// Listen and serve con info del config.json
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al esuchar en el puerto " + port)
+	}
 
 }
 
