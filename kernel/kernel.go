@@ -39,7 +39,7 @@ func main() {
 	// planificacion.Detener(configJson)
 	// planificacion.Iniciar(configJson)
 
-	// Establezco petición
+	//Establezco petición
 	http.HandleFunc("GET /holamundo", kernel)
 
 	// declaro puerto

@@ -2,7 +2,6 @@ package planificacion
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -15,81 +14,23 @@ import (
 ////CALLS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Iniciar(configJson config.Kernel) {
-
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", configJson.Ip_CPU, configJson.Port_CPU)
-
-	// Genera una petición HTTP.
-	req, err := http.NewRequest("PUT", url, nil)
-
-	// Check error generando una request.
-	if err != nil {
-		fmt.Printf("Error creando request: %s\n", err.Error())
+	// Enviar request al servidor
+	respuesta := config.EnviarRequest("PUT", "plani", configJson.Port_CPU, configJson.Ip_CPU)
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
 		return
 	}
 
-	// Se envía la request al servidor.
-	respuesta, err := cliente.Do(req)
-
-	// Check request enviada.
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_CPU, configJson.Port_CPU)
-		return
-	}
-
-	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	defer respuesta.Body.Close()
-
-	// Check response recibida.
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return
-	}
-
-	// Todo salió bien, la planificación se inició correctamente.
-	fmt.Println("Planificación iniciada exitosamente.")
 }
 
 func Detener(configJson config.Kernel) {
-
-	// Se declara un nuevo cliente
-	cliente := &http.Client{}
-
-	// Se declara la url a utilizar (depende de una ip y un puerto).
-	url := fmt.Sprintf("http://%s:%d/plani", configJson.Ip_CPU, configJson.Port_CPU)
-
-	// Genera una petición HTTP.
-	req, err := http.NewRequest("DELETE", url, nil)
-
-	// Check error generando una request.
-	if err != nil {
-		fmt.Printf("Error creando request: %s\n", err.Error())
+	// Enviar request al servidor
+	respuesta := config.EnviarRequest("DELETE", "plani", configJson.Port_CPU, configJson.Ip_CPU)
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
 		return
 	}
 
-	// Se envía la request al servidor.
-	respuesta, err := cliente.Do(req)
-
-	// Check request enviada.
-	if err != nil {
-		fmt.Printf("error enviando request a ip: %s puerto: %d\n", configJson.Ip_CPU, configJson.Port_CPU)
-		return
-	}
-
-	//Espera a que la respuesta se termine de utilizar para liberarla de memoria.
-	defer respuesta.Body.Close()
-
-	// Check response recibida.
-	if respuesta.StatusCode != http.StatusOK {
-		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return
-	}
-
-	// Todo salió bien, la planificación se detuvo correctamente.
-	fmt.Println("Planificación detenida exitosamente.")
 }
 
 //SERVER SIDE/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
