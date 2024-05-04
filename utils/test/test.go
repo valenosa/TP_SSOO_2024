@@ -9,6 +9,23 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
+//FUNCIONES PARA TESTEAR////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Utilizado para testear "IniciarConfiguracion()"
+func Print(configJson config.Kernel) {
+
+	fmt.Println("port: ", configJson.Port)
+	fmt.Println("ip_memory: ", configJson.Ip_Memory)
+	fmt.Println("port_memory: ", configJson.Port_Memory)
+	fmt.Println("ip_cpu: ", configJson.Ip_CPU)
+	fmt.Println("port_cpu: ", configJson.Port_CPU)
+	fmt.Println("planning_algorithm: ", configJson.Planning_Algorithm)
+	fmt.Println("quantum: ", configJson.Quantum)
+	fmt.Println("resources: ", configJson.Resources)
+	fmt.Println("resource_instances: ", configJson.Resource_Instances)
+	fmt.Println("multiprogramming: ", configJson.Multiprogramming)
+}
+
 // Testea la conectividad con otros módulos
 func Conectividad(configJson config.Kernel) {
 	fmt.Println("\nIniciar Proceso:")
