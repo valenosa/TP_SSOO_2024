@@ -34,10 +34,6 @@ type RegistrosUsoGeneral struct {
 	DI  uint32
 }
 
-// Lista que contiene los PCBs (procesos)
-var ReadyQueue []PCB
-var BlockQueue []PCB
-
 //=====================================| SERVER SIDE |========================================================\\
 
 //-------------------------- VARIABLES && STRUCTS ------------------------------------

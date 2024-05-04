@@ -16,6 +16,14 @@ import (
 
 //-------------------------- STRUCTS -----------------------------------------
 
+//-------------------------- VARIABLES ---------------------------------------
+
+var ReadyQueue []proceso.PCB
+var BlockQueue []proceso.PCB
+var CPUActivo bool = false
+var planificadorActivo bool = true
+var ReadyQueueVacia bool = true
+
 func main() {
 
 	// Configura el logger
@@ -71,7 +79,7 @@ func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 	nuevoPCB.Estado = "READY"
 
 	// Agrega el nuevo PCB a la lista de PCBs
-	proceso.ReadyQueue = append(proceso.ReadyQueue, nuevoPCB) //AAAAAAAAAAAAAAAAAAAAAAAAA
+	ReadyQueue = append(ReadyQueue, nuevoPCB) //AAAAAAAAAAAAAAAAAAAAAAAAA
 	// for _, pcb := range queuePCB {
 	// 	fmt.Print(pcb.PID, "\n")
 	// }
@@ -142,7 +150,7 @@ func iniciarProceso(configJson config.Kernel) {
 		// Imprime pid (parámetro de la estructura)
 		fmt.Printf("pid: %d\n", response.Pid)
 
-		for _, pcb := range proceso.ReadyQueue { //AAAAAAAAAAAAAAAAAAAAAAAAA
+		for _, pcb := range ReadyQueue { //AAAAAAAAAAAAAAAAAAAAAAAAA
 			fmt.Print(pcb.PID, "\n")
 		}
 
@@ -229,8 +237,45 @@ func detenerPlanificacion(configJson config.Kernel) {
 	}
 }
 
-func dispatch() {
+// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
+func EnviarAPlanificador(pcb proceso.PCB) {
+	if pcb.Estado == "READY" {
+		ReadyQueue = append(ReadyQueue, pcb)
+		ReadyQueueVacia = false
+	} else if pcb.Estado == "BLOCK" {
+		BlockQueue = append(BlockQueue, pcb)
+	}
+}
 
+// Envía continuamente procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un proceso.
+func planificador() {
+	for planificadorActivo {
+		if !CPUActivo {
+			//Se envía el primer proceso y se hace un pop del mismo de la lista
+			if !ReadyQueueVacia {
+				dispatch(ReadyQueue[0])
+			}
+			CPUActivo = true
+			ReadyQueue = pop(ReadyQueue)
+		}
+	}
+}
+
+// Elimina el primer PCB de la lista, si esta está vacía, simplemente espera a que vuelva a comenzar
+func pop(listaPCB []proceso.PCB) []proceso.PCB {
+	l := len(listaPCB)
+
+	if l == 0 {
+		log.Print("Esperando nuevos procesos...")
+		ReadyQueueVacia = true
+		return nil
+	}
+
+	return listaPCB[:l-1]
+}
+
+func dispatch(pcb proceso.PCB) {
+	//envía a CPU el PCB
 }
 
 func interrupt() {
