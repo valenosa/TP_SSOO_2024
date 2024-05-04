@@ -79,7 +79,7 @@ func Iniciar(configJson config.Kernel) {
 	}
 
 	// Enviar request al servidor
-	respuesta := config.EnviarBodyRequest("PUT", "process", body, configJson.Port_Memory, configJson.Ip_Memory)
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", body)
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return
@@ -101,14 +101,20 @@ func Iniciar(configJson config.Kernel) {
 	}
 
 	asignarPCB(nuevoPCB, response)
-	// Imprime pid (parámetro de la estructura)
-	fmt.Printf("pid: %d\n", response.Pid)
 
-	for _, pcb := range ReadyQueue {
-		fmt.Print(pcb.PID, "\n")
+	//Funcionalidades temporales para testing
+	testing := func() {
+		// Imprime pid (parámetro de la estructura)
+		fmt.Printf("pid: %d\n", response.Pid)
+
+		for _, pcb := range ReadyQueue {
+			fmt.Print(pcb.PID, "\n")
+		}
+
+		fmt.Println("Counter:", Counter)
 	}
 
-	fmt.Println("Counter:", Counter)
+	testing()
 }
 
 // Solamente esqueleto
@@ -118,7 +124,7 @@ func Finalizar(configJson config.Kernel) {
 	pid := 0
 
 	// Enviar request al servidor
-	respuesta := config.EnviarRequest("DELETE", fmt.Sprintf("process/%d", pid), configJson.Port_Memory, configJson.Ip_Memory)
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "DELETE", fmt.Sprintf("process/%d", pid))
 	// verificamos si hubo error en la request
 	if respuesta == nil {
 		return
@@ -132,7 +138,7 @@ func Estado(configJson config.Kernel) {
 	pid := 0
 
 	// Enviar request al servidor
-	respuesta := config.EnviarRequest("GET", fmt.Sprintf("process/%d", pid), configJson.Port_Memory, configJson.Ip_Memory)
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", fmt.Sprintf("process/%d", pid))
 	// verificamos si hubo error en la request
 	if respuesta == nil {
 		return
@@ -158,7 +164,7 @@ func Estado(configJson config.Kernel) {
 func Listar(configJson config.Kernel) {
 
 	// Enviar request al servidor
-	respuesta := config.EnviarRequest("GET", "process", configJson.Port_Memory, configJson.Ip_Memory)
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", "process")
 	// verificamos si hubo error en la request
 	if respuesta == nil {
 		return
