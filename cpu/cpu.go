@@ -1,18 +1,16 @@
 package main
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////IMPORTS//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
-	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-cpu/planificacion"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////MAIN///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ================================| MAIN |===================================================\\
 
 func main() {
 
@@ -22,8 +20,8 @@ func main() {
 	log.Printf("Soy un logeano")
 
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
-	http.HandleFunc("PUT /plani", planificacion.HandlerIniciar)
-	http.HandleFunc("DELETE /plani", planificacion.HandlerDetener)
+	http.HandleFunc("PUT /plani", handlerIniciarPlanificacion)
+	http.HandleFunc("DELETE /plani", handlerDetenerPlanificacion)
 
 	// Extrae info de config.json
 	var configJson config.Cpu
@@ -38,4 +36,36 @@ func main() {
 	if err != nil {
 		fmt.Println("Error al esuchar en el puerto " + port)
 	}
+}
+
+//-------------------------- HANDLERS -----------------------------------
+
+func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
+
+	// Respuesta vacía significa que manda una respuesta vacía, o que no hay respuesta?
+	respuesta, err := json.Marshal("")
+
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
+
+	// Respuesta vacía significa que manda una respuesta vacía, o que no hay respuesta?
+	respuesta, err := json.Marshal("")
+
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
 }
