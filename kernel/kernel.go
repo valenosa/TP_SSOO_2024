@@ -319,6 +319,8 @@ func logPidsReady(ReadyQueue []proceso.PCB) {
 	log.Printf("Cola Ready 'ReadyQueue' : %v", pids)
 }
 
+//LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS
+
 // log para el manejo de listas BLOCK
 func logPidsBlock(BlockQueue []proceso.PCB) {
 	var pids []uint32
@@ -327,7 +329,7 @@ func logPidsBlock(BlockQueue []proceso.PCB) {
 		pids = append(pids, pcb.PID)
 	}
 
-	log.Printf("Cola Block 'BlockQueue' : %v", pids)
+	fmt.Printf("Cola Block 'BlockQueue' : %v", pids)
 }
 
 // log para el manejo de listas EXEC
@@ -338,5 +340,5 @@ func logPidsExec(ExecQueue []proceso.PCB) {
 		pids = append(pids, pcb.PID)
 	}
 
-	log.Printf("Cola Executing 'ExecQueue' : %v", pids)
+	fmt.Printf("Cola Executing 'ExecQueue' : %v", pids)
 }
