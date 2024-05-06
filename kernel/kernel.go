@@ -73,7 +73,7 @@ func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 	// Crea un nuevo PCB
 
 	nuevoPCB.PID = uint32(respuesta.Pid)
-  pcb_estado_viejo := nuevoPCB.Estado
+	pcb_estado_viejo := nuevoPCB.Estado
 	nuevoPCB.Estado = "READY"
 
 	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
@@ -252,13 +252,13 @@ func interrupt() {
 // Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
 func enviarAPlanificador(pcb proceso.PCB) {
 	if pcb.Estado == "READY" {
-		ReadyQueue = append(ReadyQueue, pcb)
-		ReadyQueueVacia = false
-		logPidsReady(ReadyQueue)
+		readyQueue = append(readyQueue, pcb)
+		readyQueueVacia = false
+		logPidsReady(readyQueue)
 
 	} else if pcb.Estado == "BLOCK" {
-		BlockQueue = append(BlockQueue, pcb)
-		logPidsBlock(BlockQueue)
+		blockQueue = append(blockQueue, pcb)
+		logPidsBlock(blockQueue)
 	}
 }
 
@@ -328,7 +328,7 @@ func testConectividad(configJson config.Kernel) {
 func testPlanificacion(configJson config.Kernel) {
 
 	printList := func() {
-		fmt.Println("ReadyQueue:")
+		fmt.Println("readyQueue:")
 		var ready []uint32
 		for _, pcb := range readyQueue {
 			ready = append(ready, pcb.PID)
@@ -340,7 +340,6 @@ func testPlanificacion(configJson config.Kernel) {
 	fmt.Println("\nSe crean 2 procesos-------------\n")
 	for i := 0; i < 2; i++ {
 		iniciarProceso(configJson)
-		printList()
 	}
 
 	fmt.Println("\nSe testea el planificador-------------\n")
@@ -350,11 +349,10 @@ func testPlanificacion(configJson config.Kernel) {
 	fmt.Println("\nSe crean 2 procesos-------------\n")
 	for i := 0; i < 2; i++ {
 		iniciarProceso(configJson)
-		printList()
 	}
 }
 
-// -------------------------- LOG´s --------------------------------------------------
+// -------------------------- LOG's --------------------------------------------------
 // log obligatorio (1/6)
 func logNuevoProceso(response proceso.Response, nuevoPCB proceso.PCB) {
 
@@ -369,27 +367,27 @@ func logCambioDeEstado(pcb_estado_viejo string, pcb proceso.PCB) {
 }
 
 // log obligatorio (3/6)
-func logPidsReady(ReadyQueue []proceso.PCB) {
+func logPidsReady(readyQueue []proceso.PCB) {
 	var pids []uint32
 	//Recorre la lista READY y guarda sus PIDs
-	for _, pcb := range ReadyQueue {
+	for _, pcb := range readyQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	log.Printf("Cola Ready 'ReadyQueue' : %v", pids)
+	log.Printf("Cola Ready 'readyQueue' : %v", pids)
 }
 
 //LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS
 
 // log para el manejo de listas BLOCK
-func logPidsBlock(BlockQueue []proceso.PCB) {
+func logPidsBlock(blockQueue []proceso.PCB) {
 	var pids []uint32
 	//Recorre la lista BLOCK y guarda sus PIDs
-	for _, pcb := range BlockQueue {
+	for _, pcb := range blockQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	fmt.Printf("Cola Block 'BlockQueue' : %v", pids)
+	fmt.Printf("Cola Block 'blockQueue' : %v", pids)
 }
 
 // log para el manejo de listas EXEC
