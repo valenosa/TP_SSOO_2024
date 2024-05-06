@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -18,11 +17,12 @@ import (
 
 //-------------------------- VARIABLES ---------------------------------------
 
-var ReadyQueue []proceso.PCB
-var BlockQueue []proceso.PCB
-var CPUActivo bool = false
+var readyQueue []proceso.PCB
+var blockQueue []proceso.PCB
+var CPUOcupado bool = false
 var planificadorActivo bool = true
-var ReadyQueueVacia bool = true
+var readyQueueVacia bool = true
+var configJson config.Kernel
 
 func main() {
 
@@ -32,24 +32,23 @@ func main() {
 	log.Printf("Soy un logeano")
 
 	// Extrae info de config.json
-	var configJson config.Kernel
 
 	config.Iniciar("config.json", &configJson)
 
 	// teste la conectividad con otros modulos
-	Conectividad(configJson)
+	testPlanificacion(configJson)
 
-	//Establezco petición
-	http.HandleFunc("GET /holamundo", kernel)
+	// //Establezco petición
+	// http.HandleFunc("GET /holamundo", kernel)
 
-	// declaro puerto
-	port := ":" + strconv.Itoa(configJson.Port)
+	// // declaro puerto
+	// port := ":" + strconv.Itoa(configJson.Port)
 
-	// Listen and serve con info del config.json
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Error al esuchar en el puerto " + port)
-	}
+	// // Listen and serve con info del config.json
+	// err := http.ListenAndServe(port, nil)
+	// if err != nil {
+	// 	fmt.Println("Error al esuchar en el puerto " + port)
+	// }
 
 }
 
@@ -78,33 +77,8 @@ func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 	nuevoPCB.PID = uint32(respuesta.Pid)
 	nuevoPCB.Estado = "READY"
 
-	// Agrega el nuevo PCB a la lista de PCBs
-	ReadyQueue = append(ReadyQueue, nuevoPCB) //AAAAAAAAAAAAAAAAAAAAAAAAA
-	// for _, pcb := range queuePCB {
-	// 	fmt.Print(pcb.PID, "\n")
-	// }
-}
-
-//-------------------------- TEST --------------------------------------------------
-
-// Testea la conectividad con otros módulos
-
-func Conectividad(configJson config.Kernel) {
-	fmt.Println("\nIniciar Proceso:")
-	iniciarProceso(configJson)
-	iniciarProceso(configJson)
-	iniciarProceso(configJson)
-	iniciarProceso(configJson)
-	fmt.Println("\nFinalizar Proceso:")
-	finalizarProceso(configJson)
-	fmt.Println("\nEstado Proceso:")
-	estadoProceso(configJson)
-	fmt.Println("\nListar Procesos:")
-	listarProceso(configJson)
-	fmt.Println("\nDetener Planificación:")
-	detenerPlanificacion(configJson)
-	fmt.Println("\nIniciar Planificación:")
-	iniciarPlanificacion(configJson)
+	// Agrega el nuevo PCB a readyQueue
+	enviarAPlanificador(nuevoPCB)
 }
 
 //-------------------------- API's --------------------------------------------------
@@ -144,20 +118,6 @@ func iniciarProceso(configJson config.Kernel) {
 	}
 
 	asignarPCB(nuevoPCB, response)
-
-	//Funcionalidades temporales para testing
-	testing := func() {
-		// Imprime pid (parámetro de la estructura)
-		fmt.Printf("pid: %d\n", response.Pid)
-
-		for _, pcb := range ReadyQueue { //AAAAAAAAAAAAAAAAAAAAAAAAA
-			fmt.Print(pcb.PID, "\n")
-		}
-
-		fmt.Println("Counter:", proceso.Counter) //AAAAAAAAAAAAAAAAAAAAAAAAA
-	}
-
-	testing()
 }
 
 func finalizarProceso(configJson config.Kernel) {
@@ -237,47 +197,150 @@ func detenerPlanificacion(configJson config.Kernel) {
 	}
 }
 
+func dispatch(pcb proceso.PCB) {
+	//Envia PCB al CPU
+	fmt.Println("Se envió el proceso", pcb.PID, "al CPU\n")
+
+	//Pasan cosas de HTTP y se ejecuta el proceso
+	CPUOcupado = true
+
+	//-------------------Request al CPU------------------------
+	// Codificar Body en un array de bytes (formato json)
+	body, err := json.Marshal(pcb)
+	// Error Handler de la codificación
+	if err != nil {
+		fmt.Printf("error codificando body: %s", err.Error())
+		return
+	}
+
+	// Enviar request al servidor
+	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
+		return
+	}
+
+	// Se declara una nueva variable que contendrá la respuesta del servidor
+	var response string
+
+	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
+	err = json.NewDecoder(respuesta.Body).Decode(&response)
+
+	// Error Handler para al decodificación
+	if err != nil {
+		fmt.Printf("Error decodificando\n")
+		return
+	}
+	//-------------------Fin Request al CPU------------------------
+
+	//Se muestra la respuesta del CPU
+	fmt.Println(response)
+	CPUOcupado = false
+}
+
+func interrupt() {
+}
+
+//-------------------------- PLANIFICACIÓN --------------------------------------------------
+
 // Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
-func EnviarAPlanificador(pcb proceso.PCB) {
+func enviarAPlanificador(pcb proceso.PCB) {
 	if pcb.Estado == "READY" {
-		ReadyQueue = append(ReadyQueue, pcb)
-		ReadyQueueVacia = false
+		readyQueue = append(readyQueue, pcb)
+		readyQueueVacia = false
 	} else if pcb.Estado == "BLOCK" {
-		BlockQueue = append(BlockQueue, pcb)
+		blockQueue = append(blockQueue, pcb)
 	}
 }
 
 // Envía continuamente procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un proceso.
 func planificador() {
+	if !CPUOcupado && !readyQueueVacia {
+		planificadorActivo = true
+	}
 	for planificadorActivo {
-		if !CPUActivo {
-			//Se envía el primer proceso y se hace un pop del mismo de la lista
-			if !ReadyQueueVacia {
-				dispatch(ReadyQueue[0])
-			}
-			CPUActivo = true
-			ReadyQueue = pop(ReadyQueue)
+		//Si el CPU está ocupado, se detiene el planificador
+		if CPUOcupado {
+			planificadorActivo = false
+			break
 		}
+		//Si no...
+
+		//Si la lista de READY está vacía, se detiene el planificador
+		if len(readyQueue) == 0 {
+			//Si la lista está vacía, se detiene el planificador
+			fmt.Println("Esperando nuevos procesos...") //Se puede implementar un log en nuestro archivo no-oficial de logs
+			readyQueueVacia = true
+			planificadorActivo = false
+			break
+		}
+
+		//Si la lista no está vacía, se envía el proceso al CPU
+		//Se envía el primer proceso y se hace un dequeue del mismo de la lista READY
+		var poppedPCB proceso.PCB
+		readyQueue, poppedPCB = dequeuePCB(readyQueue)
+		estadoAExec(&poppedPCB)
+		dispatch(poppedPCB)
 	}
 }
 
-// Elimina el primer PCB de la lista, si esta está vacía, simplemente espera a que vuelva a comenzar
-func pop(listaPCB []proceso.PCB) []proceso.PCB {
-	l := len(listaPCB)
+// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos procesos, y avisa que la lista está vacía
+func dequeuePCB(listaPCB []proceso.PCB) ([]proceso.PCB, proceso.PCB) {
 
-	if l == 0 {
-		log.Print("Esperando nuevos procesos...")
-		ReadyQueueVacia = true
-		return nil
+	return listaPCB[1:], listaPCB[0]
+}
+
+func estadoAExec(pcb *proceso.PCB) {
+	(*pcb).Estado = "EXEC"
+}
+
+//-------------------------- TEST --------------------------------------------------
+
+// Testea la conectividad con otros módulos
+
+func testConectividad(configJson config.Kernel) {
+	fmt.Println("\nIniciar Proceso:")
+	iniciarProceso(configJson)
+	iniciarProceso(configJson)
+	iniciarProceso(configJson)
+	iniciarProceso(configJson)
+	fmt.Println("\nFinalizar Proceso:")
+	finalizarProceso(configJson)
+	fmt.Println("\nEstado Proceso:")
+	estadoProceso(configJson)
+	fmt.Println("\nListar Procesos:")
+	listarProceso(configJson)
+	fmt.Println("\nDetener Planificación:")
+	detenerPlanificacion(configJson)
+	fmt.Println("\nIniciar Planificación:")
+	iniciarPlanificacion(configJson)
+}
+
+func testPlanificacion(configJson config.Kernel) {
+
+	printList := func() {
+		fmt.Println("ReadyQueue:")
+		var ready []uint32
+		for _, pcb := range readyQueue {
+			ready = append(ready, pcb.PID)
+		}
+		fmt.Println(ready)
 	}
 
-	return listaPCB[:l-1]
-}
+	//
+	fmt.Println("\nSe crean 2 procesos-------------\n")
+	for i := 0; i < 2; i++ {
+		iniciarProceso(configJson)
+		printList()
+	}
 
-func dispatch(pcb proceso.PCB) {
-	//envía a CPU el PCB
-}
+	fmt.Println("\nSe testea el planificador-------------\n")
+	planificador()
+	printList()
 
-func interrupt() {
-
+	fmt.Println("\nSe crean 2 procesos-------------\n")
+	for i := 0; i < 2; i++ {
+		iniciarProceso(configJson)
+		printList()
+	}
 }
