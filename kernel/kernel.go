@@ -16,13 +16,21 @@ import (
 
 //-------------------------- STRUCTS -----------------------------------------
 
-//-------------------------- VARIABLES ---------------------------------------
+// MOVELO A UTILS (struct tambien usada por entrasalida.go)
+type Interfaz struct {
+	Nombre string
+	Tipo   string
+	Puerto int
+}
+
+//-------------------------- VARIABLES --------------------------
 
 var ReadyQueue []proceso.PCB
 var BlockQueue []proceso.PCB
 var CPUActivo bool = false
 var planificadorActivo bool = true
 var ReadyQueueVacia bool = true
+var interfacesConectadas []Interfaz
 
 func main() {
 
@@ -34,11 +42,11 @@ func main() {
 
 	config.Iniciar("config.json", &configJson)
 
-	// teste la conectividad con otros modulos
-	Conectividad(configJson)
+	// testea la conectividad con otros modulos
+	//Conectividad(configJson)
 
 	//Establezco petición
-	http.HandleFunc("GET /holamundo", kernel)
+	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
 
 	// declaro puerto
 	port := ":" + strconv.Itoa(configJson.Port)
@@ -53,19 +61,26 @@ func main() {
 
 //-------------------------- FUNCIONES ---------------------------------------------
 
-func kernel(w http.ResponseWriter, r *http.Request) {
+func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 
-	respuesta, err := json.Marshal("Hello world! Soy una consola del kernel")
+	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
+	var request Interfaz
 
+	// Decodifica el request (codificado en formato json)
+	err := json.NewDecoder(r.Body).Decode(&request)
+
+	// Error Handler de la decodificación
 	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		fmt.Printf("Error al decodificar request body: ")
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
+	// Imprime el request por consola (del lado del server)
+	fmt.Println("Request path:", request)
 
-	fmt.Println("Hello world! Soy una consola del kernel")
+	//Guarda la interfaz en la lista de interfaces conectadas.
+	interfacesConectadas = append(interfacesConectadas, request)
 }
 
 //-------------------------- ADJACENT FUNCTIONS ------------------------------------
@@ -81,7 +96,7 @@ func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 	logCambioDeEstado(pcb_estado_viejo, nuevoPCB)
 
 	// Agrega el nuevo PCB a la lista de PCBs
-	ReadyQueue = append(ReadyQueue, nuevoPCB) //AAAAAAAAAAAAAAAAAAAAAAAAA
+	ReadyQueue = append(ReadyQueue, nuevoPCB)
 
 	// for _, pcb := range queuePCB {
 	// 	fmt.Print(pcb.PID, "\n")
@@ -159,11 +174,11 @@ func iniciarProceso(configJson config.Kernel) {
 		// Imprime pid (parámetro de la estructura)
 		fmt.Printf("pid: %d\n", response.Pid)
 
-		for _, pcb := range ReadyQueue { //AAAAAAAAAAAAAAAAAAAAAAAAA
+		for _, pcb := range ReadyQueue {
 			fmt.Print(pcb.PID, "\n")
 		}
 
-		fmt.Println("Counter:", proceso.Counter) //AAAAAAAAAAAAAAAAAAAAAAAAA
+		fmt.Println("Counter:", proceso.Counter)
 	}
 
 	testing()
