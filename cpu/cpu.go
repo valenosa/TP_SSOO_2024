@@ -91,7 +91,7 @@ func ejecutarProceso(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Se está ejecutando el proceso: ", request.PID)
 
 	// Responde que se terminó de ejecutar el proceso (respuesta en caso de que se haya podido terminar de ejecutar el proceso)
-	var respBody string = "\nSe termino de ejecutar el proceso: " + strconv.FormatUint(uint64(request.PID), 10) //el choclo este convierte uint32 a string
+	var respBody string = "Se termino de ejecutar el proceso: " + strconv.FormatUint(uint64(request.PID), 10) + "\n" //el choclo este convierte uint32 a string
 
 	// Codificar Response en un array de bytes (formato json)
 	respuesta, err := json.Marshal(respBody)

@@ -205,7 +205,7 @@ func detenerPlanificacion(configJson config.Kernel) {
 
 func dispatch(pcb proceso.PCB) {
 	//Envia PCB al CPU
-	fmt.Println("Se envió el proceso", pcb.PID, "al CPU\n")
+	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
 
 	//Pasan cosas de HTTP y se ejecuta el proceso
 	CPUOcupado = true
