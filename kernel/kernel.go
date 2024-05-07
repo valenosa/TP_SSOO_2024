@@ -22,9 +22,9 @@ var blockQueue []proceso.PCB
 var CPUOcupado bool = false
 var planificadorActivo bool = true
 var readyQueueVacia bool = true
-var configJson config.Kernel
 
 func main() {
+	var configJson config.Kernel
 
 	// Configura el logger
 	config.Logger("Kernel.log")
@@ -203,7 +203,7 @@ func detenerPlanificacion(configJson config.Kernel) {
 	}
 }
 
-func dispatch(pcb proceso.PCB) {
+func dispatch(pcb proceso.PCB, configJson config.Kernel) {
 	//Envia PCB al CPU
 	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
 
@@ -263,7 +263,7 @@ func enviarAPlanificador(pcb proceso.PCB) {
 }
 
 // Envía continuamente procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un proceso.
-func planificador() {
+func planificador(configJson config.Kernel) {
 	if !CPUOcupado && !readyQueueVacia {
 		planificadorActivo = true
 	}
@@ -289,7 +289,7 @@ func planificador() {
 		var poppedPCB proceso.PCB
 		readyQueue, poppedPCB = dequeuePCB(readyQueue)
 		estadoAExec(&poppedPCB)
-		dispatch(poppedPCB)
+		dispatch(poppedPCB, configJson)
 	}
 }
 
@@ -343,7 +343,7 @@ func testPlanificacion(configJson config.Kernel) {
 	}
 
 	fmt.Println("\nSe testea el planificador-------------\n")
-	planificador()
+	planificador(configJson)
 	printList()
 
 	fmt.Println("\nSe crean 2 procesos-------------\n")
