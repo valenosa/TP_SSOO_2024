@@ -6,6 +6,7 @@ package proceso
 
 type BodyIniciar struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
+	PID  uint32 `json:"pid"`
 	Path string `json:"path"`
 }
 
@@ -39,7 +40,7 @@ type RegistrosUsoGeneral struct {
 //-------------------------- VARIABLES && STRUCTS ------------------------------------
 
 type Response struct {
-	Pid    int    `json:"pid"`
+	PID    uint32 `json:"pid"`
 	Estado string `json:"estado"`
 }
 
