@@ -56,7 +56,6 @@ func main() {
 
 func guardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32][]string) {
 	path = configJson.Instructions_Path + "/" + path
-	fmt.Println("Path: ", path)
 	data := extractInstructions(path)
 	insertData(pid, memoriaInstrucciones, data)
 }
@@ -79,7 +78,14 @@ func insertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 	instrucciones := strings.Split(string(data), "\n")
 	// Inserta en la memoria de instrucciones
 	memoriaInstrucciones[pid] = instrucciones
-	fmt.Println("Instrucciones guardadas en memoria: ", memoriaInstrucciones)
+	fmt.Println("Instrucciones guardadas en memoria: ")
+	for pid, instrucciones := range memoriaInstrucciones {
+		fmt.Printf("PID: %d\n", pid)
+		for _, instruccion := range instrucciones {
+			fmt.Println(instruccion)
+		}
+		fmt.Println()
+	}
 }
 
 //================================| HANDLERS |====================================================\\
