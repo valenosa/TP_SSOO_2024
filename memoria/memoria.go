@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -24,7 +25,7 @@ func main() {
 	config.Iniciar("config.json", &configJson)
 
 	// Crea e inicializa la memoria de instrucciones
-	memoriaInstrucciones := make(map[uint32]string)
+	memoriaInstrucciones := make(map[uint32][]string)
 
 	// Para que no llore Go
 	fmt.Println("Memoria: ", memoriaInstrucciones)
@@ -47,13 +48,13 @@ func main() {
 	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
-		fmt.Println("Error al esuchar en el puerto " + port)
+		fmt.Println("Error al escuchar en el puerto " + port)
 	}
 }
 
 //================================| FUNCIONES |===================================================\\
 
-func guardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32]string) {
+func guardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32][]string) {
 	path = configJson.Instructions_Path + "/" + path
 	fmt.Println("Path: ", path)
 	data := extractInstructions(path)
@@ -73,16 +74,18 @@ func extractInstructions(path string) []byte {
 }
 
 // funciona todo bien con uint?
-func insertData(pid uint32, memoriaInstrucciones map[uint32]string, data []byte) {
+func insertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byte) {
+	// Separar instrucciones por medio de tokens
+	instrucciones := strings.Split(string(data), "\n")
 	// Inserta en la memoria de instrucciones
-	memoriaInstrucciones[pid] = string(data)
+	memoriaInstrucciones[pid] = instrucciones
 	fmt.Println("Instrucciones guardadas en memoria: ", memoriaInstrucciones)
 }
 
 //================================| HANDLERS |====================================================\\
 
 // Wrapper del handler de iniciar proceso. esto permite pasarle parametros al handler para no tener que usar variables globales y poder pasarle parámetros
-func handlerIniciarProceso(memoriaInstrucciones map[uint32]string) func(http.ResponseWriter, *http.Request) {
+func handlerIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
 
 	// Handler para iniciar un proceso
 	return func(w http.ResponseWriter, r *http.Request) {
