@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -351,18 +352,20 @@ func testPlanificacion(configJson config.Kernel) {
 	}
 
 	//
-	fmt.Println("\nSe crean 2 procesos-------------\n")
+	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
 	for i := 0; i < 2; i++ {
-		iniciarProceso(configJson, "path")
+		path := "proceso" + strconv.Itoa(counter) + ".txt"
+		iniciarProceso(configJson, path)
 	}
 
-	fmt.Println("\nSe testea el planificador-------------\n")
+	fmt.Printf("\nSe testea el planificador-------------\n\n")
 	planificador(configJson)
 	printList()
 
-	fmt.Println("\nSe crean 2 procesos-------------\n")
+	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
 	for i := 0; i < 2; i++ {
-		iniciarProceso(configJson, "path")
+		path := "proceso" + strconv.Itoa(counter) + ".txt"
+		iniciarProceso(configJson, path)
 	}
 }
 

@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,18 +13,7 @@ import (
 
 //-------------------------- STRUCTS --------------------------------------------------
 
-// Estructura para la tabla de páginas
-type Pagina struct {
-	numero uint
-	marco  uint
-}
-
-// Estructura administrativa que relaciona una/s determinada/s página/s con las instrucciones de un proceso.
-type PaginaInstrucciones struct { // Cambiar nombre
-	PID             uint32
-	pagina          Pagina
-	cantidadPaginas uint
-}
+// Estructura administrativa que alamcena las instrucciones de un proceso.
 
 // ================================| MAIN |===================================================\\
 
@@ -35,24 +23,18 @@ func main() {
 	// Extrae info de config.json
 	config.Iniciar("config.json", &configJson)
 
-	// Crea la memoria que representa el espacio de usuario
-	memoria := make([]byte, configJson.Memory_Size)
-
-	// Se crea un índice para saber a partir de donde escribir en memoria
-	var memoryIndex uint = 0
-
-	// Tabla de páginas que contienen instrucciones
-	var tablaPaginas []PaginaInstrucciones
+	// Crea e inicializa la memoria de instrucciones
+	memoriaInstrucciones := make(map[uint32]string)
 
 	// Para que no llore Go
-	fmt.Println("Memoria: ", memoria)
+	fmt.Println("Memoria: ", memoriaInstrucciones)
 
 	// Configura el logger
 	config.Logger("Memoria.log")
 
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
 
-	http.HandleFunc("PUT /process", handlerIniciarProceso(memoria, memoryIndex, tablaPaginas))
+	http.HandleFunc("PUT /process", handlerIniciarProceso(memoriaInstrucciones))
 	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
 	http.HandleFunc("GET /process/{pid}", handlerEstadoProceso)
 	http.HandleFunc("GET /process", handlerListarProceso)
@@ -71,9 +53,11 @@ func main() {
 
 //================================| FUNCIONES |===================================================\\
 
-func guardarInstrucciones(pid uint32, path string, memoria []byte, memoryIndex uint, tablaInstrucciones []PaginaInstrucciones) {
+func guardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32]string) {
+	path = configJson.Instructions_Path + "/" + path
+	fmt.Println("Path: ", path)
 	data := extractInstructions(path)
-	insertData(pid, memoria, data, memoryIndex, tablaInstrucciones)
+	insertData(pid, memoriaInstrucciones, data)
 }
 
 func extractInstructions(path string) []byte {
@@ -89,33 +73,16 @@ func extractInstructions(path string) []byte {
 }
 
 // funciona todo bien con uint?
-func insertData(pid uint32, memoria []byte, data []byte, memoryIndex uint, tablaPaginas []PaginaInstrucciones) {
-
-	// Calcula el número de páginas necesarias, redondeando hacia arriba
-	numPages := uint(math.Ceil(float64(len(data)) / float64(configJson.Page_Size)))
-
-	// Verifica si hay suficiente espacio en la memoria
-	if memoryIndex+uint(numPages)*configJson.Memory_Size > uint(len(memoria)) {
-		//Debería "limpiar" memoria con el algoritmo elegido
-		fmt.Println("No hay suficiente espacio en la memoria")
-		return
-	}
-
-	// Copia data en memoria
-	copy(memoria[memoryIndex:], data)
-
-	// Actualiza la tabla de páginas
-	tablaPaginas = append(tablaPaginas, PaginaInstrucciones{PID: pid, pagina: Pagina{numero: uint(memoryIndex / configJson.Memory_Size), marco: memoryIndex}, cantidadPaginas: numPages})
-
-	// Actualiza currentIndex para la próxima inserción
-	memoryIndex += uint(numPages) * configJson.Page_Size
-
+func insertData(pid uint32, memoriaInstrucciones map[uint32]string, data []byte) {
+	// Inserta en la memoria de instrucciones
+	memoriaInstrucciones[pid] = string(data)
+	fmt.Println("Instrucciones guardadas en memoria: ", memoriaInstrucciones)
 }
 
 //================================| HANDLERS |====================================================\\
 
 // Wrapper del handler de iniciar proceso. esto permite pasarle parametros al handler para no tener que usar variables globales y poder pasarle parámetros
-func handlerIniciarProceso(memoria []byte, memoryIndex uint, tablaPaginas []PaginaInstrucciones) func(http.ResponseWriter, *http.Request) {
+func handlerIniciarProceso(memoriaInstrucciones map[uint32]string) func(http.ResponseWriter, *http.Request) {
 
 	// Handler para iniciar un proceso
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +100,7 @@ func handlerIniciarProceso(memoria []byte, memoryIndex uint, tablaPaginas []Pagi
 			return
 		}
 		// Se guardan las instrucciones en memoria
-		guardarInstrucciones(request.PID, request.Path, memoria, memoryIndex, tablaPaginas)
+		guardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
 
 		// Crea una variable tipo Response (para confeccionar una respuesta)
 		var respBody proceso.Response = proceso.Response{PID: request.PID}
