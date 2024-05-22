@@ -96,7 +96,7 @@ func handlerIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.R
 	// Handler para iniciar un proceso
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		//Crea uan variable tipo BodyIniciar (para interpretar lo que se recibe de la request)
+		//Crea una variable tipo BodyIniciar (para interpretar lo que se recibe de la request)
 		var request proceso.BodyIniciar
 
 		// Decodifica el request (codificado en formato json)

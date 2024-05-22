@@ -16,57 +16,76 @@ import (
 
 //-------------------------- STRUCTS -----------------------------------------
 
-//-------------------------- VARIABLES ---------------------------------------
+// MOVELO A UTILS (struct tambien usada por entrasalida.go)
+type Interfaz struct {
+	Nombre string
+	Tipo   string
+	Puerto int
+}
+
+//-------------------------- VARIABLES --------------------------
 
 var newQueue []proceso.PCB
 var readyQueue []proceso.PCB
 var blockQueue []proceso.PCB
 var CPUOcupado bool = false
 var planificadorActivo bool = true
+var interfacesConectadas []Interfaz
 var readyQueueVacia bool = true
 var counter int = 0
 
 func main() {
+  
 	var configJson config.Kernel
 
 	// Extrae info de config.json
 	config.Iniciar("config.json", &configJson)
+
+	// testea la conectividad con otros modulos
+	//Conectividad(configJson)
 
 	// Configura el logger
 	config.Logger("Kernel.log")
 
 	// teste la conectividad con otros modulos
 	testPlanificacion(configJson)
-
-	// //Establezco petición
-	// http.HandleFunc("GET /holamundo", kernel)
+  
+  //Establezco petición
+	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
 
 	// // declaro puerto
-	// port := ":" + strconv.Itoa(configJson.Port)
+	port := ":" + strconv.Itoa(configJson.Port)
 
-	// // Listen and serve con info del config.json
-	// err := http.ListenAndServe(port, nil)
-	// if err != nil {
-	// 	fmt.Println("Error al esuchar en el puerto " + port)
-	// }
+	// Listen and serve con info del config.json
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+  fmt.Println("Error al esuchar en el puerto " + port)
+	}
 
 }
 
 //-------------------------- FUNCIONES ---------------------------------------------
 
-func kernel(w http.ResponseWriter, r *http.Request) {
+func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 
-	respuesta, err := json.Marshal("Hello world! Soy una consola del kernel")
+	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
+	var request Interfaz
 
+	// Decodifica el request (codificado en formato json)
+	err := json.NewDecoder(r.Body).Decode(&request)
+
+	// Error Handler de la decodificación
 	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		fmt.Printf("Error al decodificar request body: ")
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
+	// Imprime el request por consola (del lado del server)
+	fmt.Println("Request path:", request)
 
-	fmt.Println("Hello world! Soy una consola del kernel")
+	//Guarda la interfaz en la lista de interfaces conectadas.
+	interfacesConectadas = append(interfacesConectadas, request)
 }
 
 //-------------------------- ADJACENT FUNCTIONS ------------------------------------
@@ -83,7 +102,6 @@ func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 
 	// Agrega el nuevo PCB a readyQueue
 	enviarAPlanificador(nuevoPCB)
-
 }
 
 //-------------------------- API's --------------------------------------------------
