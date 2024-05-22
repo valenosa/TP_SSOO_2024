@@ -25,36 +25,41 @@ type Interfaz struct {
 
 //-------------------------- VARIABLES --------------------------
 
-var ReadyQueue []proceso.PCB
-var BlockQueue []proceso.PCB
-var CPUActivo bool = false
+var newQueue []proceso.PCB
+var readyQueue []proceso.PCB
+var blockQueue []proceso.PCB
+var CPUOcupado bool = false
 var planificadorActivo bool = true
-var ReadyQueueVacia bool = true
 var interfacesConectadas []Interfaz
+var readyQueueVacia bool = true
+var counter int = 0
 
 func main() {
-
-	// Configura el logger
-	config.Logger("Kernel.log")
-
-	// Extrae info de config.json
+  
 	var configJson config.Kernel
 
+	// Extrae info de config.json
 	config.Iniciar("config.json", &configJson)
 
 	// testea la conectividad con otros modulos
 	//Conectividad(configJson)
 
-	//Establezco petición
+	// Configura el logger
+	config.Logger("Kernel.log")
+
+	// teste la conectividad con otros modulos
+	testPlanificacion(configJson)
+  
+  //Establezco petición
 	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
 
-	// declaro puerto
+	// // declaro puerto
 	port := ":" + strconv.Itoa(configJson.Port)
 
 	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
-		fmt.Println("Error al esuchar en el puerto " + port)
+  fmt.Println("Error al esuchar en el puerto " + port)
 	}
 
 }
@@ -88,50 +93,33 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 	// Crea un nuevo PCB
 
-	nuevoPCB.PID = uint32(respuesta.Pid)
+	nuevoPCB.PID = uint32(respuesta.PID)
+	pcb_estado_viejo := nuevoPCB.Estado
 	nuevoPCB.Estado = "READY"
-	pcb_estado_viejo := "NEW"
 
 	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
 	logCambioDeEstado(pcb_estado_viejo, nuevoPCB)
 
-	// Agrega el nuevo PCB a la lista de PCBs
-	ReadyQueue = append(ReadyQueue, nuevoPCB)
-
-	// for _, pcb := range queuePCB {
-	// 	fmt.Print(pcb.PID, "\n")
-	// }
-}
-
-//-------------------------- TEST --------------------------------------------------
-
-// Testea la conectividad con otros módulos
-
-func Conectividad(configJson config.Kernel) {
-	fmt.Println("\nIniciar Proceso:")
-	iniciarProceso(configJson)
-	iniciarProceso(configJson)
-	iniciarProceso(configJson)
-	iniciarProceso(configJson)
-	fmt.Println("\nFinalizar Proceso:")
-	finalizarProceso(configJson)
-	fmt.Println("\nEstado Proceso:")
-	estadoProceso(configJson)
-	fmt.Println("\nListar Procesos:")
-	listarProceso(configJson)
-	fmt.Println("\nDetener Planificación:")
-	detenerPlanificacion(configJson)
-	fmt.Println("\nIniciar Planificación:")
-	iniciarPlanificacion(configJson)
+	// Agrega el nuevo PCB a readyQueue
+	enviarAPlanificador(nuevoPCB)
 }
 
 //-------------------------- API's --------------------------------------------------
 
-func iniciarProceso(configJson config.Kernel) {
+func iniciarProceso(configJson config.Kernel, path string) {
+
+	// Se crea un nuevo PCB en estado NEW
+	var nuevoPCB proceso.PCB
+	nuevoPCB.PID = uint32(counter)
+	nuevoPCB.Estado = "NEW"
+
+	// Incrementa el contador de procesos
+	counter++
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(proceso.BodyIniciar{
-		Path: "string",
+		PID:  nuevoPCB.PID,
+		Path: path,
 	})
 	// Error Handler de la codificación
 	if err != nil {
@@ -139,15 +127,13 @@ func iniciarProceso(configJson config.Kernel) {
 		return
 	}
 
+	//En realidad me parece que se tendría que mandar el path a memoria solamente si hay "espacio" en la readyQueue (depende del grado de multiprogramación)
 	// Enviar request al servidor
 	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", body)
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return
 	}
-	// Se crea un nuevo PCB en estado NEW
-	var nuevoPCB proceso.PCB
-	nuevoPCB.Estado = "NEW"
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
 	var response proceso.Response
@@ -162,26 +148,9 @@ func iniciarProceso(configJson config.Kernel) {
 	}
 
 	//log obligatorio(1/6): creacion de proceso
-	logNuevoProceso(response, nuevoPCB)
+	logNuevoProceso(nuevoPCB)
 
 	asignarPCB(nuevoPCB, response)
-
-	//log obligatorio (3/6): Ingreso a READY
-	logPidsReady(ReadyQueue)
-
-	//Funcionalidades temporales para testing
-	testing := func() {
-		// Imprime pid (parámetro de la estructura)
-		fmt.Printf("pid: %d\n", response.Pid)
-
-		for _, pcb := range ReadyQueue {
-			fmt.Print(pcb.PID, "\n")
-		}
-
-		fmt.Println("Counter:", proceso.Counter)
-	}
-
-	testing()
 }
 
 func finalizarProceso(configJson config.Kernel) {
@@ -261,59 +230,168 @@ func detenerPlanificacion(configJson config.Kernel) {
 	}
 }
 
-// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
-func EnviarAPlanificador(pcb proceso.PCB) {
-	if pcb.Estado == "READY" {
-		ReadyQueue = append(ReadyQueue, pcb)
-		ReadyQueueVacia = false
-		logPidsReady(ReadyQueue)
+func dispatch(pcb proceso.PCB, configJson config.Kernel) {
+	//Envia PCB al CPU
+	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
 
-	} else if pcb.Estado == "BLOCK" {
-		BlockQueue = append(BlockQueue, pcb)
-		logPidsBlock(BlockQueue)
+	//Pasan cosas de HTTP y se ejecuta el proceso
+	CPUOcupado = true
+
+	//-------------------Request al CPU------------------------
+	//Capaz no es necesario mandar todo el PID
+	// Codificar Body en un array de bytes (formato json)
+	body, err := json.Marshal(pcb)
+	// Error Handler de la codificación
+	if err != nil {
+		fmt.Printf("error codificando body: %s", err.Error())
+		return
+	}
+
+	// Enviar request al servidor
+	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
+		return
+	}
+
+	// Se declara una nueva variable que contendrá la respuesta del servidor
+	var response string
+
+	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
+	err = json.NewDecoder(respuesta.Body).Decode(&response)
+
+	// Error Handler para al decodificación
+	if err != nil {
+		fmt.Printf("Error decodificando\n")
+		return
+	}
+	//-------------------Fin Request al CPU------------------------
+
+	//Se muestra la respuesta del CPU
+	fmt.Println(response)
+	CPUOcupado = false
+}
+
+func interrupt() {
+}
+
+//-------------------------- PLANIFICACIÓN --------------------------------------------------
+
+// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
+func enviarAPlanificador(pcb proceso.PCB) {
+
+	switch pcb.Estado {
+	case "NEW":
+		newQueue = append(newQueue, pcb)
+	case "READY":
+		readyQueue = append(readyQueue, pcb)
+		readyQueueVacia = false
+		logPidsReady(readyQueue)
+
+	case "BLOCK":
+
+		blockQueue = append(blockQueue, pcb)
+		logPidsBlock(blockQueue)
 	}
 }
 
 // Envía continuamente procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un proceso.
-func planificador() {
+func planificador(configJson config.Kernel) {
+	if !CPUOcupado && !readyQueueVacia {
+		planificadorActivo = true
+	}
 	for planificadorActivo {
-		if !CPUActivo {
-			//Se envía el primer proceso y se hace un pop del mismo de la lista
-			if !ReadyQueueVacia {
-				dispatch(ReadyQueue[0])
-			}
-			CPUActivo = true
-			ReadyQueue = pop(ReadyQueue)
+		//Si el CPU está ocupado, se detiene el planificador
+		if CPUOcupado {
+			planificadorActivo = false
+			break
 		}
+		//Si no...
+
+		//Si la lista de READY está vacía, se detiene el planificador
+		if len(readyQueue) == 0 {
+			//Si la lista está vacía, se detiene el planificador
+			fmt.Println("Esperando nuevos procesos...") //Se puede implementar un log en nuestro archivo no-oficial de logs
+			readyQueueVacia = true
+			planificadorActivo = false
+			break
+		}
+
+		//Si la lista no está vacía, se envía el proceso al CPU
+		//Se envía el primer proceso y se hace un dequeue del mismo de la lista READY
+		var poppedPCB proceso.PCB
+		readyQueue, poppedPCB = dequeuePCB(readyQueue)
+		estadoAExec(&poppedPCB)
+		dispatch(poppedPCB, configJson)
 	}
 }
 
-// Elimina el primer PCB de la lista, si esta está vacía, simplemente espera a que vuelva a comenzar
-func pop(listaPCB []proceso.PCB) []proceso.PCB {
-	l := len(listaPCB)
+// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos procesos, y avisa que la lista está vacía
+func dequeuePCB(listaPCB []proceso.PCB) ([]proceso.PCB, proceso.PCB) {
 
-	if l == 0 {
-		log.Print("Esperando nuevos procesos...")
-		ReadyQueueVacia = true
-		return nil
+	return listaPCB[1:], listaPCB[0]
+}
+
+func estadoAExec(pcb *proceso.PCB) {
+	(*pcb).Estado = "EXEC"
+}
+
+//-------------------------- TEST --------------------------------------------------
+
+// Testea la conectividad con otros módulos
+
+func testConectividad(configJson config.Kernel) {
+	fmt.Println("\nIniciar Proceso:")
+	iniciarProceso(configJson, "path")
+	iniciarProceso(configJson, "path")
+	iniciarProceso(configJson, "path")
+	iniciarProceso(configJson, "path")
+	fmt.Println("\nFinalizar Proceso:")
+	finalizarProceso(configJson)
+	fmt.Println("\nEstado Proceso:")
+	estadoProceso(configJson)
+	fmt.Println("\nListar Procesos:")
+	listarProceso(configJson)
+	fmt.Println("\nDetener Planificación:")
+	detenerPlanificacion(configJson)
+	fmt.Println("\nIniciar Planificación:")
+	iniciarPlanificacion(configJson)
+}
+
+func testPlanificacion(configJson config.Kernel) {
+
+	printList := func() {
+		fmt.Println("readyQueue:")
+		var ready []uint32
+		for _, pcb := range readyQueue {
+			ready = append(ready, pcb.PID)
+		}
+		fmt.Println(ready)
 	}
 
-	return listaPCB[:l-1]
+	//
+	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
+	for i := 0; i < 2; i++ {
+		path := "proceso" + strconv.Itoa(counter) + ".txt"
+		iniciarProceso(configJson, path)
+	}
+
+	fmt.Printf("\nSe testea el planificador-------------\n\n")
+	planificador(configJson)
+	printList()
+
+	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
+	for i := 0; i < 2; i++ {
+		path := "proceso" + strconv.Itoa(counter) + ".txt"
+		iniciarProceso(configJson, path)
+	}
 }
 
-func dispatch(pcb proceso.PCB) {
-	//envía a CPU el PCB
-}
-
-func interrupt() {
-
-}
-
-// -------------------------- LOG´s --------------------------------------------------
+// -------------------------- LOG's --------------------------------------------------
 // log obligatorio (1/6)
-func logNuevoProceso(response proceso.Response, nuevoPCB proceso.PCB) {
+func logNuevoProceso(nuevoPCB proceso.PCB) {
 
-	log.Printf("Se crea el proceso %d en estado %s", response.Pid, nuevoPCB.Estado)
+	log.Printf("Se crea el proceso %d en estado %s", nuevoPCB.PID, nuevoPCB.Estado)
 }
 
 // log obligatorio (2/6)
@@ -324,27 +402,27 @@ func logCambioDeEstado(pcb_estado_viejo string, pcb proceso.PCB) {
 }
 
 // log obligatorio (3/6)
-func logPidsReady(ReadyQueue []proceso.PCB) {
+func logPidsReady(readyQueue []proceso.PCB) {
 	var pids []uint32
 	//Recorre la lista READY y guarda sus PIDs
-	for _, pcb := range ReadyQueue {
+	for _, pcb := range readyQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	log.Printf("Cola Ready 'ReadyQueue' : %v", pids)
+	log.Printf("Cola Ready 'readyQueue' : %v", pids)
 }
 
 //LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS
 
 // log para el manejo de listas BLOCK
-func logPidsBlock(BlockQueue []proceso.PCB) {
+func logPidsBlock(blockQueue []proceso.PCB) {
 	var pids []uint32
 	//Recorre la lista BLOCK y guarda sus PIDs
-	for _, pcb := range BlockQueue {
+	for _, pcb := range blockQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	fmt.Printf("Cola Block 'BlockQueue' : %v", pids)
+	fmt.Printf("Cola Block 'blockQueue' : %v", pids)
 }
 
 // log para el manejo de listas EXEC
