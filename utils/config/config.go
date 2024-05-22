@@ -47,8 +47,8 @@ type Kernel struct {
 
 type Memoria struct {
 	Port              int    `json:"port"`
-	Memory_Size       int    `json:"memory_size"`
-	Page_Size         int    `json:"page_size"`
+	Memory_Size       uint   `json:"memory_size"`
+	Page_Size         uint   `json:"page_size"`
 	Instructions_Path string `json:"instructions_path"`
 	Delay_Response    int    `json:"delay_response"`
 }
