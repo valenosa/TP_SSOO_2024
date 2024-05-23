@@ -12,6 +12,12 @@ import (
 
 // ================================| MAIN |===================================================\\
 
+type IO_GEN_SLEEP struct {
+	Instruccion       string
+	NombreInterfaz    string
+	UnidadesDeTrabajo int
+}
+
 func main() {
 
 	// Configura el logger
@@ -31,6 +37,16 @@ func main() {
 	// declaro puerto
 	port := ":" + strconv.Itoa(configJson.Port)
 
+	//COMIENZO DEL HARDCODEO DEL DEVE.
+	/*instruccion := IO_GEN_SLEEP{
+		Instruccion:       "IO_GEN_SLEEP",
+		NombreInterfaz:    "GenericIO",
+		UnidadesDeTrabajo: 10,
+	}*/
+
+	//enviarInstruccionIO_GEN_SLEEP(instruccion)
+	//FINAL DEL HARDCODEO DEL DEVE.
+
 	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
@@ -38,7 +54,26 @@ func main() {
 	}
 }
 
-//-------------------------- HANDLERS -----------------------------------
+// -------------------------- HANDLERS -----------------------------------
+// Funcion test para enviar una instruccion leída al kernel.
+/*
+func enviarInstruccionIO_GEN_SLEEP(instruccion IO_GEN_SLEEP) {
+	body, err := json.Marshal(instruccion)
+
+	//Check si no hay errores al crear el body.
+	if err != nil {
+		fmt.Printf("error codificando body: %s", err.Error())
+		return
+	}
+
+	Mandar a ejecutar a la interfaz (Puerto)
+	respuesta := config.Request(config.Kernel.Port, config.Kernel. , "POST", "/instruccion", body)
+
+	if respuesta == nil{
+		fmt.Println("Fallo en el envío de instrucción desde CPU a Kernel.")
+	}
+
+}*/
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
