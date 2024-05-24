@@ -147,6 +147,10 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	//A IMPLEMENTAR
 	//Una vez que llega el status 200(OK) pasar el proceso a READY.
+	if respuesta.StatusCode == http.StatusOK {
+		//Pasar proceso a ready
+		fmt.Println("Mandar proceso a READY.")
+	}
 
 }
 
@@ -154,7 +158,7 @@ func validarInstruccion(tipo string, instruccion string) bool {
 	//Verificar que esa interfaz puede ejecutar la instruccion que le pide el CPU
 	switch tipo {
 	case "GENERICA":
-		return instruccion != "IO_GEN_SLEEP"
+		return instruccion == "IO_GEN_SLEEP"
 	}
 	return false
 }
