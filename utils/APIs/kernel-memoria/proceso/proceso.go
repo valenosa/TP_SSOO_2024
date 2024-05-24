@@ -15,7 +15,6 @@ type BodyIniciar struct {
 // Estructura de los PCB
 type PCB struct {
 	PID     uint32
-	PC      uint32
 	Quantum uint16
 	Estado  string
 	RegistrosUsoGeneral
@@ -23,6 +22,7 @@ type PCB struct {
 
 // Estructura de los registros de uso general (para tener info del contexto de ejecución de cada PCB)
 type RegistrosUsoGeneral struct {
+	PC  uint32
 	AX  uint8
 	BX  uint8
 	CX  uint8
