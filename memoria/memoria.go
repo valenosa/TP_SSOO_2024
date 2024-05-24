@@ -39,6 +39,7 @@ func main() {
 	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
 	http.HandleFunc("GET /process/{pid}", handlerEstadoProceso)
 	http.HandleFunc("GET /process", handlerListarProceso)
+	http.HandleFunc("GET /instrucciones/", handlerEnviarInstruccion(memoriaInstrucciones))
 
 	// Extrae info de config.json
 
@@ -209,4 +210,29 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente.
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+}
+
+func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
+
+	// Handler para iniciar un proceso
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
+		pc, errPC := strconv.ParseUint(queryParams.Get("pc"), 10, 32)
+
+		if errPid != nil || errPC != nil {
+			return
+		}
+
+		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
+
+		respuesta, err := json.Marshal(instruccion)
+		if err != nil {
+			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write(respuesta)
+	}
 }

@@ -149,9 +149,9 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 
 func ejecutarCiclosDeInstruccion(PCB proceso.PCB) {
 
-	for true {
-		text := fetch(PCB.PID, registrosCPU.PC)
-		decodeAndExecute(text)
+	for i := 0; i < 3; i++ {
+		instruccion := fetch(PCB.PID, registrosCPU.PC)
+		decodeAndExecute(instruccion, PCB.PC)
 	}
 }
 
@@ -162,12 +162,13 @@ func fetch(PID uint32, PC uint32) string {
 	pc := strconv.FormatUint(uint64(PC), 10)
 
 	cliente := &http.Client{}
-	url := fmt.Sprintf("http://%s:%s/instrucciones", configJson.Ip_Memory, configJson.Port_Memory)
+	url := fmt.Sprintf("http://%s:%d/instrucciones", configJson.Ip_Memory, configJson.Port_Memory)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return ""
 	}
 
+	//Paso como parametros pid y pc.
 	q := req.URL.Query()
 	q.Add("PID", pid)
 	q.Add("PC", pc)
@@ -192,14 +193,108 @@ func fetch(PID uint32, PC uint32) string {
 	return string(bodyBytes)
 }
 
-func decodeAndExecute(text string) {
-	variable := strings.Split(text, " ")
-	fmt.Println("Instrucción: ", variable[0], " Parametros: ", variable[1:])
+func decodeAndExecute(instruccion string, PC uint32) {
+
+	var registrosMap = map[string]*uint8{
+		"AX": &registrosCPU.AX,
+		"BX": &registrosCPU.BX,
+	}
+
+	variable := strings.Split(instruccion, " ")
+
+	fmt.Println("Instruccion: ", variable[0], " Parametros: ", variable[1:])
+
 	switch variable[0] {
 	case "SET":
-		// set(variable[1], variable[2], registrosMap)
+		set(variable[1], variable[2], registrosMap)
 		fmt.Println("------------------------")
+	case "SUM":
+		sum(variable[1], variable[2], registrosMap)
+	case "SUB":
+		sub(variable[1], variable[2], registrosMap)
+	case "JNZ":
+		jnz(variable[1], variable[2], &PC, registrosMap)
+	// case "IO_GEN_SLEEP":
+
 	default:
 		fmt.Println("------")
 	}
 }
+
+//---------------------FUNCIONES DE INSTRUCCIONES---------------------
+
+func set(reg string, dato string, registroMap map[string]*uint8) {
+
+	//Checkea si existe el registro obtenido de la instruccion.
+	registro, encontrado := registroMap[reg]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	//Parsea string a entero el valor que va a tomar el registro.
+	valor, err := strconv.Atoi(dato)
+
+	if err != nil {
+		fmt.Println("Dato no valido")
+	}
+
+	//Asigna el nuevo valor al registro.
+	*registro = uint8(valor)
+}
+
+func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
+	//Checkea si existe el registro obtenido de la instruccion.
+	registro1, encontrado := registroMap[reg1]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	registro2, encontrado := registroMap[reg2]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	*registro1 += *registro2
+}
+
+func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
+	//Checkea si existe el registro obtenido de la instruccion.
+	registro1, encontrado := registroMap[reg1]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	registro2, encontrado := registroMap[reg2]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	*registro1 -= *registro2
+}
+
+func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
+	registro, encontrado := registroMap[reg]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	valorInt64, err := strconv.ParseUint(valor, 10, 32)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	nuevoValor := uint32(valorInt64)
+
+	if *registro != 0 {
+		*PC = nuevoValor
+	}
+}
+
+// func io_gen_sleep() {}
