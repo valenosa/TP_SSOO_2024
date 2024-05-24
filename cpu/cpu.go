@@ -127,14 +127,13 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Simula ejecutar el proceso
-	ejecutarCiclosDeInstruccion(pcbRecibido)
+	ejecutarCiclosDeInstruccion(&pcbRecibido)
+
 	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
-	// Responde que se terminó de ejecutar el proceso (respuesta en caso de que se haya podido terminar de ejecutar el proceso)
-	var respBody string = "Se termino de ejecutar el proceso: " + strconv.FormatUint(uint64(pcbRecibido.PID), 10) + "\n" //el choclo este convierte uint32 a string
-
+	// Falta devolver tambien el motivo de desalojo. Tenemos que charlar cuales son los motivos y como lo almacenamos.
 	// Codificar Response en un array de bytes (formato json)
-	respuesta, err := json.Marshal(respBody)
+	respuesta, err := json.Marshal(pcbRecibido)
 
 	// Error Handler de la codificación
 	if err != nil {
@@ -147,11 +146,16 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-func ejecutarCiclosDeInstruccion(PCB proceso.PCB) {
+func ejecutarCiclosDeInstruccion(PCB *proceso.PCB) {
+	var cicloFInalizado bool = false
 
-	for i := 0; i < 3; i++ {
+	for {
 		instruccion := fetch(PCB.PID, registrosCPU.PC)
-		decodeAndExecute(instruccion, PCB.PC)
+		decodeAndExecute(PCB, instruccion, &registrosCPU.PC, &cicloFInalizado)
+		if cicloFInalizado {
+			break
+		}
+		checkInterrupt()
 	}
 }
 
@@ -174,7 +178,7 @@ func fetch(PID uint32, PC uint32) string {
 	q.Add("PC", pc)
 	req.URL.RawQuery = q.Encode()
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "text/plain")
 	respuesta, err := cliente.Do(req)
 	if err != nil {
 		return ""
@@ -193,7 +197,7 @@ func fetch(PID uint32, PC uint32) string {
 	return string(bodyBytes)
 }
 
-func decodeAndExecute(instruccion string, PC uint32) {
+func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
 
 	var registrosMap = map[string]*uint8{
 		"AX": &registrosCPU.AX,
@@ -206,26 +210,53 @@ func decodeAndExecute(instruccion string, PC uint32) {
 
 	switch variable[0] {
 	case "SET":
-		set(variable[1], variable[2], registrosMap)
-		fmt.Println("------------------------")
+		set(variable[1], variable[2], registrosMap, PC)
+
 	case "SUM":
 		sum(variable[1], variable[2], registrosMap)
+
 	case "SUB":
 		sub(variable[1], variable[2], registrosMap)
+
 	case "JNZ":
-		jnz(variable[1], variable[2], &PC, registrosMap)
-	// case "IO_GEN_SLEEP":
+		jnz(variable[1], variable[2], PC, registrosMap)
+
+	case "EXIT":
+		*cicloFinalizado = true
+		PCB.RegistrosUsoGeneral = registrosCPU
+
+		//El estado debería pasar a EXIT acá o en Kernel?
+		estadoAExit := func() {
+			PCB.Estado = "EXIT"
+		}
+		defer estadoAExit()
+
+		return
 
 	default:
 		fmt.Println("------")
 	}
+
+	*PC++
 }
 
 //---------------------FUNCIONES DE INSTRUCCIONES---------------------
 
-func set(reg string, dato string, registroMap map[string]*uint8) {
+func set(reg string, dato string, registroMap map[string]*uint8, PC *uint32) {
 
 	//Checkea si existe el registro obtenido de la instruccion.
+	if reg == "PC" {
+
+		valorInt64, err := strconv.ParseUint(dato, 10, 32)
+
+		if err != nil {
+			fmt.Println("Dato no valido")
+		}
+
+		*PC = uint32(valorInt64) - 1
+		return
+	}
+
 	registro, encontrado := registroMap[reg]
 	if !encontrado {
 		fmt.Println("Registro invalido")
@@ -258,6 +289,7 @@ func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
 	}
 
 	*registro1 += *registro2
+
 }
 
 func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
@@ -290,7 +322,7 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 		return
 	}
 
-	nuevoValor := uint32(valorInt64)
+	nuevoValor := uint32(valorInt64) - 1
 
 	if *registro != 0 {
 		*PC = nuevoValor
@@ -298,3 +330,7 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 }
 
 // func io_gen_sleep() {}
+
+func checkInterrupt() {
+	//Checkea si hay interrupciones.
+}

@@ -34,6 +34,7 @@ type InstruccionIO struct {
 var newQueue []proceso.PCB          //Debe tener mutex
 var readyQueue []proceso.PCB        //Debe tener mutex
 var blockQueue []proceso.PCB        //Debe tener mutex
+var exitQueue []proceso.PCB         //Debe tener mutex
 var CPUOcupado bool = false         //Esto se hace con un sem binario
 var planificadorActivo bool = true  //Esto se hace con un sem binario
 var interfacesConectadas []Interfaz //Debe tener mutex
@@ -41,7 +42,7 @@ var readyQueueVacia bool = true     //Esto se hace con un sem binario
 var counter int = 0
 
 func main() {
-  
+
 	var configJson config.Kernel
 
 	// Extrae info de config.json
@@ -54,9 +55,9 @@ func main() {
 	config.Logger("Kernel.log")
 
 	// teste la conectividad con otros modulos
-	testPlanificacion(configJson)
-  
-  //Establezco petición
+	testCicloDeInstruccion(configJson)
+
+	//Establezco petición
 	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
@@ -66,7 +67,7 @@ func main() {
 	// Listen and serve con info del config.json
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
-  fmt.Println("Error al esuchar en el puerto " + port)
+		fmt.Println("Error al esuchar en el puerto " + port)
 	}
 
 }
@@ -345,10 +346,10 @@ func dispatch(pcb proceso.PCB, configJson config.Kernel) {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var response string
+	var pcbRecibido proceso.PCB
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
-	err = json.NewDecoder(respuesta.Body).Decode(&response)
+	err = json.NewDecoder(respuesta.Body).Decode(&pcbRecibido)
 
 	// Error Handler para al decodificación
 	if err != nil {
@@ -357,9 +358,11 @@ func dispatch(pcb proceso.PCB, configJson config.Kernel) {
 	}
 	//-------------------Fin Request al CPU------------------------
 
-	//Se muestra la respuesta del CPU
-	fmt.Println(response)
+	enviarAPlanificador(pcbRecibido)
+
 	CPUOcupado = false
+
+	fmt.Println("Exit queue:", exitQueue)
 }
 
 func interrupt() {
@@ -373,16 +376,22 @@ func enviarAPlanificador(pcb proceso.PCB) {
 	switch pcb.Estado {
 	case "NEW":
 		newQueue = append(newQueue, pcb)
+
 	case "READY":
 		readyQueue = append(readyQueue, pcb)
 		readyQueueVacia = false
 		logPidsReady(readyQueue)
 
 	case "BLOCK":
-
 		blockQueue = append(blockQueue, pcb)
 		logPidsBlock(blockQueue)
+
+	// Agrega los procesos en exit a una queue. Quedan en estado Zombie hasta que el kernel los lea. (Debería ser un map, pero me da paja armarlo ahora)
+	// Hay que chequear si esto es necesario para el tp
+	case "EXIT":
+		exitQueue = append(blockQueue, pcb)
 	}
+
 }
 
 // Envía continuamente procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un proceso.
@@ -475,6 +484,15 @@ func testPlanificacion(configJson config.Kernel) {
 		path := "proceso" + strconv.Itoa(counter) + ".txt"
 		iniciarProceso(configJson, path)
 	}
+}
+
+func testCicloDeInstruccion(configJson config.Kernel) {
+
+	fmt.Printf("\nSe crean 1 proceso-------------\n\n")
+	iniciarProceso(configJson, "proceso_test")
+
+	fmt.Printf("\nSe testea el planificador-------------\n\n")
+	planificador(configJson)
 }
 
 // -------------------------- LOG's --------------------------------------------------

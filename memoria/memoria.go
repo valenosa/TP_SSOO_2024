@@ -39,7 +39,7 @@ func main() {
 	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
 	http.HandleFunc("GET /process/{pid}", handlerEstadoProceso)
 	http.HandleFunc("GET /process", handlerListarProceso)
-	http.HandleFunc("GET /instrucciones/", handlerEnviarInstruccion(memoriaInstrucciones))
+	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 
 	// Extrae info de config.json
 
@@ -214,25 +214,28 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
 
-	// Handler para iniciar un proceso
+	// Handler para enviar una instruccion
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryParams := r.URL.Query()
-		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
-		pc, errPC := strconv.ParseUint(queryParams.Get("pc"), 10, 32)
+		pid, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
+		pc, errPC := strconv.ParseUint(queryParams.Get("PC"), 10, 32)
 
 		if errPid != nil || errPC != nil {
 			return
 		}
 
 		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
+		fmt.Println(instruccion)
 
-		respuesta, err := json.Marshal(instruccion)
-		if err != nil {
-			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-			return
-		}
+		// respuesta, err := json.Marshal(instruccion)
+		// fmt.Println(respuesta)
+
+		// if err != nil {
+		// 	http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		// 	return
+		// }
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(respuesta)
+		w.Write([]byte(instruccion))
 	}
 }
