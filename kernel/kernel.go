@@ -23,15 +23,21 @@ type Interfaz struct {
 	Puerto int
 }
 
+type InstruccionIO struct {
+	NombreInterfaz string
+	Instruccion    string
+	UnitWorkTime   int
+}
+
 //-------------------------- VARIABLES --------------------------
 
-var newQueue []proceso.PCB
-var readyQueue []proceso.PCB
-var blockQueue []proceso.PCB
-var CPUOcupado bool = false
-var planificadorActivo bool = true
-var interfacesConectadas []Interfaz
-var readyQueueVacia bool = true
+var newQueue []proceso.PCB          //Debe tener mutex
+var readyQueue []proceso.PCB        //Debe tener mutex
+var blockQueue []proceso.PCB        //Debe tener mutex
+var CPUOcupado bool = false         //Esto se hace con un sem binario
+var planificadorActivo bool = true  //Esto se hace con un sem binario
+var interfacesConectadas []Interfaz //Debe tener mutex
+var readyQueueVacia bool = true     //Esto se hace con un sem binario
 var counter int = 0
 
 func main() {
@@ -52,6 +58,7 @@ func main() {
   
   //Establezco petición
 	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
+	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
 	// // declaro puerto
 	port := ":" + strconv.Itoa(configJson.Port)
@@ -86,6 +93,89 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 
 	//Guarda la interfaz en la lista de interfaces conectadas.
 	interfacesConectadas = append(interfacesConectadas, request)
+}
+
+// TODO: implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
+func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
+	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
+	var request InstruccionIO
+
+	// Decodifica el request (codificado en formato json)
+	err := json.NewDecoder(r.Body).Decode(&request)
+
+	// Error Handler de la decodificación
+	if err != nil {
+		fmt.Printf("Error al decodificar request body: ")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Imprime el request por consola (del lado del server)
+	fmt.Println("Request path:", request)
+
+	// Funcion que busca en la lista de interfacesConectadas
+	interfaz := buscarInstruccion(request)
+
+	// IMPLEMENTAR
+	if interfaz == nil {
+		//Mandar proceso a EXIT
+		fmt.Println("Mandar proceso a EXIT.") // ESTO NO ESTA IMPLEMENTADO
+		return
+	}
+
+	//Verificar que la instruccion sea compatible con el tipo de interfaz.
+	isvalid := validarInstruccion(interfaz.Tipo, request.Instruccion)
+
+	// IMPLEMENTAR
+	if !isvalid {
+		fmt.Println("Instruccion no compatible.")
+		//Mandar proceso a EXIT
+		fmt.Println("Mandar proceso a EXIT.") // ESTO NO ESTA IMPLEMENTADO
+	}
+
+	//Preparo la interfaz para enviarla en un body.
+	body, err := json.Marshal(request.UnitWorkTime)
+
+	//Check si no hay errores al crear el body.
+	if err != nil {
+		fmt.Printf("error codificando body: %s", err.Error())
+		return
+	}
+
+	// Mandar a ejecutar a la interfaz (Puerto)
+	respuesta := config.Request(interfaz.Puerto, "localhost", "POST", request.Instruccion, body)
+
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
+		return
+	}
+
+	//A IMPLEMENTAR
+	//Una vez que llega el status 200(OK) pasar el proceso a READY.
+	if respuesta.StatusCode == http.StatusOK {
+		//Pasar proceso a ready
+		fmt.Println("Mandar proceso a READY.")
+	}
+
+}
+
+func validarInstruccion(tipo string, instruccion string) bool {
+	//Verificar que esa interfaz puede ejecutar la instruccion que le pide el CPU
+	switch tipo {
+	case "GENERICA":
+		return instruccion == "IO_GEN_SLEEP"
+	}
+	return false
+}
+
+// Busca si la interfaz existe en el slice de interfacesConectadas.
+func buscarInstruccion(request InstruccionIO) *Interfaz {
+	for _, interfaz := range interfacesConectadas {
+		if interfaz.Nombre == request.NombreInterfaz {
+			return &interfaz
+		}
+	}
+	return nil
 }
 
 //-------------------------- ADJACENT FUNCTIONS ------------------------------------

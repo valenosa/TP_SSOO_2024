@@ -56,11 +56,16 @@ func conectarInterfaz(nombre string, filePath string) {
 		return
 	}
 
-	inciarServidorInterfaz((configInterfaz.Port))
+	iniciarServidorInterfaz(configInterfaz)
 }
 
-func inciarServidorInterfaz(puerto int) {
-	port := ":" + strconv.Itoa(puerto)
+func iniciarServidorInterfaz(configInterfaz config.IO) {
+
+	http.HandleFunc("POST /IO_GEN_SLEEP", createHandlerIO_GEN_SLEEP(configInterfaz))
+	//http.HandleFunc("POST /IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
+	//http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDOUT_WRITE)
+
+	port := ":" + strconv.Itoa(configInterfaz.Port)
 
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
@@ -68,51 +73,33 @@ func inciarServidorInterfaz(puerto int) {
 	}
 }
 
-// Funcion que genera una interfaz, según el tipo establecido en config.json
-func crearInterfaz(configJson config.IO) {
-	switch configJson.Type {
+// Implemantación de la Interfaz Génerica
 
-	case "GENERICA":
-		crearInterfazGenerica(configJson)
+func createHandlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	case "STDIN":
-		//crearInterfazSTDIN()
+		//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la unidadesDeTrabajo)
+		var unidadesDeTrabajo int
 
-	case "STDOUT":
-		//crearInterfazSTDOUT()
+		// Decodifica el request (codificado en formato json)
+		err := json.NewDecoder(r.Body).Decode(&unidadesDeTrabajo)
+
+		// Error de la decodificación
+		if err != nil {
+			fmt.Printf("Error al decodificar request body: ")
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Imprime el request por consola (del lado del server)
+		fmt.Println("Request path:", unidadesDeTrabajo)
+
+		//Ejecuta IO_GEN_SLEEP
+		sleepTime := configIO.Unit_Work_Time * unidadesDeTrabajo
+		time.Sleep(time.Duration(sleepTime))
+
+		// Responde al cliente
+		w.WriteHeader(http.StatusOK)
 
 	}
 }
-
-func crearInterfazGenerica(configJson config.IO) {
-
-	time.Sleep(time.Duration(configJson.Unit_Work_Time))
-}
-
-// func crearInterfazSTDIN(){}
-// func crearInterfazSTDOUT(){}
-
-//TODO: Interfaz Genérica desarrollada.
-/*
-	 En el config.json está la unidad de trabajo,
-	 cuyo valor se va a multiplicar
-	 por otro valor dado según el tipo de interfaz que tengamos,
-
-	 Al iniciar una Interfaz de I/O la misma deberá recibir 2 parámetros:
- 	 -Nombre (id)
-	 -Archivo de Configuración.
-
-	 _INTERFACES GENÉRICAS_
-	Ante una petición van a esperar una cantidad de unidades de trabajo,
-	cuyo valor va a venir dado en la petición desde el Kernel.
-
-	Las instrucciones que aceptan estas interfaces son:
-	IO_GEN_SLEEP
-
-	Al leer el archivo de configuración solo le van a importar las propiedades de:
-	type
-	unit_work_time
-	ip_kernel
-	port_kernel
-
-*/
