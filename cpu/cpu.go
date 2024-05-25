@@ -221,6 +221,9 @@ func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFin
 	case "JNZ":
 		jnz(variable[1], variable[2], PC, registrosMap)
 
+	case "IO_GEN_SLEEP":
+		IoGenSleep(variable[1], variable[2], registrosMap)
+
 	case "EXIT":
 		*cicloFinalizado = true
 		PCB.RegistrosUsoGeneral = registrosCPU
@@ -329,7 +332,52 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 }
 
-// func io_gen_sleep() {}
+type InstruccionIO struct {
+	NombreInterfaz string
+	Instruccion    string
+	UnitWorkTime   int
+}
+
+// Envía una request a kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
+func IoGenSleep(reg1 string, reg2 string, registroMap map[string]*uint8) {
+	//Variable 1: Nombre interfaz
+	//Variable 2: UnitWorkTime
+	//En segundo lugar va "IO_GEN_SLEEP"
+
+	//Busco los registros
+	nombreInterfazInt8, encontrado := registroMap[reg1]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	UnitWorkTime, encontrado := registroMap[reg2]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	//Pasa de uint8 a string.
+	nombreInterfaz := strconv.Itoa(int(*nombreInterfazInt8))
+
+	//Confecciona el body.
+	body, err := json.Marshal(InstruccionIO{
+		NombreInterfaz: string(nombreInterfaz),
+		Instruccion:    "IO_GEN_SLEEP",
+		UnitWorkTime:   int(*UnitWorkTime),
+	})
+	if err != nil {
+		return
+	}
+	//Envía la request
+	respuesta := config.Request(8001, "127.0.0.1", "POST", "instruccion", body)
+
+	// Verificar que no hubo error en la request
+	if respuesta == nil {
+		return
+	}
+	//Que hacer con la respuesta????
+}
 
 func checkInterrupt() {
 	//Checkea si hay interrupciones.
