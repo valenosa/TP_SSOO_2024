@@ -17,6 +17,8 @@ type Cpu struct {
 	Port_Memory        int    `json:"port_memory"`
 	Number_Felling_tlb int    `json:"number_felling_tlb"`
 	Algorithm_tlb      string `json:"algorithm_tlb"`
+	Ip_Kernel          string `json:"ip_kernel"`
+	Port_Kernel        int    `json:"port_kernel"`
 }
 
 type IO struct {

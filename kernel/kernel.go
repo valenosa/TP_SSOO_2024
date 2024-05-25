@@ -16,11 +16,15 @@ import (
 
 //-------------------------- STRUCTS -----------------------------------------
 
+type RequestInterfaz struct {
+	NombreInterfaz string
+	Interfaz       Interfaz
+}
+
 // MOVELO A UTILS (struct tambien usada por entrasalida.go)
 type Interfaz struct {
-	Nombre string
-	Tipo   string
-	Puerto int
+	TipoInterfaz   string
+	PuertoInterfaz int
 }
 
 type InstruccionIO struct {
@@ -31,14 +35,17 @@ type InstruccionIO struct {
 
 //-------------------------- VARIABLES --------------------------
 
-var newQueue []proceso.PCB          //Debe tener mutex
-var readyQueue []proceso.PCB        //Debe tener mutex
-var blockQueue []proceso.PCB        //Debe tener mutex
-var CPUOcupado bool = false         //Esto se hace con un sem binario
-var planificadorActivo bool = true  //Esto se hace con un sem binario
-var interfacesConectadas []Interfaz //Debe tener mutex
-var readyQueueVacia bool = true     //Esto se hace con un sem binario
+var newQueue []proceso.PCB                           //Debe tener mutex
+var readyQueue []proceso.PCB                         //Debe tener mutex
+var blockQueue []proceso.PCB                         //Debe tener mutex
+var exitQueue []proceso.PCB                          //Debe tener mutex
+var CPUOcupado bool = false                          //Esto se hace con un sem binario
+var planificadorActivo bool = true                   //Esto se hace con un sem binario
+var interfacesConectadas = make(map[string]Interfaz) //Debe tener mutex
+var readyQueueVacia bool = true                      //Esto se hace con un sem binario
 var counter int = 0
+
+var hayInterfaz = make(chan int)
 
 func main() {
 
@@ -53,21 +60,27 @@ func main() {
 	// Configura el logger
 	config.Logger("Kernel.log")
 
-	// teste la conectividad con otros modulos
-	testPlanificacion(configJson)
-
 	//Establezco petición
 	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
-	// // declaro puerto
+	// declaro puerto
 	port := ":" + strconv.Itoa(configJson.Port)
 
-	// Listen and serve con info del config.json
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Error al esuchar en el puerto " + port)
-	}
+	// Inicio el servidor en una goroutine para que no bloquee la ejecución del programa
+	go func() {
+		err := http.ListenAndServe(port, nil)
+		if err != nil {
+			fmt.Println("Error al escuchar en el puerto " + port)
+		}
+	}()
+	fmt.Printf("Antes del test")
+
+	// Ahora que el servidor está en ejecución, puedo iniciar el ciclo de instrucción
+	<-hayInterfaz
+	testCicloDeInstruccion(configJson)
+
+	fmt.Printf("Despues del test")
 
 }
 
@@ -76,7 +89,7 @@ func main() {
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 
 	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
-	var request Interfaz
+	var request RequestInterfaz
 
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -92,7 +105,9 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", request)
 
 	//Guarda la interfaz en la lista de interfaces conectadas.
-	interfacesConectadas = append(interfacesConectadas, request)
+	interfacesConectadas[request.NombreInterfaz] = request.Interfaz
+
+	hayInterfaz <- 0
 }
 
 // TODO: implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
@@ -114,20 +129,20 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", request)
 
 	// Funcion que busca en la lista de interfacesConectadas
-	interfaz := buscarInstruccion(request)
+	interfaz, encontrado := interfacesConectadas[request.NombreInterfaz]
 
 	// IMPLEMENTAR
-	if interfaz == nil {
+	if !encontrado {
 		//Mandar proceso a EXIT
 		fmt.Println("Mandar proceso a EXIT.") // ESTO NO ESTA IMPLEMENTADO
 		return
 	}
 
 	//Verificar que la instruccion sea compatible con el tipo de interfaz.
-	isvalid := validarInstruccion(interfaz.Tipo, request.Instruccion)
+	valid := validarInstruccion(interfaz.TipoInterfaz, request.Instruccion)
 
 	// IMPLEMENTAR
-	if !isvalid {
+	if !valid {
 		fmt.Println("Instruccion no compatible.")
 		//Mandar proceso a EXIT
 		fmt.Println("Mandar proceso a EXIT.") // ESTO NO ESTA IMPLEMENTADO
@@ -143,7 +158,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Mandar a ejecutar a la interfaz (Puerto)
-	respuesta := config.Request(interfaz.Puerto, "localhost", "POST", request.Instruccion, body)
+	respuesta := config.Request(interfaz.PuertoInterfaz, "localhost", "POST", request.Instruccion, body)
 
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
@@ -156,7 +171,6 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 		//Pasar proceso a ready
 		fmt.Println("Mandar proceso a READY.")
 	}
-
 }
 
 func validarInstruccion(tipo string, instruccion string) bool {
@@ -166,16 +180,6 @@ func validarInstruccion(tipo string, instruccion string) bool {
 		return instruccion == "IO_GEN_SLEEP"
 	}
 	return false
-}
-
-// Busca si la interfaz existe en el slice de interfacesConectadas.
-func buscarInstruccion(request InstruccionIO) *Interfaz {
-	for _, interfaz := range interfacesConectadas {
-		if interfaz.Nombre == request.NombreInterfaz {
-			return &interfaz
-		}
-	}
-	return nil
 }
 
 //-------------------------- ADJACENT FUNCTIONS ------------------------------------
@@ -191,7 +195,7 @@ func asignarPCB(nuevoPCB proceso.PCB, respuesta proceso.Response) {
 	logCambioDeEstado(pcb_estado_viejo, nuevoPCB)
 
 	// Agrega el nuevo PCB a readyQueue
-	enviarAPlanificador(nuevoPCB)
+	administrarQueues(nuevoPCB)
 }
 
 //-------------------------- API's --------------------------------------------------
@@ -345,10 +349,10 @@ func dispatch(pcb proceso.PCB, configJson config.Kernel) {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var response string
+	var pcbRecibido proceso.PCB
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
-	err = json.NewDecoder(respuesta.Body).Decode(&response)
+	err = json.NewDecoder(respuesta.Body).Decode(&pcbRecibido)
 
 	// Error Handler para al decodificación
 	if err != nil {
@@ -357,9 +361,13 @@ func dispatch(pcb proceso.PCB, configJson config.Kernel) {
 	}
 	//-------------------Fin Request al CPU------------------------
 
+	administrarQueues(pcbRecibido)
+
 	//Se muestra la respuesta del CPU
-	fmt.Println(response)
+	fmt.Println(pcbRecibido)
 	CPUOcupado = false
+
+	fmt.Println("Exit queue:", exitQueue)
 }
 
 func interrupt() {
@@ -368,20 +376,26 @@ func interrupt() {
 //-------------------------- PLANIFICACIÓN --------------------------------------------------
 
 // Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
-func enviarAPlanificador(pcb proceso.PCB) {
+func administrarQueues(pcb proceso.PCB) {
 
 	switch pcb.Estado {
 	case "NEW":
 		newQueue = append(newQueue, pcb)
+
 	case "READY":
 		readyQueue = append(readyQueue, pcb)
 		readyQueueVacia = false
 		logPidsReady(readyQueue)
 
+	//Deberia ser una por cada IO. Revisar
 	case "BLOCK":
-
 		blockQueue = append(blockQueue, pcb)
 		logPidsBlock(blockQueue)
+
+	// Agrega los procesos en exit a una queue. Quedan en estado Zombie hasta que el kernel los lea. (Debería ser un map, pero me da paja armarlo ahora)
+	// Hay que chequear si esto es necesario para el tp
+	case "EXIT":
+		exitQueue = append(exitQueue, pcb)
 	}
 }
 
@@ -475,6 +489,15 @@ func testPlanificacion(configJson config.Kernel) {
 		path := "proceso" + strconv.Itoa(counter) + ".txt"
 		iniciarProceso(configJson, path)
 	}
+}
+
+func testCicloDeInstruccion(configJson config.Kernel) {
+
+	fmt.Printf("\nSe crean 1 proceso-------------\n\n")
+	iniciarProceso(configJson, "proceso_test")
+
+	fmt.Printf("\nSe testea el planificador-------------\n\n")
+	planificador(configJson)
 }
 
 // -------------------------- LOG's --------------------------------------------------
