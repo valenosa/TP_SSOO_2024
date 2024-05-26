@@ -27,6 +27,7 @@ type Interfaz struct {
 	PuertoInterfaz int
 }
 
+// MOVELO A UTILS (struct tambien usada por cpu.go)
 type InstruccionIO struct {
 	NombreInterfaz string
 	Instruccion    string
@@ -39,6 +40,7 @@ var newQueue []proceso.PCB                           //Debe tener mutex
 var readyQueue []proceso.PCB                         //Debe tener mutex
 var blockQueue []proceso.PCB                         //Debe tener mutex
 var exitQueue []proceso.PCB                          //Debe tener mutex
+var procesoExec proceso.PCB                          //Debe tener mutex
 var CPUOcupado bool = false                          //Esto se hace con un sem binario
 var planificadorActivo bool = true                   //Esto se hace con un sem binario
 var interfacesConectadas = make(map[string]Interfaz) //Debe tener mutex
@@ -54,20 +56,20 @@ func main() {
 	// Extrae info de config.json
 	config.Iniciar("config.json", &configJson)
 
-	// testea la conectividad con otros modulos
+	// Testea la conectividad con otros modulos
 	//Conectividad(configJson)
 
 	// Configura el logger
 	config.Logger("Kernel.log")
 
-	//Establezco petición
+	// Establece los endpoints.
 	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
-	// declaro puerto
+	// Declara su puerto
 	port := ":" + strconv.Itoa(configJson.Port)
 
-	// Inicio el servidor en una goroutine para que no bloquee la ejecución del programa
+	// Inicio el servidor en una go-routine para que no bloquee la ejecución del programa
 	go func() {
 		err := http.ListenAndServe(port, nil)
 		if err != nil {
@@ -86,32 +88,35 @@ func main() {
 
 //-------------------------- FUNCIONES ---------------------------------------------
 
+// Recibe una interfaz y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 
-	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
-	var request RequestInterfaz
+	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la requestInterfaz)
+	var requestInterfaz RequestInterfaz
 
 	// Decodifica el request (codificado en formato json)
-	err := json.NewDecoder(r.Body).Decode(&request)
+	err := json.NewDecoder(r.Body).Decode(&requestInterfaz)
 
 	// Error Handler de la decodificación
 	if err != nil {
-		fmt.Printf("Error al decodificar request body: ")
+		logErrorDecode()
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Imprime el request por consola (del lado del server)
-	fmt.Println("Request path:", request)
+	fmt.Println("Request path:", requestInterfaz)
 
 	//Guarda la interfaz en la lista de interfaces conectadas.
-	interfacesConectadas[request.NombreInterfaz] = request.Interfaz
+	interfacesConectadas[requestInterfaz.NombreInterfaz] = requestInterfaz.Interfaz
 
 	hayInterfaz <- 0
 }
 
+var volvioElProceso = make(chan int)
 // TODO: implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
 func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
+
 	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
 	var request InstruccionIO
 
@@ -120,8 +125,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Error Handler de la decodificación
 	if err != nil {
-		fmt.Printf("Error al decodificar request body: ")
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		logErrorDecode()
 		return
 	}
 
@@ -131,46 +135,70 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Funcion que busca en la lista de interfacesConectadas
 	interfaz, encontrado := interfacesConectadas[request.NombreInterfaz]
 
+	
 	// IMPLEMENTAR
 	if !encontrado {
 		//Mandar proceso a EXIT
-		fmt.Println("Mandar proceso a EXIT.") // ESTO NO ESTA IMPLEMENTADO
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println("EL WRITEHEADER FUNCIONA")
 		return
 	}
 
 	//Verificar que la instruccion sea compatible con el tipo de interfaz.
-	valid := validarInstruccion(interfaz.TipoInterfaz, request.Instruccion)
-
+	isValid := validarInstruccion(interfaz.TipoInterfaz, request.Instruccion)
+	
 	// IMPLEMENTAR
-	if !valid {
-		fmt.Println("Instruccion no compatible.")
+	if !isValid {
 		//Mandar proceso a EXIT
-		fmt.Println("Mandar proceso a EXIT.") // ESTO NO ESTA IMPLEMENTADO
+		fmt.Println("Instruccion no compatible.")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println("EL WRITEHEADER FUNCIONA")
+		return
 	}
-
+	
+	//El proceso se debería mandar a BLOCK acá (TODO: pero por fines prácticos de la prueba con un solo proceso se lo hace en el planificador (apenas termina de ejecutarse dispatch).
+	
 	//Preparo la interfaz para enviarla en un body.
 	body, err := json.Marshal(request.UnitWorkTime)
-
+	
 	//Check si no hay errores al crear el body.
 	if err != nil {
 		fmt.Printf("error codificando body: %s", err.Error())
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
+	
+	//Esta implementacion con los headers está mal, deberian manejarse los estados más arriba de la funcion
+	w.WriteHeader(http.StatusOK)
+	fmt.Println("EL WRITEHEADER FUNCIONA")
+	
+	
+	
 	// Mandar a ejecutar a la interfaz (Puerto)
 	respuesta := config.Request(interfaz.PuertoInterfaz, "localhost", "POST", request.Instruccion, body)
-
+	
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
 		return
 	}
-
-	//A IMPLEMENTAR
+	<-volvioElProceso
+	
 	//Una vez que llega el status 200(OK) pasar el proceso a READY.
 	if respuesta.StatusCode == http.StatusOK {
-		//Pasar proceso a ready
+		//Pasar proceso a ready (TODO: esto se deberia hacer en la queue especifica del IO en particular, pero ahora usamos una sola con fines prácticos)
 		fmt.Println("Mandar proceso a READY.")
+		var poppedPCB proceso.PCB
+		blockQueue, poppedPCB = dequeuePCB(blockQueue)
+		fmt.Printf("El length de blockQueue es: %d", (len(blockQueue)))
+		poppedPCB.Estado = "READY"
+		administrarQueues(poppedPCB)
+
+		//SACAR ESTO
+		fmt.Println("READY QUEUE", readyQueue)
 	}
+
+	// Todos
+
 }
 
 func validarInstruccion(tipo string, instruccion string) bool {
@@ -324,7 +352,14 @@ func detenerPlanificacion(configJson config.Kernel) {
 	}
 }
 
-func dispatch(pcb proceso.PCB, configJson config.Kernel) {
+type RespuestaDispatch struct {
+	MotivoDeDesalojo string
+	PCB              proceso.PCB
+}
+
+// Le envia un PCB al CPU
+func dispatch(pcb proceso.PCB, configJson config.Kernel) (proceso.PCB, string) {
+
 	//Envia PCB al CPU
 	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
 
@@ -332,45 +367,81 @@ func dispatch(pcb proceso.PCB, configJson config.Kernel) {
 	CPUOcupado = true
 
 	//-------------------Request al CPU------------------------
-	//Capaz no es necesario mandar todo el PID
+
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(pcb)
 	// Error Handler de la codificación
 	if err != nil {
 		fmt.Printf("error codificando body: %s", err.Error())
-		return
+		return proceso.PCB{}, "ERROR"
 	}
 
 	// Enviar request al servidor
 	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
 	// Verificar que no hubo error en la request
 	if respuesta == nil {
-		return
+		return proceso.PCB{}, "ERROR"
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var pcbRecibido proceso.PCB
+	var respuestaDispatch RespuestaDispatch
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
-	err = json.NewDecoder(respuesta.Body).Decode(&pcbRecibido)
+	err = json.NewDecoder(respuesta.Body).Decode(&respuestaDispatch)
 
 	// Error Handler para al decodificación
 	if err != nil {
 		fmt.Printf("Error decodificando\n")
-		return
+		return proceso.PCB{}, "ERROR"
 	}
 	//-------------------Fin Request al CPU------------------------
+	fmt.Println("Motivo de desalojo:", respuestaDispatch.MotivoDeDesalojo)
 
-	administrarQueues(pcbRecibido)
-
-	//Se muestra la respuesta del CPU
-	fmt.Println(pcbRecibido)
 	CPUOcupado = false
 
 	fmt.Println("Exit queue:", exitQueue)
+
+	return respuestaDispatch.PCB, respuestaDispatch.MotivoDeDesalojo
 }
 
-func interrupt() {
+// Envía una interrupción al ciclo de instrucción.
+func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
+
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/interrupciones", configJson.Ip_CPU, configJson.Port_CPU)
+	req, err := http.NewRequest("POST", url, nil)
+
+	if err != nil {
+		return
+	}
+
+	//string(pid)
+	pidString := strconv.Itoa(pid)
+
+	//Pasa como param el tipoDeInterrupcion
+	q := req.URL.Query()
+	q.Add("pid", string(pidString))
+	q.Add("interrupt_type", tipoDeInterrupcion)
+
+	req.URL.RawQuery = q.Encode()
+
+	//Envía la request con el pid y el tipo de interrupcion.
+	req.Header.Set("Content-Type", "text/plain")
+	respuesta, err := cliente.Do(req)
+
+	// Verifica que no hubo error al enviar la request
+	if err != nil {
+		fmt.Println("Error al enviar la interrupción a CPU.")
+		return
+	}
+
+	// Verifica que no hubo error en la respuesta.
+	if respuesta.StatusCode != http.StatusOK {
+		fmt.Println("Error al interpretar el motivo de desalojo.")
+		return
+	}
+
+	fmt.Println("Interrupción enviada correctamente.")
 }
 
 //-------------------------- PLANIFICACIÓN --------------------------------------------------
@@ -389,6 +460,7 @@ func administrarQueues(pcb proceso.PCB) {
 
 	//Deberia ser una por cada IO. Revisar
 	case "BLOCK":
+		// En realidad debería meterlo a una cola especifica dependiendo del IO
 		blockQueue = append(blockQueue, pcb)
 		logPidsBlock(blockQueue)
 
@@ -396,6 +468,9 @@ func administrarQueues(pcb proceso.PCB) {
 	// Hay que chequear si esto es necesario para el tp
 	case "EXIT":
 		exitQueue = append(exitQueue, pcb)
+		//momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el pcb (o alguna estructura que la contenga)
+		//motivoDeFinalizacion := "SUCCESS"
+		//logFinDeProceso(pcb, motivoDeFinalizacion)
 	}
 }
 
@@ -415,7 +490,7 @@ func planificador(configJson config.Kernel) {
 		//Si la lista de READY está vacía, se detiene el planificador
 		if len(readyQueue) == 0 {
 			//Si la lista está vacía, se detiene el planificador
-			fmt.Println("Esperando nuevos procesos...") //Se puede implementar un log en nuestro archivo no-oficial de logs
+			logEsperaNuevosProcesos()
 			readyQueueVacia = true
 			planificadorActivo = false
 			break
@@ -425,8 +500,36 @@ func planificador(configJson config.Kernel) {
 		//Se envía el primer proceso y se hace un dequeue del mismo de la lista READY
 		var poppedPCB proceso.PCB
 		readyQueue, poppedPCB = dequeuePCB(readyQueue)
+		//Debería estar en dispatch?
 		estadoAExec(&poppedPCB)
-		dispatch(poppedPCB, configJson)
+		//Será siempre READY cuando pasa a EXEC?
+		logCambioDeEstado("READY", poppedPCB)
+		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
+
+		if motivoDesalojo == "" {
+			fmt.Println("Error en Dispatch.")
+			return
+		}
+
+		switch motivoDesalojo {
+		case "EXIT":
+			pcbActualizado.Estado = "EXIT"
+			//SACAR ESTO
+			fmt.Println("EXIT", procesoExec)
+
+		case "INTERFAZ_ERROR":
+			pcbActualizado.Estado = "EXIT"
+			//SACAR ESTO
+			fmt.Println("EXIT", procesoExec)
+
+		case "INTERFAZ_OK":
+			pcbActualizado.Estado = "BLOCK"
+			//SACAR ESTO
+			fmt.Println("BLOCK QUEUE", blockQueue)
+		}
+		administrarQueues(pcbActualizado)
+
+		volvioElProceso <- 1
 	}
 }
 
@@ -438,6 +541,7 @@ func dequeuePCB(listaPCB []proceso.PCB) ([]proceso.PCB, proceso.PCB) {
 
 func estadoAExec(pcb *proceso.PCB) {
 	(*pcb).Estado = "EXEC"
+	procesoExec = *pcb
 }
 
 //-------------------------- TEST --------------------------------------------------
@@ -525,7 +629,14 @@ func logPidsReady(readyQueue []proceso.PCB) {
 	log.Printf("Cola Ready 'readyQueue' : %v", pids)
 }
 
-//LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS
+// log obligatorio (4/6)
+func logFinDeProceso(pcb proceso.PCB, motivoDeFinalizacion string) {
+
+	log.Printf("Finaliza el proceso: %d - Motivo: %s", pcb.PID, motivoDeFinalizacion)
+
+}
+
+//LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS ----------------------------
 
 // log para el manejo de listas BLOCK
 func logPidsBlock(blockQueue []proceso.PCB) {
@@ -547,4 +658,15 @@ func logPidsExec(ExecQueue []proceso.PCB) {
 	}
 
 	fmt.Printf("Cola Executing 'ExecQueue' : %v", pids)
+}
+
+func logEsperaNuevosProcesos() {
+
+	fmt.Println("Esperando nuevos procesos...")
+
+}
+
+func logErrorDecode() {
+
+	fmt.Printf("Error al decodificar request body: ")
 }

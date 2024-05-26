@@ -37,6 +37,7 @@ func main() {
 	// http.HandleFunc("DELETE /plani", handlerDetenerPlanificacion)
 
 	http.HandleFunc("POST /exec", handlerEjecutarProceso)
+	http.HandleFunc("POST /interrupciones", handlerInterrupcion)
 
 	// Extrae info de config.json
 	config.Iniciar("config.json", &configJson)
@@ -79,7 +80,6 @@ func enviarInstruccionIO_GEN_SLEEP(instruccion IO_GEN_SLEEP) {
 	if respuesta == nil{
 		fmt.Println("Fallo en el envío de instrucción desde CPU a Kernel.")
 	}
-
 }*/
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
@@ -112,6 +112,17 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
+// Contiene el pid del proceso que dispatch mandó a ejecutar
+var pidEnEjecucion uint32
+
+type RespuestaDispatch struct {
+	MotivoDeDesalojo string
+	PCB              proceso.PCB
+}
+
+// Hay que pasarlla a local
+var motivoDeDesalojo string
+
 func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	// Crea uan variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
 	var pcbRecibido proceso.PCB
@@ -126,14 +137,17 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simula ejecutar el proceso
+	// Ejecuta el ciclo de instrucción.
+	pidEnEjecucion = pcbRecibido.PID
 	ejecutarCiclosDeInstruccion(&pcbRecibido)
 
 	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
-	// Falta devolver tambien el motivo de desalojo. Tenemos que charlar cuales son los motivos y como lo almacenamos.
-	// Codificar Response en un array de bytes (formato json)
-	respuesta, err := json.Marshal(pcbRecibido)
+	// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
+	respuesta, err := json.Marshal(RespuestaDispatch{
+		MotivoDeDesalojo: motivoDeDesalojo,
+		PCB:              pcbRecibido,
+	})
 
 	// Error Handler de la codificación
 	if err != nil {
@@ -146,19 +160,58 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-func ejecutarCiclosDeInstruccion(PCB *proceso.PCB) {
-	var cicloFInalizado bool = false
+var hayInterrupcion bool = false
 
-	for {
-		instruccion := fetch(PCB.PID, registrosCPU.PC)
-		decodeAndExecute(PCB, instruccion, &registrosCPU.PC, &cicloFInalizado)
-		if cicloFInalizado {
-			break
-		}
-		checkInterrupt()
+// Checkea que Kernel no haya enviado interrupciones
+func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+
+	// Está en una global; despues cambiar.
+	motivoDeDesalojo = queryParams.Get("interrupt_type")
+
+	PID, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
+
+	if errPid != nil {
+		return
 	}
+
+	if uint32(PID) != pidEnEjecucion {
+		return
+	}
+
+	hayInterrupcion = true
+
+	/*en caso de que haya interrupcion,
+	se devuelve el Contexto de Ejecución actualizado al Kernel con motivo de la interrupción.*/
+
+	// respuesta, err := json.Marshal(instruccion)
+	// fmt.Println(respuesta)
+
+	// if err != nil {
+	// 	http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// w.WriteHeader(http.StatusOK)
+	// w.Write([]byte(instruccion))
 }
 
+//---------------------FUNCIONES CICLO DE INSTRUCCION---------------------
+
+// Ejecuta un ciclo de instruccion.
+func ejecutarCiclosDeInstruccion(PCB *proceso.PCB) {
+	var cicloFinalizado bool = false
+
+	//Itera el ciclo de instruccion si hay instrucciones a ejecutar y no hay interrupciones
+	for !hayInterrupcion && !cicloFinalizado {
+		instruccion := fetch(PCB.PID, registrosCPU.PC)
+		decodeAndExecute(PCB, instruccion, &registrosCPU.PC, &cicloFinalizado)
+	}
+	PCB.RegistrosUsoGeneral = registrosCPU
+
+}
+
+// Trae de memoria las instrucciones indicadas por el PC y el PID.
 func fetch(PID uint32, PC uint32) string {
 
 	// Se pasan PID y PC a string
@@ -197,6 +250,7 @@ func fetch(PID uint32, PC uint32) string {
 	return string(bodyBytes)
 }
 
+// Ejecuta las instrucciones traidas de memoria.
 func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
 
 	var registrosMap = map[string]*uint8{
@@ -206,6 +260,7 @@ func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFin
 		"DX": &registrosCPU.DX,
 	}
 
+	//Parsea las instrucciones de string a string[]
 	variable := strings.Split(instruccion, " ")
 
 	fmt.Println("Instruccion: ", variable[0], " Parametros: ", variable[1:])
@@ -224,18 +279,14 @@ func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFin
 		jnz(variable[1], variable[2], PC, registrosMap)
 
 	case "IO_GEN_SLEEP":
-		IoGenSleep(variable[1], variable[2], registrosMap)
+		*cicloFinalizado = true
+		IoGenSleep(variable[1],
+
+			variable[2], registrosMap)
 
 	case "EXIT":
 		*cicloFinalizado = true
-		PCB.RegistrosUsoGeneral = registrosCPU
-
-		//El estado debería pasar a EXIT acá o en Kernel?
-		estadoAExit := func() {
-			PCB.Estado = "EXIT"
-		}
-
-		defer estadoAExit()
+		motivoDeDesalojo = "EXIT"
 
 		return
 
@@ -248,6 +299,7 @@ func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFin
 
 //---------------------FUNCIONES DE INSTRUCCIONES---------------------
 
+// Asigna al registro el valor pasado como parámetro.
 func set(reg string, dato string, registroMap map[string]*uint8, PC *uint32) {
 
 	//Checkea si existe el registro obtenido de la instruccion.
@@ -280,6 +332,7 @@ func set(reg string, dato string, registroMap map[string]*uint8, PC *uint32) {
 	*registro = uint8(valor)
 }
 
+// Suma al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
 func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
 	//Checkea si existe el registro obtenido de la instruccion.
 	registro1, encontrado := registroMap[reg1]
@@ -298,6 +351,7 @@ func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
 
 }
 
+// Resta al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
 func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
 	//Checkea si existe el registro obtenido de la instruccion.
 	registro1, encontrado := registroMap[reg1]
@@ -315,6 +369,7 @@ func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
 	*registro1 -= *registro2
 }
 
+// Si el valor del registro es distinto de cero, actualiza el PC al numero de instruccion pasada por parametro.
 func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	registro, encontrado := registroMap[reg]
 	if !encontrado {
@@ -341,19 +396,16 @@ type InstruccionIO struct {
 	UnitWorkTime   int
 }
 
-// Envía una request a kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
+// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
 func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8) {
-	//Variable 1: Nombre interfaz
-	//Variable 2: UnitWorkTime
-	//En segundo lugar va "IO_GEN_SLEEP"
 
-	//Pasa de unitWorkTime de string a int con ATOI
+	// int(unitWorkTime)
 	unitWorkTime, err := strconv.Atoi(unitWorkTimeString)
 	if err != nil {
 		return
 	}
 
-	//Confecciona el body.
+	//Pasa la instruccion a formato JSON.
 	body, err := json.Marshal(InstruccionIO{
 		NombreInterfaz: nombreInterfaz,
 		Instruccion:    "IO_GEN_SLEEP",
@@ -362,16 +414,23 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	if err != nil {
 		return
 	}
+
 	//Envía la request
 	respuesta := config.Request(configJson.Port_Kernel, configJson.Ip_Kernel, "POST", "instruccion", body)
 
-	// Verificar que no hubo error en la request
-	if respuesta == nil {
+	// Check si no ejecuta la interfaz por un error.
+	if respuesta.StatusCode == http.StatusBadRequest {
+
+		motivoDeDesalojo = "INTERFAZ_ERROR"
 		return
 	}
-	//Que hacer con la respuesta????
-}
 
-func checkInterrupt() {
-	//Checkea si hay interrupciones.
+	// Check si ejecuta la interfaz.
+	if respuesta.StatusCode == http.StatusOK {
+
+		motivoDeDesalojo = "INTERFAZ_OK"
+		return
+	}
+
+	fmt.Println("Error en la respuesta")
 }
