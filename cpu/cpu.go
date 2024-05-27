@@ -280,12 +280,12 @@ func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
-		IoGenSleep(variable[1],
-
-			variable[2], registrosMap)
+		PCB.Estado = "BLOCK"
+		IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
 
 	case "EXIT":
 		*cicloFinalizado = true
+		PCB.Estado = "EXIT"
 		motivoDeDesalojo = "EXIT"
 
 		return
@@ -391,13 +391,14 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 }
 
 type InstruccionIO struct {
+	PidDesalojado  uint32
 	NombreInterfaz string
 	Instruccion    string
 	UnitWorkTime   int
 }
 
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
-func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8) {
+func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
 
 	// int(unitWorkTime)
 	unitWorkTime, err := strconv.Atoi(unitWorkTimeString)
@@ -407,6 +408,7 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 	//Pasa la instruccion a formato JSON.
 	body, err := json.Marshal(InstruccionIO{
+		PidDesalojado:  PID,
 		NombreInterfaz: nombreInterfaz,
 		Instruccion:    "IO_GEN_SLEEP",
 		UnitWorkTime:   unitWorkTime,
@@ -418,19 +420,6 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	//Envía la request
 	respuesta := config.Request(configJson.Port_Kernel, configJson.Ip_Kernel, "POST", "instruccion", body)
 
-	// Check si no ejecuta la interfaz por un error.
-	if respuesta.StatusCode == http.StatusBadRequest {
-
-		motivoDeDesalojo = "INTERFAZ_ERROR"
-		return
-	}
-
-	// Check si ejecuta la interfaz.
-	if respuesta.StatusCode == http.StatusOK {
-
-		motivoDeDesalojo = "INTERFAZ_OK"
-		return
-	}
-
-	fmt.Println("Error en la respuesta")
+	//TODO: Implementar respuesta si es necesario.
+	fmt.Print(respuesta)
 }

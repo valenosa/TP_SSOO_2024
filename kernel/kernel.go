@@ -25,10 +25,12 @@ type RequestInterfaz struct {
 type Interfaz struct {
 	TipoInterfaz   string
 	PuertoInterfaz int
+	QueueBlock     []uint32
 }
 
 // MOVELO A UTILS (struct tambien usada por cpu.go)
 type InstruccionIO struct {
+	PidDesalojado  uint32
 	NombreInterfaz string
 	Instruccion    string
 	UnitWorkTime   int
@@ -38,7 +40,7 @@ type InstruccionIO struct {
 
 var newQueue []proceso.PCB                           //Debe tener mutex
 var readyQueue []proceso.PCB                         //Debe tener mutex
-var blockQueue []proceso.PCB                         //Debe tener mutex
+var blockedMap = make(map[uint32]proceso.PCB)        //Debe tener mutex
 var exitQueue []proceso.PCB                          //Debe tener mutex
 var procesoExec proceso.PCB                          //Debe tener mutex
 var CPUOcupado bool = false                          //Esto se hace con un sem binario
@@ -113,7 +115,6 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 	hayInterfaz <- 0
 }
 
-var volvioElProceso = make(chan int)
 // TODO: implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
 func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
@@ -132,73 +133,71 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Imprime el request por consola (del lado del server)
 	fmt.Println("Request path:", request)
 
-	// Funcion que busca en la lista de interfacesConectadas
+	// Busca en la lista de interfacesConectadas
 	interfaz, encontrado := interfacesConectadas[request.NombreInterfaz]
 
-	
-	// IMPLEMENTAR
+	// Si no se encontró la interfaz de la request, se desaloja el proceso.
 	if !encontrado {
-		//Mandar proceso a EXIT
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("EL WRITEHEADER FUNCIONA")
+
+		pcbDesalojado := blockedMap[request.PidDesalojado]
+		//TODO: Hacer wrapper de delete
+		delete(blockedMap, request.PidDesalojado)
+		pcbDesalojado.Estado = "EXIT"
+		administrarQueues(pcbDesalojado)
+
+		fmt.Println("Interfaz no conectada.")
 		return
 	}
 
 	//Verificar que la instruccion sea compatible con el tipo de interfaz.
 	isValid := validarInstruccion(interfaz.TipoInterfaz, request.Instruccion)
-	
+
 	// IMPLEMENTAR
 	if !isValid {
+
+		//!No repetir logica
+		pcbDesalojado := blockedMap[request.PidDesalojado]
+		//TODO: Hacer wrapper de delete
+		delete(blockedMap, request.PidDesalojado)
+		pcbDesalojado.Estado = "EXIT"
+		administrarQueues(pcbDesalojado)
+
 		//Mandar proceso a EXIT
 		fmt.Println("Instruccion no compatible.")
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("EL WRITEHEADER FUNCIONA")
 		return
 	}
-	
-	//El proceso se debería mandar a BLOCK acá (TODO: pero por fines prácticos de la prueba con un solo proceso se lo hace en el planificador (apenas termina de ejecutarse dispatch).
-	
+
+	//Agrega el proceso a la cola de bloqueados de la interfaz.
+	interfaz.QueueBlock = append(interfaz.QueueBlock, request.PidDesalojado)
+	interfacesConectadas[request.NombreInterfaz] = interfaz
+
 	//Preparo la interfaz para enviarla en un body.
 	body, err := json.Marshal(request.UnitWorkTime)
-	
-	//Check si no hay errores al crear el body.
+
+	//Checkea que no haya errores al crear el body.
 	if err != nil {
 		fmt.Printf("error codificando body: %s", err.Error())
-		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	
-	//Esta implementacion con los headers está mal, deberian manejarse los estados más arriba de la funcion
-	w.WriteHeader(http.StatusOK)
-	fmt.Println("EL WRITEHEADER FUNCIONA")
-	
-	
-	
-	// Mandar a ejecutar a la interfaz (Puerto)
+
+	// Manda a ejecutar a la interfaz (Puerto)
 	respuesta := config.Request(interfaz.PuertoInterfaz, "localhost", "POST", request.Instruccion, body)
-	
-	// Verificar que no hubo error en la request
+
+	// Verifica que no hubo error en la request
 	if respuesta == nil {
 		return
 	}
-	<-volvioElProceso
-	
-	//Una vez que llega el status 200(OK) pasar el proceso a READY.
+
+	//Si la interfaz pudo ejecutar la instrucción, pasa el proceso a READY.
 	if respuesta.StatusCode == http.StatusOK {
-		//Pasar proceso a ready (TODO: esto se deberia hacer en la queue especifica del IO en particular, pero ahora usamos una sola con fines prácticos)
-		fmt.Println("Mandar proceso a READY.")
-		var poppedPCB proceso.PCB
-		blockQueue, poppedPCB = dequeuePCB(blockQueue)
-		fmt.Printf("El length de blockQueue es: %d", (len(blockQueue)))
-		poppedPCB.Estado = "READY"
-		administrarQueues(poppedPCB)
-
-		//SACAR ESTO
-		fmt.Println("READY QUEUE", readyQueue)
+		//Pasar proceso a ready
+		//!No repetir logica
+		pcbDesalojado := blockedMap[request.PidDesalojado]
+		//TODO: Hacer wrapper de delete
+		delete(blockedMap, request.PidDesalojado)
+		pcbDesalojado.Estado = "READY"
+		administrarQueues(pcbDesalojado)
 	}
-
-	// Todos
-
 }
 
 func validarInstruccion(tipo string, instruccion string) bool {
@@ -460,15 +459,15 @@ func administrarQueues(pcb proceso.PCB) {
 
 	//Deberia ser una por cada IO. Revisar
 	case "BLOCK":
-		// En realidad debería meterlo a una cola especifica dependiendo del IO
-		blockQueue = append(blockQueue, pcb)
-		logPidsBlock(blockQueue)
+		//Agrega el pcb en el map de pcb's bloqueados.
+		blockedMap[pcb.PID] = pcb
 
-	// Agrega los procesos en exit a una queue. Quedan en estado Zombie hasta que el kernel los lea. (Debería ser un map, pero me da paja armarlo ahora)
-	// Hay que chequear si esto es necesario para el tp
+		//TODO: Implementar log para el manejo de listas BLOCK con map
+		//logPidsBlock(blockedMap)
+
 	case "EXIT":
 		exitQueue = append(exitQueue, pcb)
-		//momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el pcb (o alguna estructura que la contenga)
+		//TODO: momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el pcb (o alguna estructura que la contenga)
 		//motivoDeFinalizacion := "SUCCESS"
 		//logFinDeProceso(pcb, motivoDeFinalizacion)
 	}
@@ -506,30 +505,10 @@ func planificador(configJson config.Kernel) {
 		logCambioDeEstado("READY", poppedPCB)
 		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
 
-		if motivoDesalojo == "" {
-			fmt.Println("Error en Dispatch.")
-			return
-		}
+		//TODO: Usar motivo de desalojo para algo.
+		fmt.Println(motivoDesalojo)
 
-		switch motivoDesalojo {
-		case "EXIT":
-			pcbActualizado.Estado = "EXIT"
-			//SACAR ESTO
-			fmt.Println("EXIT", procesoExec)
-
-		case "INTERFAZ_ERROR":
-			pcbActualizado.Estado = "EXIT"
-			//SACAR ESTO
-			fmt.Println("EXIT", procesoExec)
-
-		case "INTERFAZ_OK":
-			pcbActualizado.Estado = "BLOCK"
-			//SACAR ESTO
-			fmt.Println("BLOCK QUEUE", blockQueue)
-		}
 		administrarQueues(pcbActualizado)
-
-		volvioElProceso <- 1
 	}
 }
 
@@ -638,7 +617,7 @@ func logFinDeProceso(pcb proceso.PCB, motivoDeFinalizacion string) {
 
 //LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS ----------------------------
 
-// log para el manejo de listas BLOCK
+// TODO: Implementar para blockedMap.
 func logPidsBlock(blockQueue []proceso.PCB) {
 	var pids []uint32
 	//Recorre la lista BLOCK y guarda sus PIDs
