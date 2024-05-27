@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
+	"github.com/sisoputnfrba/tp-golang/utils/APIs/structs"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
@@ -21,7 +21,7 @@ type IO_GEN_SLEEP struct {
 	UnidadesDeTrabajo int
 }
 
-var registrosCPU proceso.RegistrosUsoGeneral
+var registrosCPU structs.RegistrosUsoGeneral
 
 var configJson config.Cpu
 
@@ -117,7 +117,7 @@ var pidEnEjecucion uint32
 
 type RespuestaDispatch struct {
 	MotivoDeDesalojo string
-	PCB              proceso.PCB
+	PCB              structs.PCB
 }
 
 // Hay que pasarlla a local
@@ -125,7 +125,7 @@ var motivoDeDesalojo string
 
 func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	// Crea uan variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
-	var pcbRecibido proceso.PCB
+	var pcbRecibido structs.PCB
 
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&pcbRecibido)
@@ -199,7 +199,7 @@ func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
 //---------------------FUNCIONES CICLO DE INSTRUCCION---------------------
 
 // Ejecuta un ciclo de instruccion.
-func ejecutarCiclosDeInstruccion(PCB *proceso.PCB) {
+func ejecutarCiclosDeInstruccion(PCB *structs.PCB) {
 	var cicloFinalizado bool = false
 
 	//Itera el ciclo de instruccion si hay instrucciones a ejecutar y no hay interrupciones
@@ -251,7 +251,7 @@ func fetch(PID uint32, PC uint32) string {
 }
 
 // Ejecuta las instrucciones traidas de memoria.
-func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
+func decodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
 
 	var registrosMap = map[string]*uint8{
 		"AX": &registrosCPU.AX,
