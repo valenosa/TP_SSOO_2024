@@ -9,17 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sisoputnfrba/tp-golang/utils/APIs/structs"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-// ================================| MAIN |===================================================\\
-
-type IO_GEN_SLEEP struct {
-	Instruccion       string
-	NombreInterfaz    string
-	UnidadesDeTrabajo int
-}
+//================================| MAIN |================================\\
 
 var registrosCPU structs.RegistrosUsoGeneral
 
@@ -115,12 +109,7 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 // Contiene el pid del proceso que dispatch mandó a ejecutar
 var pidEnEjecucion uint32
 
-type RespuestaDispatch struct {
-	MotivoDeDesalojo string
-	PCB              structs.PCB
-}
-
-// Hay que pasarlla a local
+// TODO: Hay que pasarla a local
 var motivoDeDesalojo string
 
 func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +133,7 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
 	// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
-	respuesta, err := json.Marshal(RespuestaDispatch{
+	respuesta, err := json.Marshal(structs.RespuestaDispatch{
 		MotivoDeDesalojo: motivoDeDesalojo,
 		PCB:              pcbRecibido,
 	})
@@ -390,13 +379,6 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 }
 
-type InstruccionIO struct {
-	PidDesalojado  uint32
-	NombreInterfaz string
-	Instruccion    string
-	UnitWorkTime   int
-}
-
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
 func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
 
@@ -407,7 +389,7 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	}
 
 	//Pasa la instruccion a formato JSON.
-	body, err := json.Marshal(InstruccionIO{
+	body, err := json.Marshal(structs.InstruccionIO{
 		PidDesalojado:  PID,
 		NombreInterfaz: nombreInterfaz,
 		Instruccion:    "IO_GEN_SLEEP",

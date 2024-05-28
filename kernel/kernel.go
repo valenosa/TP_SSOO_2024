@@ -8,49 +8,26 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/sisoputnfrba/tp-golang/utils/structs"
-
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
-
-//================================| MAIN |===================================================\\
-
-//-------------------------- STRUCTS -----------------------------------------
-
-type RequestInterfaz struct {
-	NombreInterfaz string
-	Interfaz       Interfaz
-}
-
-// MOVELO A UTILS (struct tambien usada por entrasalida.go)
-type Interfaz struct {
-	TipoInterfaz   string
-	PuertoInterfaz int
-	QueueBlock     []uint32
-}
-
-// MOVELO A UTILS (struct tambien usada por cpu.go)
-type InstruccionIO struct {
-	PidDesalojado  uint32
-	NombreInterfaz string
-	Instruccion    string
-	UnitWorkTime   int
-}
 
 //-------------------------- VARIABLES --------------------------
 
-var newQueue []structs.PCB                           //Debe tener mutex
-var readyQueue []structs.PCB                         //Debe tener mutex
-var blockedMap = make(map[uint32]structs.PCB)        //Debe tener mutex
-var exitQueue []structs.PCB                          //Debe tener mutex
-var structsExec structs.PCB                          //Debe tener mutex
-var CPUOcupado bool = false                          //Esto se hace con un sem binario
-var planificadorActivo bool = true                   //Esto se hace con un sem binario
-var interfacesConectadas = make(map[string]Interfaz) //Debe tener mutex
-var readyQueueVacia bool = true                      //Esto se hace con un sem binario
+var newQueue []structs.PCB                                   //TODO: Debe tener mutex
+var readyQueue []structs.PCB                                 //TODO: Debe tener mutex
+var blockedMap = make(map[uint32]structs.PCB)                //TODO: Debe tener mutex
+var exitQueue []structs.PCB                                  //TODO: Debe tener mutex
+var procesoExec structs.PCB                                  //TODO: Debe tener mutex
+var CPUOcupado bool = false                                  //TODO: Esto se hace con un sem binario
+var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
+var interfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
+var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
 var counter int = 0
 
 var hayInterfaz = make(chan int)
+
+//================================| MAIN |================================\\
 
 func main() {
 
@@ -66,7 +43,7 @@ func main() {
 	config.Logger("Kernel.log")
 
 	// Establece los endpoints.
-	http.HandleFunc("POST /interfaz", handlerIniciarInterfaz)
+	http.HandleFunc("POST /interfazConectada", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
 	// Declara su puerto
@@ -91,11 +68,11 @@ func main() {
 
 //-------------------------- FUNCIONES ---------------------------------------------
 
-// Recibe una interfaz y la agrega al map de interfaces conectadas.
+// Recibe una interfazConectada y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 
-	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la requestInterfaz)
-	var requestInterfaz RequestInterfaz
+	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la structs.requestInterfaz)
+	var requestInterfaz structs.RequestInterfaz
 
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&requestInterfaz)
@@ -110,7 +87,7 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 	// Imprime el request por consola (del lado del server)
 	fmt.Println("Request path:", requestInterfaz)
 
-	//Guarda la interfaz en la lista de interfaces conectadas.
+	//Guarda la interfazConectada en la lista de interfaces conectadas.
 	interfacesConectadas[requestInterfaz.NombreInterfaz] = requestInterfaz.Interfaz
 
 	hayInterfaz <- 0
@@ -120,7 +97,7 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la request)
-	var request InstruccionIO
+	var request structs.InstruccionIO
 
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -135,9 +112,9 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", request)
 
 	// Busca en la lista de interfacesConectadas
-	interfaz, encontrado := interfacesConectadas[request.NombreInterfaz]
+	interfazConectada, encontrado := interfacesConectadas[request.NombreInterfaz]
 
-	// Si no se encontró la interfaz de la request, se desaloja el structs.
+	// Si no se encontró la interfazConectada de la request, se desaloja el structs.
 	if !encontrado {
 
 		pcbDesalojado := blockedMap[request.PidDesalojado]
@@ -150,10 +127,10 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Verificar que la instruccion sea compatible con el tipo de interfaz.
-	isValid := validarInstruccion(interfaz.TipoInterfaz, request.Instruccion)
+	//Verificar que la instruccion sea compatible con el tipo de interfazConectada.
+	isValid := validarInstruccion(interfazConectada.TipoInterfaz, request.Instruccion)
 
-	// IMPLEMENTAR
+	//TODO: IMPLEMENTAR
 	if !isValid {
 
 		//!No repetir logica
@@ -163,16 +140,16 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 		pcbDesalojado.Estado = "EXIT"
 		administrarQueues(pcbDesalojado)
 
-		//Mandar structs a EXIT
+		//Mandar Proceso a EXIT
 		fmt.Println("Instruccion no compatible.")
 		return
 	}
 
-	//Agrega el structs a la cola de bloqueados de la interfaz.
-	interfaz.QueueBlock = append(interfaz.QueueBlock, request.PidDesalojado)
-	interfacesConectadas[request.NombreInterfaz] = interfaz
+	//Agrega el Proceso a la cola de bloqueados de la interfazConectada.
+	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, request.PidDesalojado)
+	interfacesConectadas[request.NombreInterfaz] = interfazConectada
 
-	//Preparo la interfaz para enviarla en un body.
+	//Preparo la interfazConectada para enviarla en un body.
 	body, err := json.Marshal(request.UnitWorkTime)
 
 	//Checkea que no haya errores al crear el body.
@@ -181,17 +158,17 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Manda a ejecutar a la interfaz (Puerto)
-	respuesta := config.Request(interfaz.PuertoInterfaz, "localhost", "POST", request.Instruccion, body)
+	// Manda a ejecutar a la interfazConectada (Puerto)
+	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", request.Instruccion, body)
 
 	// Verifica que no hubo error en la request
 	if respuesta == nil {
 		return
 	}
 
-	//Si la interfaz pudo ejecutar la instrucción, pasa el structs a READY.
+	//Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
 	if respuesta.StatusCode == http.StatusOK {
-		//Pasar structs a ready
+		//Pasar Proceso a ready
 		//!No repetir logica
 		pcbDesalojado := blockedMap[request.PidDesalojado]
 		//TODO: Hacer wrapper de delete
@@ -202,7 +179,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 }
 
 func validarInstruccion(tipo string, instruccion string) bool {
-	//Verificar que esa interfaz puede ejecutar la instruccion que le pide el CPU
+	//Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
 	switch tipo {
 	case "GENERICA":
 		return instruccion == "IO_GEN_SLEEP"
@@ -212,10 +189,12 @@ func validarInstruccion(tipo string, instruccion string) bool {
 
 //-------------------------- ADJACENT FUNCTIONS ------------------------------------
 
-func asignarPCB(nuevoPCB structs.PCB, respuesta structs.Response) {
-	// Crea un nuevo PCB
+func asignarPCB(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarProceso) {
 
+	// Crea un nuevo PCB en base a un pid
 	nuevoPCB.PID = uint32(respuesta.PID)
+
+	// Almacena el estado viejo de un PCB
 	pcb_estado_viejo := nuevoPCB.Estado
 	nuevoPCB.Estado = "READY"
 
@@ -228,14 +207,14 @@ func asignarPCB(nuevoPCB structs.PCB, respuesta structs.Response) {
 
 //-------------------------- API's --------------------------------------------------
 
-func iniciarstructs(configJson config.Kernel, path string) {
+func iniciarProceso(configJson config.Kernel, path string) {
 
 	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB structs.PCB
 	nuevoPCB.PID = uint32(counter)
 	nuevoPCB.Estado = "NEW"
 
-	// Incrementa el contador de structss
+	// Incrementa el contador de Procesos
 	counter++
 
 	// Codificar Body en un array de bytes (formato json)
@@ -249,7 +228,7 @@ func iniciarstructs(configJson config.Kernel, path string) {
 		return
 	}
 
-	//En realidad me parece que se tendría que mandar el path a memoria solamente si hay "espacio" en la readyQueue (depende del grado de multiprogramación)
+	//TODO: En realidad me parece que se tendría que mandar el path a memoria solamente si hay "espacio" en la readyQueue (depende del grado de multiprogramación)
 	// Enviar request al servidor
 	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", body)
 	// Verificar que no hubo error en la request
@@ -258,10 +237,10 @@ func iniciarstructs(configJson config.Kernel, path string) {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var response structs.Response
+	var responseIniciarProceso structs.ResponseIniciarProceso
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
-	err = json.NewDecoder(respuesta.Body).Decode(&response)
+	err = json.NewDecoder(respuesta.Body).Decode(&responseIniciarProceso)
 
 	// Error Handler para al decodificación
 	if err != nil {
@@ -269,13 +248,13 @@ func iniciarstructs(configJson config.Kernel, path string) {
 		return
 	}
 
-	//log obligatorio(1/6): creacion de structs
-	logNuevostructs(nuevoPCB)
+	//log obligatorio(1/6): creacion de Proceso
+	//logNuevoProceso(nuevoPCB)
 
-	asignarPCB(nuevoPCB, response)
+	asignarPCB(nuevoPCB, responseIniciarProceso)
 }
 
-func finalizarstructs(configJson config.Kernel) {
+func finalizarProceso(configJson config.Kernel) {
 
 	// Establecer pid (hardcodeado)
 	pid := 0
@@ -288,7 +267,7 @@ func finalizarstructs(configJson config.Kernel) {
 	}
 }
 
-func estadostructs(configJson config.Kernel) {
+func estadoProceso(configJson config.Kernel) {
 
 	// Establecer pid (hardcodeado)
 	pid := 0
@@ -301,7 +280,7 @@ func estadostructs(configJson config.Kernel) {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var response structs.Response
+	var response structs.ResponseIniciarProceso
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
 	err := json.NewDecoder(respuesta.Body).Decode(&response)
@@ -317,7 +296,8 @@ func estadostructs(configJson config.Kernel) {
 	fmt.Println(response)
 }
 
-func listarstructs(configJson config.Kernel) {
+// TODO dearrollar la lectura de procesos creados
+func listarProceso(configJson config.Kernel) {
 
 	// Enviar request al servidor
 	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", "process")
@@ -352,18 +332,13 @@ func detenerPlanificacion(configJson config.Kernel) {
 	}
 }
 
-type RespuestaDispatch struct {
-	MotivoDeDesalojo string
-	PCB              structs.PCB
-}
-
 // Le envia un PCB al CPU
 func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	//Envia PCB al CPU
-	fmt.Println("Se envió el structs", pcb.PID, "al CPU")
+	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
 
-	//Pasan cosas de HTTP y se ejecuta el structs
+	//Pasan cosas de HTTP y se ejecuta el Proceso
 	CPUOcupado = true
 
 	//-------------------Request al CPU------------------------
@@ -384,7 +359,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor
-	var respuestaDispatch RespuestaDispatch
+	var respuestaDispatch structs.RespuestaDispatch
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente
 	err = json.NewDecoder(respuesta.Body).Decode(&respuestaDispatch)
@@ -470,11 +445,11 @@ func administrarQueues(pcb structs.PCB) {
 		exitQueue = append(exitQueue, pcb)
 		//TODO: momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el pcb (o alguna estructura que la contenga)
 		//motivoDeFinalizacion := "SUCCESS"
-		//logFinDestructs(pcb, motivoDeFinalizacion)
+		//logFinDeProceso(pcb, motivoDeFinalizacion)
 	}
 }
 
-// Envía continuamente structss al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
+// Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
 func planificador(configJson config.Kernel) {
 	if !CPUOcupado && !readyQueueVacia {
 		planificadorActivo = true
@@ -490,14 +465,14 @@ func planificador(configJson config.Kernel) {
 		//Si la lista de READY está vacía, se detiene el planificador
 		if len(readyQueue) == 0 {
 			//Si la lista está vacía, se detiene el planificador
-			logEsperaNuevosstructss()
+			logEsperaNuevosProcesos()
 			readyQueueVacia = true
 			planificadorActivo = false
 			break
 		}
 
-		//Si la lista no está vacía, se envía el structs al CPU
-		//Se envía el primer structs y se hace un dequeue del mismo de la lista READY
+		//Si la lista no está vacía, se envía el Proceso al CPU
+		//Se envía el primer Proceso y se hace un dequeue del mismo de la lista READY
 		var poppedPCB structs.PCB
 		readyQueue, poppedPCB = dequeuePCB(readyQueue)
 		//Debería estar en dispatch?
@@ -513,7 +488,7 @@ func planificador(configJson config.Kernel) {
 	}
 }
 
-// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos structss, y avisa que la lista está vacía
+// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos Procesos, y avisa que la lista está vacía
 func dequeuePCB(listaPCB []structs.PCB) ([]structs.PCB, structs.PCB) {
 
 	return listaPCB[1:], listaPCB[0]
@@ -521,7 +496,7 @@ func dequeuePCB(listaPCB []structs.PCB) ([]structs.PCB, structs.PCB) {
 
 func estadoAExec(pcb *structs.PCB) {
 	(*pcb).Estado = "EXEC"
-	structsExec = *pcb
+	procesoExec = *pcb
 }
 
 //-------------------------- TEST --------------------------------------------------
@@ -529,17 +504,17 @@ func estadoAExec(pcb *structs.PCB) {
 // Testea la conectividad con otros módulos
 
 func testConectividad(configJson config.Kernel) {
-	fmt.Println("\nIniciar structs:")
-	iniciarstructs(configJson, "path")
-	iniciarstructs(configJson, "path")
-	iniciarstructs(configJson, "path")
-	iniciarstructs(configJson, "path")
-	fmt.Println("\nFinalizar structs:")
-	finalizarstructs(configJson)
-	fmt.Println("\nEstado structs:")
-	estadostructs(configJson)
-	fmt.Println("\nListar structss:")
-	listarstructs(configJson)
+	fmt.Println("\nIniciar Proceso:")
+	iniciarProceso(configJson, "path")
+	iniciarProceso(configJson, "path")
+	iniciarProceso(configJson, "path")
+	iniciarProceso(configJson, "path")
+	fmt.Println("\nFinalizar Proceso:")
+	finalizarProceso(configJson)
+	fmt.Println("\nEstado Proceso:")
+	estadoProceso(configJson)
+	fmt.Println("\nListar Procesos:")
+	listarProceso(configJson)
 	fmt.Println("\nDetener Planificación:")
 	detenerPlanificacion(configJson)
 	fmt.Println("\nIniciar Planificación:")
@@ -558,27 +533,27 @@ func testPlanificacion(configJson config.Kernel) {
 	}
 
 	//
-	fmt.Printf("\nSe crean 2 structss-------------\n\n")
+	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
 	for i := 0; i < 2; i++ {
-		path := "structs" + strconv.Itoa(counter) + ".txt"
-		iniciarstructs(configJson, path)
+		path := "procesos" + strconv.Itoa(counter) + ".txt"
+		iniciarProceso(configJson, path)
 	}
 
 	fmt.Printf("\nSe testea el planificador-------------\n\n")
 	planificador(configJson)
 	printList()
 
-	fmt.Printf("\nSe crean 2 structss-------------\n\n")
+	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
 	for i := 0; i < 2; i++ {
-		path := "structs" + strconv.Itoa(counter) + ".txt"
-		iniciarstructs(configJson, path)
+		path := "proceso" + strconv.Itoa(counter) + ".txt"
+		iniciarProceso(configJson, path)
 	}
 }
 
 func testCicloDeInstruccion(configJson config.Kernel) {
 
-	fmt.Printf("\nSe crean 1 structs-------------\n\n")
-	iniciarstructs(configJson, "structs_test")
+	fmt.Printf("\nSe crean 1 proceso-------------\n\n")
+	iniciarProceso(configJson, "proceso_test")
 
 	fmt.Printf("\nSe testea el planificador-------------\n\n")
 	planificador(configJson)
@@ -586,9 +561,9 @@ func testCicloDeInstruccion(configJson config.Kernel) {
 
 // -------------------------- LOG's --------------------------------------------------
 // log obligatorio (1/6)
-func logNuevostructs(nuevoPCB structs.PCB) {
+func logNuevoProceso(nuevoPCB structs.PCB) {
 
-	log.Printf("Se crea el structs %d en estado %s", nuevoPCB.PID, nuevoPCB.Estado)
+	log.Printf("Se crea el proceso %d en estado %s", nuevoPCB.PID, nuevoPCB.Estado)
 }
 
 // log obligatorio (2/6)
@@ -610,9 +585,9 @@ func logPidsReady(readyQueue []structs.PCB) {
 }
 
 // log obligatorio (4/6)
-func logFinDestructs(pcb structs.PCB, motivoDeFinalizacion string) {
+func logFinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
 
-	log.Printf("Finaliza el structs: %d - Motivo: %s", pcb.PID, motivoDeFinalizacion)
+	log.Printf("Finaliza el proceso: %d - Motivo: %s", pcb.PID, motivoDeFinalizacion)
 
 }
 
@@ -640,9 +615,9 @@ func logPidsExec(ExecQueue []structs.PCB) {
 	fmt.Printf("Cola Executing 'ExecQueue' : %v", pids)
 }
 
-func logEsperaNuevosstructss() {
+func logEsperaNuevosProcesos() {
 
-	fmt.Println("Esperando nuevos structss...")
+	fmt.Println("Esperando nuevos procesos...")
 
 }
 
