@@ -10,14 +10,15 @@ import (
 
 var configJson config.Memoria
 
-// Toma de a un archio a la vez y guarda las instrucciones en un map l
+// Toma de a un archivo a la vez y guarda las instrucciones en un map l
 func GuardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32][]string) {
 	path = configJson.Instructions_Path + "/" + path
 	data := extractInstructions(path)
 	insertData(pid, memoriaInstrucciones, data)
 }
 
-// Abre el arhivo y guarda su contenido en un arrayfunc extractInstructions(path string) []byte
+// Abre el archivo especificado por la ruta 'path' y guarda su contenido en un slice de bytes.
+// Retorna el contenido del archivo como un slice de bytes.
 func extractInstructions(path string) []byte {
 	// Lee el archivo
 	file, err := os.ReadFile(path)
@@ -26,16 +27,18 @@ func extractInstructions(path string) []byte {
 		return nil
 	}
 
-	// Ahora data es un array de bytes con el contenido del archivo
+	// Ahora 'file' es un slice de bytes con el contenido del archivo
 	return file
 }
 
-// funciona todo bien con uint?
+// insertData inserta las instrucciones en la memoria de instrucciones asociadas al PID especificado
+// e imprime las instrucciones guardadas en memoria junto con su PID correspondiente.
 func insertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byte) {
-	// Separar instrucciones por medio de tokens
+	// Separar las instrucciones por medio de tokens
 	instrucciones := strings.Split(string(data), "\n")
-	// Inserta en la memoria de instrucciones
+	// Insertar las instrucciones en la memoria de instrucciones
 	memoriaInstrucciones[pid] = instrucciones
+	// Imprimir las instrucciones guardadas en memoria
 	fmt.Println("Instrucciones guardadas en memoria: ")
 	for pid, instrucciones := range memoriaInstrucciones {
 		fmt.Printf("PID: %d\n", pid)

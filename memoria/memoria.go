@@ -33,14 +33,8 @@ func main() {
 	http.HandleFunc("GET /process", handlerListarProceso)
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 
-	// Declara un puerto.
-	port := ":" + strconv.Itoa(configJson.Port)
-
-	// Se levanta el servidor de memoria.
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Error al escuchar en el puerto " + port)
-	}
+	//inicio el servidor de Memoria
+	go config.IniciarServidor(configJson.Port)
 }
 
 //================================| HANDLERS |====================================================\\
