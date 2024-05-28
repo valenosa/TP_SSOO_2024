@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/sisoputnfrba/tp-golang/kernel/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
@@ -114,31 +115,19 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Si no se encontró la interfazConectada de la request, se desaloja el structs.
 	if !encontrado {
 
-		pcbDesalojado := blockedMap[request.PidDesalojado]
-		//TODO: Hacer wrapper de delete
-		delete(blockedMap, request.PidDesalojado)
-		pcbDesalojado.Estado = "EXIT"
-		administrarQueues(pcbDesalojado)
-
+		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
 		fmt.Println("Interfaz no conectada.")
 		return
 	}
 
 	//Verifica que la instruccion sea compatible con el tipo de interfazConectada.
-	isValid := validarInstruccion(interfazConectada.TipoInterfaz, request.Instruccion)
+	isValid := funciones.ValidarInstruccion(interfazConectada.TipoInterfaz, request.Instruccion)
 
 	// Si la instrucción no es compatible, se desaloja el proceso y se marca como "EXIT".
 	if !isValid {
 
-		//!No repetir logica
-		pcbDesalojado := blockedMap[request.PidDesalojado]
-		//TODO: Hacer wrapper de delete
-		delete(blockedMap, request.PidDesalojado)
-		pcbDesalojado.Estado = "EXIT"
-		administrarQueues(pcbDesalojado)
-
-		//Mandar Proceso a EXIT
-		fmt.Println("Instruccion no compatible.")
+		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
+		fmt.Println("Interfaz incompatible.")
 		return
 	}
 
@@ -166,12 +155,8 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
 	if respuesta.StatusCode == http.StatusOK {
 		// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-		//!No repetir logica
-		pcbDesalojado := blockedMap[request.PidDesalojado]
-		//TODO: Hacer wrapper de delete
-		delete(blockedMap, request.PidDesalojado)
-		pcbDesalojado.Estado = "READY"
-		administrarQueues(pcbDesalojado)
+		funciones.DesalojarProceso(request.PidDesalojado, "READY")
+		return
 	}
 }
 
@@ -184,6 +169,7 @@ func validarInstruccion(tipo string, instruccion string) bool {
 	return false
 }
 
+// ! SE PUEDE BORRAR TODO ESTO, YA ESTÁ UTILIZANDO LOS PAQUETES "FUNCIONES" Y "LOG". LOS TESTS NO FUERON MIGRADOS.
 // -------------------------- ADJACENT FUNCTIONS ------------------------------------
 // Asigna un PCB recién creado a la lista de PCBs en estado READY.
 func asignarPCBAReady(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarProceso) {
@@ -541,25 +527,25 @@ func estadoAExec(pcb *structs.PCB) {
 }
 
 //-------------------------- TEST --------------------------------------------------
-
+// !ESTO NO SE MIGRÓ A NINGÚN PAQUETE.
 // Testea la conectividad con otros módulos
 
 func testConectividad(configJson config.Kernel) {
 	fmt.Println("\nIniciar Proceso:")
-	iniciarProceso(configJson, "path")
-	iniciarProceso(configJson, "path")
-	iniciarProceso(configJson, "path")
-	iniciarProceso(configJson, "path")
+	funciones.IniciarProceso(configJson, "path")
+	funciones.IniciarProceso(configJson, "path")
+	funciones.IniciarProceso(configJson, "path")
+	funciones.IniciarProceso(configJson, "path")
 	fmt.Println("\nFinalizar Proceso:")
-	finalizarProceso(configJson)
+	funciones.FinalizarProceso(configJson)
 	fmt.Println("\nEstado Proceso:")
-	estadoProceso(configJson)
+	funciones.EstadoProceso(configJson)
 	fmt.Println("\nListar Procesos:")
-	listarProceso(configJson)
+	funciones.ListarProceso(configJson)
 	fmt.Println("\nDetener Planificación:")
-	detenerPlanificacion(configJson)
+	funciones.DetenerPlanificacion(configJson)
 	fmt.Println("\nIniciar Planificación:")
-	iniciarPlanificacion(configJson)
+	funciones.IniciarPlanificacion(configJson)
 }
 
 func testPlanificacion(configJson config.Kernel) {
@@ -577,30 +563,31 @@ func testPlanificacion(configJson config.Kernel) {
 	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
 	for i := 0; i < 2; i++ {
 		path := "procesos" + strconv.Itoa(counter) + ".txt"
-		iniciarProceso(configJson, path)
+		funciones.IniciarProceso(configJson, path)
 	}
 
 	fmt.Printf("\nSe testea el planificador-------------\n\n")
-	planificador(configJson)
+	funciones.Planificador(configJson)
 	printList()
 
 	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
 	for i := 0; i < 2; i++ {
 		path := "proceso" + strconv.Itoa(counter) + ".txt"
-		iniciarProceso(configJson, path)
+		funciones.IniciarProceso(configJson, path)
 	}
 }
 
 func testCicloDeInstruccion(configJson config.Kernel) {
 
 	fmt.Printf("\nSe crean 1 proceso-------------\n\n")
-	iniciarProceso(configJson, "proceso_test")
+	funciones.IniciarProceso(configJson, "proceso_test")
 
 	fmt.Printf("\nSe testea el planificador-------------\n\n")
-	planificador(configJson)
+	funciones.Planificador(configJson)
 }
 
 // -------------------------- LOG's --------------------------------------------------
+// !SE MIGRÓ AL PAQUETE "LOG"
 // log obligatorio (1/6)
 func logNuevoProceso(nuevoPCB structs.PCB) {
 
