@@ -59,7 +59,7 @@ func handlerIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.R
 		}
 
 		// Se guardan las instrucciones en un map de memoria.
-		funciones.GuardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
+		guardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
 
 		// Crea una variable tipo Response (para confeccionar una respuesta)
 		var respBody structs.ResponseIniciarProceso = structs.ResponseIniciarProceso{PID: request.PID}
@@ -171,4 +171,12 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(instruccion))
 	}
+}
+
+// Funciones auxiliares
+// Toma de a un archivo a la vez y guarda las instrucciones en un map l
+func guardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32][]string) {
+	path = configJson.Instructions_Path + "/" + path
+	data := funciones.ExtractInstructions(path)
+	funciones.InsertData(pid, memoriaInstrucciones, data)
 }
