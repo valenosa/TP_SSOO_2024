@@ -35,7 +35,7 @@ func main() {
 	config.Iniciar("config.json", &configJson)
 
 	//inicio el servidor de CPU
-	go config.IniciarServidor(configJson.Port)
+	config.IniciarServidor(configJson.Port)
 
 }
 

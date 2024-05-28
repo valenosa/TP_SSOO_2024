@@ -7,23 +7,24 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/sisoputnfrba/tp-golang/kernel/log"
+	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
+
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
 //-------------------------- VARIABLES ---------------------------------------------
 
-var newQueue []structs.PCB                                   //TODO: Debe tener mutex
-var readyQueue []structs.PCB                                 //TODO: Debe tener mutex
+var NewQueue []structs.PCB                                   //TODO: Debe tener mutex
+var ReadyQueue []structs.PCB                                 //TODO: Debe tener mutex
 var blockedMap = make(map[uint32]structs.PCB)                //TODO: Debe tener mutex
 var exitQueue []structs.PCB                                  //TODO: Debe tener mutex
 var procesoExec structs.PCB                                  //TODO: Debe tener mutex
 var CPUOcupado bool = false                                  //TODO: Esto se hace con un sem binario
 var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
-var interfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
+var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
 var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
-var counter int = 0
+var Counter int = 0
 
 var hayInterfaz = make(chan int)
 
@@ -34,11 +35,11 @@ func IniciarProceso(configJson config.Kernel, path string) {
 
 	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(counter)
+	nuevoPCB.PID = uint32(Counter)
 	nuevoPCB.Estado = "NEW"
 
 	// Incrementa el contador de Procesos
-	counter++
+	Counter++
 
 	// Codificar Body en un array de bytes (formato json)
 	body, err := json.Marshal(structs.BodyIniciar{
@@ -192,7 +193,7 @@ func DesalojarProceso(pid uint32, estado string) {
 	delete(blockedMap, pid)
 	pcbDesalojado.Estado = estado
 	administrarQueues(pcbDesalojado)
-	log.FinDeProceso(pcbDesalojado, estado)
+	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
@@ -210,9 +211,9 @@ func Planificador(configJson config.Kernel) {
 		}
 
 		// Si la lista de procesos en READY está vacía, se detiene el planificador.
-		if len(readyQueue) == 0 {
+		if len(ReadyQueue) == 0 {
 			// Si la lista está vacía, se detiene el planificador.
-			log.EsperaNuevosProcesos()
+			logueano.EsperaNuevosProcesos()
 			readyQueueVacia = true
 			planificadorActivo = false
 			break
@@ -221,12 +222,12 @@ func Planificador(configJson config.Kernel) {
 		// Si la lista no está vacía, se envía el Proceso al CPU.
 		// Se envía el primer Proceso y se hace un dequeue del mismo de la lista READY.
 		var poppedPCB structs.PCB
-		readyQueue, poppedPCB = dequeuePCB(readyQueue)
+		ReadyQueue, poppedPCB = dequeuePCB(ReadyQueue)
 
 		// ? Debería estar en dispatch?
 		estadoAExec(&poppedPCB)
 		// ? Será siempre READY cuando pasa a EXEC?
-		log.CambioDeEstado("READY", poppedPCB)
+		logueano.CambioDeEstado("READY", poppedPCB)
 
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
 		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
@@ -351,7 +352,7 @@ func asignarPCBAReady(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarPro
 	nuevoPCB.Estado = "READY"
 
 	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	log.CambioDeEstado(pcb_estado_viejo, nuevoPCB)
+	logueano.CambioDeEstado(pcb_estado_viejo, nuevoPCB)
 
 	// Agrega el nuevo PCB a readyQueue
 	administrarQueues(nuevoPCB)
@@ -364,14 +365,14 @@ func administrarQueues(pcb structs.PCB) {
 	case "NEW":
 
 		// Agrega el PCB a la cola de nuevos procesos
-		newQueue = append(newQueue, pcb)
+		NewQueue = append(NewQueue, pcb)
 
 	case "READY":
 
 		// Agrega el PCB a la cola de procesos listos
-		readyQueue = append(readyQueue, pcb)
+		ReadyQueue = append(ReadyQueue, pcb)
 		readyQueueVacia = false
-		log.PidsReady(readyQueue)
+		logueano.PidsReady(ReadyQueue)
 
 	//TODO: Deberia ser una por cada IO.
 	case "BLOCK":

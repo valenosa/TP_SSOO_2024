@@ -8,7 +8,15 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
-var configJson config.Memoria
+var ConfigJson config.Memoria
+
+// Funciones auxiliares
+// Toma de a un archivo a la vez y guarda las instrucciones en un map l
+func GuardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32][]string) {
+	path = ConfigJson.Instructions_Path + "/" + path
+	data := ExtractInstructions(path)
+	InsertData(pid, memoriaInstrucciones, data)
+}
 
 // Abre el archivo especificado por la ruta 'path' y guarda su contenido en un slice de bytes.
 // Retorna el contenido del archivo como un slice de bytes.
