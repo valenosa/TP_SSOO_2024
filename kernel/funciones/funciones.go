@@ -24,7 +24,7 @@ var CPUOcupado bool = false                                  //TODO: Esto se hac
 var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
 var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
 var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
-var Counter int = 0
+var CounterPID uint32 = 0
 
 var hayInterfaz = make(chan int)
 
@@ -43,7 +43,7 @@ func EstadoProceso(configJson config.Kernel) {
 	}
 
 	// Declarar una variable para almacenar la respuesta del servidor.
-	var response structs.ResponseIniciarProceso
+	var response structs.ResponseListarProceso
 
 	// Decodifica la respuesta del servidor.
 	err := json.NewDecoder(respuesta.Body).Decode(&response)
@@ -105,34 +105,6 @@ func DesalojarProceso(pid uint32, estado string) {
 
 //*======================================================| PLANIFICADORES |======================================================\\
 
-//----------------------( INICIAR y DETENER )----------------------\\
-
-// TODO: La función no está implementada. (27/05/24)
-// Envía una solicitud al módulo de CPU para iniciar el proceso de planificación
-func IniciarPlanificacion(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de CPU para iniciar la planificación.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "PUT", "plani")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
-
-// TODO: La función no está implementada. (27/05/24)
-// Envía una solicitud al módulo de CPU para detener el proceso de planificación
-func DetenerPlanificacion(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de CPU para detener la planificación.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "DELETE", "plani")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
-
 //*======================================[ PLANI LARGO PLAZO ]=======================================\\
 
 //----------------------( CREAR PROCESOS )----------------------\\
@@ -141,14 +113,14 @@ func IniciarProceso(configJson config.Kernel, path string) {
 
 	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(Counter)
+	nuevoPCB.PID = uint32(CounterPID)
 	nuevoPCB.Estado = "NEW"
 
 	// Incrementa el contador de Procesos
-	Counter++
+	CounterPID++
 
 	// Codificar Body en un array de bytes (formato json)
-	body, err := json.Marshal(structs.BodyIniciar{
+	body, err := json.Marshal(structs.BodyIniciarProceso{
 		PID:  nuevoPCB.PID,
 		Path: path,
 	})
@@ -168,7 +140,7 @@ func IniciarProceso(configJson config.Kernel, path string) {
 	}
 
 	// Se declara una nueva variable que contendrá la respuesta del servidor.
-	var responseIniciarProceso structs.ResponseIniciarProceso
+	var responseIniciarProceso structs.ResponseListarProceso
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente.
 	err = json.NewDecoder(respuesta.Body).Decode(&responseIniciarProceso)
@@ -187,7 +159,7 @@ func IniciarProceso(configJson config.Kernel, path string) {
 }
 
 // Asigna un PCB al Proceso recién creado y lo envía a la lista de READY para su ejecución
-func asignarPCB(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarProceso) {
+func asignarPCB(nuevoPCB structs.PCB, respuesta structs.ResponseListarProceso) {
 
 	// Crea un nuevo PCB en base a un pid
 	nuevoPCB.PID = uint32(respuesta.PID)

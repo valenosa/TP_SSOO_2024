@@ -25,31 +25,28 @@ func main() {
 	config.Logger("Memoria.log")
 
 	// ======== HandleFunctions ========
-	http.HandleFunc("PUT /process", handlerIniciarProceso(memoriaInstrucciones))
+	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones))
 	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
-	http.HandleFunc("GET /process/{pid}", handlerEstadoProceso)
-	http.HandleFunc("GET /process", handlerListarProceso)
+
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 
 	//inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
 }
 
-//================================| HANDLERS |====================================================\\
+//================================| HANDLERS |================================\\
 
 // Wrapper que crea un PCB con el pid recibido.
-func handlerIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
+func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
 
 	// Handler para iniciar un proceso.
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		//variable que recibirá la request.
-		var request structs.BodyIniciar
+		var request structs.BodyIniciarProceso
 
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
-
-		// Error Handler de la decodificación
 		if err != nil {
 			fmt.Printf("Error al decodificar request body: ")
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -60,12 +57,8 @@ func handlerIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.R
 		funciones.GuardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
 
 		// Crea una variable tipo Response (para confeccionar una respuesta)
-		var respBody structs.ResponseIniciarProceso = structs.ResponseIniciarProceso{PID: request.PID}
-
-		// Codificar Response en un array de bytes (formato json)
+		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
-
-		// Error Handler de la codificación
 		if err != nil {
 			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
 			return
@@ -75,7 +68,6 @@ func handlerIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.R
 		w.WriteHeader(http.StatusOK)
 		w.Write(respuesta)
 	}
-
 }
 
 // TODO: busca el pid y lo interrumpe si está en ejecución y lo pasa a EXIT, de estar encolado, solamente lo desencola y lo pasa a EXIT
@@ -96,56 +88,6 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía respuesta (con estatus como header) al cliente
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
-}
-
-// TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
-func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
-	//usando el struct de Response envío el estado del proceso
-
-	pid, error := strconv.Atoi(r.PathValue("pid"))
-
-	if error != nil {
-		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
-		return
-	}
-	//Crea una variable tipo Response (para confeccionar una respuesta)
-	var respBody structs.ResponseIniciarProceso = structs.ResponseIniciarProceso{PID: uint32(pid), Estado: "READY"}
-
-	// Codificar Response en un array de bytes (formato json)
-	respuesta, err := json.Marshal(respBody)
-
-	// Error Handler de la codificación
-	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Envía respuesta (con estatus como header) al cliente
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
-}
-
-// TODO tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista.
-func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
-
-	//Harcodea una lista de procesos, más adelante deberá ser dinámico.
-	var listaDeProcesos []structs.ResponseIniciarProceso = []structs.ResponseIniciarProceso{
-		{PID: 0, Estado: "READY"},
-		{PID: 1, Estado: "BLOCK"},
-	}
-
-	//Paso a formato JSON la lista de procesos.
-	respuesta, err := json.Marshal(listaDeProcesos)
-
-	//Check si hubo algún error al parsear el JSON.
-	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Envía respuesta (con estatus como header) al cliente.
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
 }

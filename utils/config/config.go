@@ -174,5 +174,6 @@ func IniciarServidor(puerto int) {
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		fmt.Println("Error al esuchar en el puerto " + port)
+		fmt.Println(err)
 	}
 }
