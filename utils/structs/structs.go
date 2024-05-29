@@ -2,12 +2,23 @@ package structs
 
 // =====================================| ESTRUCTURAS BASE DE UN PROCESO |========================================================\\
 
-// CPU, Kernel, Memoria
+//	Kernel -> Cliente
+//
 // Estructura que contiene el path del archivo que se utilizará como base para ejecutar un nuevo proceso y su PID asociado.
-type BodyIniciar struct {
+type BodyIniciarProceso struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
 	PID  uint32 `json:"pid"`
 	Path string `json:"path"`
+}
+
+type RequestIniciarProceso struct {
+	Path string `json:"path"`
+}
+
+// Kernel -> Cliente
+type ResponseEstadoProceso struct {
+	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
+	State string `json:"state"`
 }
 
 // CPU, Kernel.
@@ -39,7 +50,7 @@ type RegistrosUsoGeneral struct {
 
 // Kernel, Memoria
 // Estructura de respuesta al iniciar un proceso
-type ResponseIniciarProceso struct {
+type ResponseListarProceso struct {
 	PID    uint32 `json:"pid"`
 	Estado string `json:"estado"`
 }

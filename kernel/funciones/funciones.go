@@ -24,7 +24,7 @@ var CPUOcupado bool = false                                  //TODO: Esto se hac
 var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
 var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
 var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
-var Counter int = 0
+var CounterPID uint32 = 0
 
 var hayInterfaz = make(chan int)
 
@@ -43,7 +43,7 @@ func EstadoProceso(configJson config.Kernel) {
 	}
 
 	// Declarar una variable para almacenar la respuesta del servidor.
-	var response structs.ResponseIniciarProceso
+	var response structs.ResponseListarProceso
 
 	// Decodifica la respuesta del servidor.
 	err := json.NewDecoder(respuesta.Body).Decode(&response)
@@ -99,126 +99,13 @@ func DesalojarProceso(pid uint32, estado string) {
 	//TODO: Hacer wrapper de delete
 	delete(blockedMap, pid)
 	pcbDesalojado.Estado = estado
-	administrarQueues(pcbDesalojado)
+	AdministrarQueues(pcbDesalojado)
 	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
 //*======================================================| PLANIFICADORES |======================================================\\
 
-//----------------------( INICIAR y DETENER )----------------------\\
-
-// TODO: La función no está implementada. (27/05/24)
-// Envía una solicitud al módulo de CPU para iniciar el proceso de planificación
-func IniciarPlanificacion(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de CPU para iniciar la planificación.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "PUT", "plani")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
-
-// TODO: La función no está implementada. (27/05/24)
-// Envía una solicitud al módulo de CPU para detener el proceso de planificación
-func DetenerPlanificacion(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de CPU para detener la planificación.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "DELETE", "plani")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
-
 //*======================================[ PLANI LARGO PLAZO ]=======================================\\
-
-//----------------------( CREAR PROCESOS )----------------------\\
-
-func IniciarProceso(configJson config.Kernel, path string) {
-
-	// Se crea un nuevo PCB en estado NEW
-	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(Counter)
-	nuevoPCB.Estado = "NEW"
-
-	// Incrementa el contador de Procesos
-	Counter++
-
-	// Codificar Body en un array de bytes (formato json)
-	body, err := json.Marshal(structs.BodyIniciar{
-		PID:  nuevoPCB.PID,
-		Path: path,
-	})
-
-	// Maneja errores de codificación.
-	if err != nil {
-		fmt.Printf("error codificando body: %s", err.Error())
-		return
-	}
-
-	//TODO: Quizá debería mandar el path a memoria solamente si hay "espacio" en la readyQueue (depende del grado de multiprogramación)
-	// Enviar solicitud al servidor de memoria para almacenar el proceso.
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", body)
-	// Verificar que no hubo error en la request
-	if respuesta == nil {
-		return
-	}
-
-	// Se declara una nueva variable que contendrá la respuesta del servidor.
-	var responseIniciarProceso structs.ResponseIniciarProceso
-
-	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente.
-	err = json.NewDecoder(respuesta.Body).Decode(&responseIniciarProceso)
-
-	// Maneja errores para al decodificación.
-	if err != nil {
-		fmt.Printf("Error decodificando\n")
-		return
-	}
-
-	//log obligatorio(1/6): creacion de Proceso
-	//logNuevoProceso(nuevoPCB)
-
-	// Asigna un PCB al proceso recién creado.
-	asignarPCB(nuevoPCB, responseIniciarProceso)
-}
-
-// Asigna un PCB al Proceso recién creado y lo envía a la lista de READY para su ejecución
-func asignarPCB(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarProceso) {
-
-	// Crea un nuevo PCB en base a un pid
-	nuevoPCB.PID = uint32(respuesta.PID)
-
-	// Almacena el estado viejo de un PCB
-	pcb_estado_viejo := nuevoPCB.Estado
-	nuevoPCB.Estado = "READY"
-
-	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	logueano.CambioDeEstado(pcb_estado_viejo, nuevoPCB)
-
-	// Agrega el nuevo PCB a readyQueue
-	administrarQueues(nuevoPCB)
-}
-
-//----------------------( FINALIZAR PROCESOS )----------------------\\
-
-// Envía una solicitud a memoria para finalizar un proceso específico mediante su PID
-func FinalizarProceso(configJson config.Kernel) {
-
-	// PID del proceso a finalizar (hardcodeado).
-	pid := 0
-
-	// Enviar solicitud al servidor de memoria para finalizar el proceso.
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "DELETE", fmt.Sprintf("process/%d", pid))
-
-	// Verifica si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
 
 //*=======================================[ PLANI CORTO PLAZO ]=======================================\\
 
@@ -260,7 +147,7 @@ func Planificador(configJson config.Kernel) {
 		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
 
 		// Se administra el PCB devuelto por el CPU
-		administrarQueues(pcbActualizado)
+		AdministrarQueues(pcbActualizado)
 
 		// TODO: Usar motivo de desalojo para algo.
 		fmt.Println(motivoDesalojo)
@@ -271,7 +158,7 @@ func Planificador(configJson config.Kernel) {
 //----------------------( ADMINISTRAR COLAS LOCALES )----------------------\\
 
 // Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
-func administrarQueues(pcb structs.PCB) {
+func AdministrarQueues(pcb structs.PCB) {
 
 	switch pcb.Estado {
 	case "NEW":

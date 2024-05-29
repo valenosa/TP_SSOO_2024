@@ -12,41 +12,225 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//*======================================| MAIN |=======================================\\
+//*======================================| MAIN |======================================\\
+
+var configJson config.Kernel
 
 func main() {
 
-	// Se declara una variable para almacenar la configuración del Kernel.
-	var configJson config.Kernel
-
-	// Extrae info de config.json
 	config.Iniciar("config.json", &configJson)
-
-	// Testea la conectividad con otros modulos
-	//Conectividad(configJson)
 
 	// Configura el logger
 	config.Logger("Kernel.log")
 
 	// ======== HandleFunctions ========
+
+	//PLANIFICACION
+	http.HandleFunc("PUT /plani", handlerIniciarPlanificacion)
+	http.HandleFunc("DELETE /plani", handlerDetenerPlanificacion)
+
+	//PROCESOS
+	http.HandleFunc("GET /process/{pid}", handlerEstadoProceso)
+	http.HandleFunc("GET /process", handlerListarProceso)
+
+	http.HandleFunc("PUT /process", handlerIniciarProceso)
+	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
+
+	//ENTRADA SALIDA
 	http.HandleFunc("POST /interfazConectada", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
-	//inicio el servidor de Kern
-	go config.IniciarServidor(configJson.Port)
-
-	fmt.Printf("Antes del test")
-
-	// Espera a que haya una interfaz conectada.
-
-	// Ahora que el servidor está en ejecución y hay una interfaz conectada, se puede iniciar el ciclo de instrucción.
-	testCicloDeInstruccion(configJson)
-
-	fmt.Printf("Despues del test")
+	//Inicio el servidor de Kernel
+	config.IniciarServidor(configJson.Port)
 
 }
 
-//*======================================| HANDLERS |=======================================\\
+//*======================================| HANDLERS |======================================\\
+
+//----------------------( PLANIFICACION )----------------------\\
+
+// TODO:Al recibir esta peticion comienza la ejecucion de el planificador de largo plazo (y corto plazo)
+func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
+
+	//* Creo que esta funcion solo le hace un signal a un semaforo, que inicia la plani
+	fmt.Println("IniciarPlanificacion")
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// TODO:Al recibir esta peticion detiene la ejecucion de el planificador de largo plazo (y corto plazo)
+func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
+
+	//* Creo que esta funcion solo le hace un wait a un semaforo, que detiene la plani
+	fmt.Printf("DetenerPlanificacion")
+
+	w.WriteHeader(http.StatusOK)
+}
+
+//----------------------( PROCESOS )----------------------\\
+
+// TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
+func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("DetenerEstadoProceso")
+
+	//--------- RECIBE ---------
+	pid, error := strconv.Atoi(r.PathValue("pid"))
+	if error != nil {
+		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("PID:", pid)
+
+	//--------- EJECUTA ---------
+
+	//TODO: Busca en base al pid el proceso en todas las colas (y el map de BLOCK) y devuelvo el estado
+	var respIniciarProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
+
+	//--------- DEVUELVE ---------
+	//Crea una variable tipo Response
+	respuesta, err := json.Marshal(respIniciarProceso)
+
+	// Error Handler de la codificación
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+// TODO:
+func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("DetenerEstadoProceso")
+
+	//--------- RECIBE ---------
+	pid, error := strconv.Atoi(r.PathValue("pid"))
+	if error != nil {
+		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("PID:", pid)
+
+	//--------- EJECUTA ---------
+
+	//* Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
+
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+}
+
+// TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
+func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Printf("ListarProceso")
+
+	//----------- EJECUTA -----------
+
+	//Harcodea una lista de procesos, más adelante deberá ser dinámico
+	var listaDeProcesos []structs.ResponseListarProceso = []structs.ResponseListarProceso{
+		{PID: 0, Estado: "READY"},
+		{PID: 1, Estado: "BLOCK"},
+	}
+
+	//----------- DEVUELVE -----------
+
+	//Paso a formato JSON la lista de procesos
+	respuesta, err := json.Marshal(listaDeProcesos)
+
+	//Check si hubo algún error al parsear el JSON
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("IniciarProceso")
+
+	//----------- RECIBE ---------
+	//variable que recibirá la request.
+	var request structs.RequestIniciarProceso
+
+	// Decodifica en formato JSON la request.
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		fmt.Println("Error al decodificar request body: ")
+		fmt.Println(err)
+
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("Path: %s\n", request.Path)
+
+	//----------- EJECUTA ---------
+
+	// Se crea un nuevo PCB en estado NEW
+	var nuevoPCB structs.PCB
+	nuevoPCB.PID = uint32(funciones.CounterPID)
+	nuevoPCB.Estado = "NEW"
+
+	//----------- Va a memoria ---------
+	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
+	if err != nil {
+		return
+	}
+
+	//Envía el path a memoria para que cree el proceso
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
+	if respuesta == nil {
+		return
+	}
+
+	var respMemoIniciarProceso structs.BodyIniciarProceso
+	// Decodifica en formato JSON la request.
+	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
+	if err != nil {
+		fmt.Println("Error al decodificar request body")
+		return
+	}
+	//----------------------------
+
+	// Si todo es correcto agregamos el PID al PCB
+	nuevoPCB.PID = funciones.CounterPID
+	nuevoPCB.Estado = "READY"
+
+	// Agrega el nuevo PCB a readyQueue
+	funciones.AdministrarQueues(nuevoPCB)
+
+	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	logueano.CambioDeEstado("NEW", nuevoPCB)
+
+	//Asigna un nuevo valor pid para la proxima response.
+	funciones.CounterPID++
+
+	//! Solo para testeoi eliminar al finalizar
+	funciones.Planificador(configJson)
+
+	// ----------- DEVUELVE -----------
+
+	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
+	if err != nil {
+		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respIniciarProceso)
+}
+
+//----------------------( I/O )----------------------\\
 
 // Recibe una interfazConectada y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
@@ -82,8 +266,6 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Se decodifica el cuerpo de la solicitud en formato JSON.
 	err := json.NewDecoder(r.Body).Decode(&request)
-
-	// Maneja el error de la decodificación
 	if err != nil {
 		logueano.ErrorDecode()
 		return
@@ -142,10 +324,11 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//*======================================| FUNC de TESTEO |=======================================\\
-// !ESTO NO SE MIGRÓ A NINGÚN PAQUETE.
-// Testea la conectividad con otros módulos
+//*======================================| FUNC de TESTEO |======================================\\
+// !ESTO NO SE MIGRO A NINGUN PAQUETE
+// ! TRAS LOS CAMBIOS DUDO QUE FUNCIONEN (29/5/24)
 
+/*
 func testConectividad(configJson config.Kernel) {
 	fmt.Println("\nIniciar Proceso:")
 	funciones.IniciarProceso(configJson, "path")
@@ -159,9 +342,9 @@ func testConectividad(configJson config.Kernel) {
 	fmt.Println("\nListar Procesos:")
 	funciones.ListarProceso(configJson)
 	fmt.Println("\nDetener Planificación:")
-	funciones.DetenerPlanificacion(configJson)
+	//funciones.DetenerPlanificacion(configJson)
 	fmt.Println("\nIniciar Planificación:")
-	funciones.IniciarPlanificacion(configJson)
+	//funciones.IniciarPlanificacion(configJson)
 }
 
 func testPlanificacion(configJson config.Kernel) {
@@ -201,3 +384,4 @@ func testCicloDeInstruccion(configJson config.Kernel) {
 	fmt.Printf("\nSe testea el planificador-------------\n\n")
 	funciones.Planificador(configJson)
 }
+*/

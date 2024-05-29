@@ -5,13 +5,24 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
-	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//================================| MAIN |================================\\
+type RequestInterfaz struct {
+	NombreInterfaz string
+	Interfaz       Interfaz
+}
+
+// MOVELO A UTILS (struct tambien usada por kernel.go)
+type Interfaz struct {
+	TipoInterfaz   string
+	PuertoInterfaz int
+}
+
+//*======================================| MAIN |======================================\\
 
 func main() {
 
@@ -21,11 +32,11 @@ func main() {
 	log.Printf("Soy un logeano")
 
 	// Crear interfaz (TESTING)
-	conectarInterfaz("GENERICO", "config.json")
+	conectarInterfaz("GENERIC_SHIT", "config.json")
 }
 
-// conectarInterfaz se encarga de conectar una interfaz con el servidor.
-// Recibe el nombre de la interfaz y la ruta del archivo de configuración.
+//*======================================| HANDLERS |======================================\\
+
 func conectarInterfaz(nombre string, filePath string) {
 
 	// Extrae info de config.json
@@ -34,10 +45,12 @@ func conectarInterfaz(nombre string, filePath string) {
 	config.Iniciar(filePath, &configInterfaz)
 
 	//Insertar Nombre, Puerto, Tipo de interfaz
-	body, err := json.Marshal(structs.NuevaInterfaz{
-		Nombre: nombre,
-		Tipo:   configInterfaz.Type,
-		Puerto: configInterfaz.Port,
+	body, err := json.Marshal(RequestInterfaz{
+		NombreInterfaz: nombre,
+		Interfaz: Interfaz{
+			TipoInterfaz:   configInterfaz.Type,
+			PuertoInterfaz: configInterfaz.Port,
+		},
 	})
 
 	if err != nil {
@@ -48,54 +61,55 @@ func conectarInterfaz(nombre string, filePath string) {
 	// Enviar request al servidor
 	respuesta := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfaz", body)
 
-	// Verificamos si hubo error en la request
+	// verificamos si hubo error en la request
 	if respuesta == nil {
 		return
 	}
 
-	// Iniciar el servidor de la interfaz
 	iniciarServidorInterfaz(configInterfaz)
 }
 
-// iniciarServidorInterfaz inicia el servidor HTTP para la interfaz con la configuración proporcionada.
 func iniciarServidorInterfaz(configInterfaz config.IO) {
 
-	// Manejadores para las rutas de la interfaz
-	http.HandleFunc("POST /IO_GEN_SLEEP", createHandlerIO_GEN_SLEEP(configInterfaz))
+	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP(configInterfaz))
 	//http.HandleFunc("POST /IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
 	//http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDOUT_WRITE)
 
-	//inicio el servidor de la Interfaz (IO)
-	config.IniciarServidor(configInterfaz.Port)
+	port := ":" + strconv.Itoa(configInterfaz.Port)
+
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al esuchar en el puerto " + port)
+	}
 }
 
-// createHandlerIO_GEN_SLEEP crea un manejador HTTP para la ruta "/IO_GEN_SLEEP".
-// Recibe la configuración de la interfaz.
-func createHandlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
+// Implemantación de la Interfaz Génerica
+
+func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// Crea una variable para almacenar el número de unidades de trabajo.
+		//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la unidadesDeTrabajo)
 		var unidadesDeTrabajo int
 
-		// Decodifica el request (codificado en formato JSON).
+		// Decodifica el request (codificado en formato json)
 		err := json.NewDecoder(r.Body).Decode(&unidadesDeTrabajo)
 
-		// Manejo de error de la decodificación.
+		// Error de la decodificación
 		if err != nil {
 			fmt.Printf("Error al decodificar request body: ")
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Imprime el request por consola (del lado del servidor).
-		fmt.Println("Request path:", unidadesDeTrabajo)
+		// Imprime el request por consola (del lado del server)
+		fmt.Println("Unidades de Trabajo:", unidadesDeTrabajo)
 
-		// Ejecuta IO_GEN_SLEEP
+		//Ejecuta IO_GEN_SLEEP
 		sleepTime := configIO.Unit_Work_Time * unidadesDeTrabajo
-		time.Sleep(time.Duration(sleepTime))
-
-		// Responde al cliente con un código de estado HTTP 200 OK.
+		fmt.Println("Zzzzzz...")
+		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		fmt.Println("Wakey wakey, its time for school")
+		// Responde al cliente
 		w.WriteHeader(http.StatusOK)
-
 	}
 }
