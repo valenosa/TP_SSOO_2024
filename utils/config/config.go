@@ -8,9 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
 
-// --------------------------| ESTRUCTURAS PARA EXTRAER INFO DEL config.json |-------------------------------------------------------------
+// ----------------------( STRUCTS Config.json )---------------------------\\
 type Cpu struct {
 	Port               int    `json:"port"`
 	Ip_Memory          string `json:"ip_memory"`
@@ -55,7 +56,7 @@ type Memoria struct {
 	Delay_Response    int    `json:"delay_response"`
 }
 
-// --------------------------| FUNCIONES PARA EXTRAER INFO DEL config.json |-------------------------------------------------------------
+//*======================================| FUNC Config.json |=======================================\\
 
 // Se implementó el uso de interface{} a la función. De esta manera, la misma puede recibir distintos tipos de datos, o en este caso, estructuras (polimorfismo).
 // Gracias a esta implementación, luego la función podrá ser trasladada a un paquete aparte y ser utilizada por todos los módulos.
@@ -96,7 +97,7 @@ func Logger(path string) {
 	log.SetOutput(mw)
 }
 
-// --------------------------| FUNCIONES PARA TESTEAR |----------------------------------------------------------------
+//*======================================| TESTEO |=======================================\\
 
 // Utilizado para testear "IniciarConfiguracion()"
 func printConfig(configJson Kernel) {
@@ -113,7 +114,7 @@ func printConfig(configJson Kernel) {
 	fmt.Println("multiprogramming: ", configJson.Multiprogramming)
 }
 
-//------------- ESTO NO VA ACA PERO ES GLOBAL Y LO USAN TODOS LOS MODULOS ------------------------------------------
+//*======================================| FUNC GLOBALES |=======================================\\
 
 // retorna true si la request fue exitosa, false en caso contrario
 func Request(port int, ip string, metodo string, query string, bodies ...[]byte) *http.Response {
@@ -163,4 +164,15 @@ func ifBody(bodies ...[]byte) io.Reader {
 		return nil
 	}
 	return bytes.NewBuffer(bodies[0])
+}
+
+func IniciarServidor(puerto int) {
+	// Declara el puerto
+	port := ":" + strconv.Itoa(puerto)
+
+	// Escucha y sirve con la información de config.json
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al esuchar en el puerto " + port)
+	}
 }
