@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
 
@@ -15,18 +16,26 @@ import (
 
 //----------------------( VARIABLES )---------------------------\\
 
-var NewQueue []structs.PCB                                   //TODO: Debe tener mutex
-var ReadyQueue []structs.PCB                                 //TODO: Debe tener mutex
-var blockedMap = make(map[uint32]structs.PCB)                //TODO: Debe tener mutex
-var exitQueue []structs.PCB                                  //TODO: Debe tener mutex
-var procesoExec structs.PCB                                  //TODO: Debe tener mutex
+var mxNEW sync.Mutex
+var listaNEW []structs.PCB
+
+var mxREADY sync.Mutex
+var listaREADY []structs.PCB
+
+var mxBLOCK sync.Mutex
+var mapBLOK = make(map[uint32]structs.PCB)
+
+var mxEXIT sync.Mutex
+var listaEXIT []structs.PCB
+
+// var procesoExec structs.PCB  //Verificar que sea necesario
 var CPUOcupado bool = false                                  //TODO: Esto se hace con un sem binario
 var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
 var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
 var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
-var CounterPID uint32 = 0
+var CounterPID uint32 = 0                                    //TODO: Esto se hace con un sem binario
 
-var hayInterfaz = make(chan int)
+//var hayInterfaz = make(chan int)
 
 // Envía una solicitud a memoria para obtener el estado de un proceso específico mediante su PID.
 func EstadoProceso(configJson config.Kernel) {
@@ -95,9 +104,12 @@ func ValidarInstruccion(tipo string, instruccion string) bool {
 
 // Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
 func DesalojarProceso(pid uint32, estado string) {
-	pcbDesalojado := blockedMap[pid]
-	//TODO: Hacer wrapper de delete
-	delete(blockedMap, pid)
+
+	mxBLOCK.Lock()
+	pcbDesalojado := mapBLOK[pid]
+	delete(mapBLOK, pid)
+	mxBLOCK.Unlock()
+
 	pcbDesalojado.Estado = estado
 	AdministrarQueues(pcbDesalojado)
 	logueano.FinDeProceso(pcbDesalojado, estado)
@@ -105,7 +117,7 @@ func DesalojarProceso(pid uint32, estado string) {
 
 //*======================================================| PLANIFICADORES |======================================================\\
 
-//*======================================[ PLANI LARGO PLAZO ]=======================================\\
+////======================================[ PLANI LARGO PLAZO ]=======================================\\
 
 //*=======================================[ PLANI CORTO PLAZO ]=======================================\\
 
@@ -125,7 +137,7 @@ func Planificador(configJson config.Kernel) {
 		}
 
 		// Si la lista de procesos en READY está vacía, se detiene el planificador.
-		if len(ReadyQueue) == 0 {
+		if len(listaREADY) == 0 {
 			// Si la lista está vacía, se detiene el planificador.
 			logueano.EsperaNuevosProcesos()
 			readyQueueVacia = true
@@ -135,16 +147,18 @@ func Planificador(configJson config.Kernel) {
 
 		// Si la lista no está vacía, se envía el Proceso al CPU.
 		// Se envía el primer Proceso y se hace un dequeue del mismo de la lista READY.
-		var poppedPCB structs.PCB
-		ReadyQueue, poppedPCB = dequeuePCB(ReadyQueue)
+		var siguientePCB structs.PCB
+		mxREADY.Lock()
+		listaREADY, siguientePCB = dequeuePCB(listaREADY)
+		mxREADY.Unlock()
 
 		// ? Debería estar en dispatch?
-		estadoAExec(&poppedPCB)
+		estadoAExec(&siguientePCB)
 		// ? Será siempre READY cuando pasa a EXEC?
-		logueano.CambioDeEstado("READY", poppedPCB)
+		logueano.CambioDeEstado("READY", siguientePCB)
 
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
-		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
+		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, configJson)
 
 		// Se administra el PCB devuelto por el CPU
 		AdministrarQueues(pcbActualizado)
@@ -155,40 +169,46 @@ func Planificador(configJson config.Kernel) {
 	}
 }
 
-//----------------------( ADMINISTRAR COLAS LOCALES )----------------------\\
+//----------------------( ADMINISTRAR COLAS )----------------------\\
 
-// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
+// Administra las colas de los procesos según el estado indicado en el PCB
 func AdministrarQueues(pcb structs.PCB) {
 
 	switch pcb.Estado {
 	case "NEW":
-
-		// Agrega el PCB a la cola de nuevos procesos
-		NewQueue = append(NewQueue, pcb)
+		//PCB --> cola de NEW
+		mxNEW.Lock()
+		listaNEW = append(listaNEW, pcb)
+		mxNEW.Unlock()
 
 	case "READY":
 
-		// Agrega el PCB a la cola de procesos listos
-		ReadyQueue = append(ReadyQueue, pcb)
-		readyQueueVacia = false
-		logueano.PidsReady(ReadyQueue)
+		//PCB --> cola de READY
+		mxREADY.Lock()
+		listaREADY = append(listaREADY, pcb)
+		mxREADY.Unlock()
 
-	//TODO: Deberia ser una por cada IO.
+		readyQueueVacia = false
+
+		//^ log obligatorio (3/6)
+		logueano.PidsReady(listaREADY)
+
 	case "BLOCK":
 
-		// Agrega el PCB al mapa de procesos bloqueados
-		blockedMap[pcb.PID] = pcb
+		//PCB --> mapa de BLOCK
+		mxBLOCK.Lock()
+		mapBLOK[pcb.PID] = pcb
+		mxBLOCK.Unlock()
 
-		//TODO: Implementar log para el manejo de listas BLOCK con map
 		//logPidsBlock(blockedMap)
 
 	case "EXIT":
 
-		// Agrega el PCB a la cola de procesos finalizados
-		exitQueue = append(exitQueue, pcb)
-		//TODO: momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el PCB (o alguna estructura que la contenga)
-		//motivoDeFinalizacion := "SUCCESS"
-		//logFinDeProceso(pcb, motivoDeFinalizacion)
+		//PCB --> cola de EXIT
+		mxEXIT.Lock()
+		listaEXIT = append(listaEXIT, pcb)
+		mxEXIT.Unlock()
+
 	}
 }
 
@@ -258,8 +278,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Actualiza el estado del CPU.
 	CPUOcupado = false
-
-	fmt.Println("Exit queue:", exitQueue)
 
 	// Retorna el PCB y el motivo de desalojo.
 	return respuestaDispatch.PCB, respuestaDispatch.MotivoDeDesalojo
