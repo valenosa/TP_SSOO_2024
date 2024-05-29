@@ -12,7 +12,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//================================| MAIN |================================\\
+//*======================================| MAIN |=======================================\\
 
 var registrosCPU structs.RegistrosUsoGeneral
 
@@ -39,7 +39,7 @@ func main() {
 
 }
 
-// -------------------------- HANDLERS -----------------------------------
+// *======================================| HANDLERS |=======================================\\
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	// Convierte una cadena vacía a JSON

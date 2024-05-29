@@ -13,7 +13,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//-------------------------- VARIABLES ---------------------------------------------
+//----------------------( VARIABLES )---------------------------\\
 
 var NewQueue []structs.PCB                                   //TODO: Debe tener mutex
 var ReadyQueue []structs.PCB                                 //TODO: Debe tener mutex
@@ -28,9 +28,115 @@ var Counter int = 0
 
 var hayInterfaz = make(chan int)
 
-// =============================PUBLICAS===================================================
-// !HAY FUNCIONES QUE SON PÚBLICAS PORQUE SOLAMENTE LAS USAN LOS TESTS, DE SACARLOS NO TENDRÍAN SENTIDO COMO PÚBLICAS
-// ----------------APIs Enunciado------------------------------------------------------------------------------
+// Envía una solicitud a memoria para obtener el estado de un proceso específico mediante su PID.
+func EstadoProceso(configJson config.Kernel) {
+
+	// PID del proceso a consultar (hardcodeado).
+	pid := 0
+
+	// Enviar solicitud a memoria para obtener el estado del proceso.
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", fmt.Sprintf("process/%d", pid))
+
+	// Verifica si ocurrió un error en la solicitud.
+	if respuesta == nil {
+		return
+	}
+
+	// Declarar una variable para almacenar la respuesta del servidor.
+	var response structs.ResponseIniciarProceso
+
+	// Decodifica la respuesta del servidor.
+	err := json.NewDecoder(respuesta.Body).Decode(&response)
+
+	// Maneja el error para la decodificación.
+	if err != nil {
+		fmt.Printf("Error decodificando\n")
+		fmt.Println(err)
+		return
+	}
+
+	// Imprimir información sobre el proceso (en este caso, solo el PID).
+	fmt.Println(response)
+}
+
+// TODO desarrollar la lectura de procesos creados (27/05/24)
+// Envía una solicitud al módulo de memoria para obtener y mostrar la lista de todos los procesos
+func ListarProceso(configJson config.Kernel) {
+
+	// Enviar solicitud al servidor de memoria
+	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", "process")
+
+	// Verificar si ocurrió un error en la solicitud.
+	if respuesta == nil {
+		return
+	}
+
+	// TODO: Checkear que io.ReadAll no esté deprecada.(27/05/24)
+	// Leer el cuerpo de la respuesta.
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return
+	}
+
+	// Imprimir la lista de procesos.
+	fmt.Println(string(bodyBytes))
+}
+
+//*======================================| ENTRADA SALIDA (I/O) |=======================================\\
+
+// Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
+func ValidarInstruccion(tipo string, instruccion string) bool {
+	switch tipo {
+	case "GENERICA":
+		return instruccion == "IO_GEN_SLEEP"
+	}
+	return false
+}
+
+// Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
+func DesalojarProceso(pid uint32, estado string) {
+	pcbDesalojado := blockedMap[pid]
+	//TODO: Hacer wrapper de delete
+	delete(blockedMap, pid)
+	pcbDesalojado.Estado = estado
+	administrarQueues(pcbDesalojado)
+	logueano.FinDeProceso(pcbDesalojado, estado)
+}
+
+//*======================================================| PLANIFICADORES |======================================================\\
+
+//----------------------( INICIAR y DETENER )----------------------\\
+
+// TODO: La función no está implementada. (27/05/24)
+// Envía una solicitud al módulo de CPU para iniciar el proceso de planificación
+func IniciarPlanificacion(configJson config.Kernel) {
+
+	// Enviar solicitud al servidor de CPU para iniciar la planificación.
+	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "PUT", "plani")
+
+	// Verificar si ocurrió un error en la solicitud.
+	if respuesta == nil {
+		return
+	}
+}
+
+// TODO: La función no está implementada. (27/05/24)
+// Envía una solicitud al módulo de CPU para detener el proceso de planificación
+func DetenerPlanificacion(configJson config.Kernel) {
+
+	// Enviar solicitud al servidor de CPU para detener la planificación.
+	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "DELETE", "plani")
+
+	// Verificar si ocurrió un error en la solicitud.
+	if respuesta == nil {
+		return
+	}
+}
+
+//*======================================[ PLANI LARGO PLAZO ]=======================================\\
+
+//----------------------( CREAR PROCESOS )----------------------\\
+
 func IniciarProceso(configJson config.Kernel, path string) {
 
 	// Se crea un nuevo PCB en estado NEW
@@ -77,10 +183,29 @@ func IniciarProceso(configJson config.Kernel, path string) {
 	//logNuevoProceso(nuevoPCB)
 
 	// Asigna un PCB al proceso recién creado.
-	asignarPCBAReady(nuevoPCB, responseIniciarProceso)
+	asignarPCB(nuevoPCB, responseIniciarProceso)
 }
 
-// Envía una solicitud a memoria para finalizar un proceso específico mediante su PID.
+// Asigna un PCB al Proceso recién creado y lo envía a la lista de READY para su ejecución
+func asignarPCB(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarProceso) {
+
+	// Crea un nuevo PCB en base a un pid
+	nuevoPCB.PID = uint32(respuesta.PID)
+
+	// Almacena el estado viejo de un PCB
+	pcb_estado_viejo := nuevoPCB.Estado
+	nuevoPCB.Estado = "READY"
+
+	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	logueano.CambioDeEstado(pcb_estado_viejo, nuevoPCB)
+
+	// Agrega el nuevo PCB a readyQueue
+	administrarQueues(nuevoPCB)
+}
+
+//----------------------( FINALIZAR PROCESOS )----------------------\\
+
+// Envía una solicitud a memoria para finalizar un proceso específico mediante su PID
 func FinalizarProceso(configJson config.Kernel) {
 
 	// PID del proceso a finalizar (hardcodeado).
@@ -95,107 +220,9 @@ func FinalizarProceso(configJson config.Kernel) {
 	}
 }
 
-// Envía una solicitud a memoria para obtener el estado de un proceso específico mediante su PID.
-func EstadoProceso(configJson config.Kernel) {
+//*=======================================[ PLANI CORTO PLAZO ]=======================================\\
 
-	// PID del proceso a consultar (hardcodeado).
-	pid := 0
-
-	// Enviar solicitud a memoria para obtener el estado del proceso.
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", fmt.Sprintf("process/%d", pid))
-
-	// Verifica si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-
-	// Declarar una variable para almacenar la respuesta del servidor.
-	var response structs.ResponseIniciarProceso
-
-	// Decodifica la respuesta del servidor.
-	err := json.NewDecoder(respuesta.Body).Decode(&response)
-
-	// Maneja el error para la decodificación.
-	if err != nil {
-		fmt.Printf("Error decodificando\n")
-		fmt.Println(err)
-		return
-	}
-
-	// Imprimir información sobre el proceso (en este caso, solo el PID).
-	fmt.Println(response)
-}
-
-// TODO desarrollar la lectura de procesos creados. La función no está en uso. (27/05/24)
-// Envía una solicitud al módulo de memoria para obtener y mostrar la lista de todos los procesos
-func ListarProceso(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de memoria
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", "process")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-
-	// TODO: Checkear que io.ReadAll no esté deprecada.(27/05/24)
-	// Leer el cuerpo de la respuesta.
-	bodyBytes, err := io.ReadAll(respuesta.Body)
-	if err != nil {
-		return
-	}
-
-	// Imprimir la lista de procesos.
-	fmt.Println(string(bodyBytes))
-}
-
-// TODO: La función no está en uso. (27/05/24)
-// Envía una solicitud al módulo de CPU para iniciar el proceso de planificación.
-func IniciarPlanificacion(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de CPU para iniciar la planificación.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "PUT", "plani")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
-
-// TODO: La función no está en uso. (27/05/24)
-// Envía una solicitud al módulo de CPU para detener el proceso de planificación.
-func DetenerPlanificacion(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de CPU para detener la planificación.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "DELETE", "plani")
-
-	// Verificar si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
-
-//----------------------------------Funciones auxiliares---------------------------------------------------------------------------
-
-// Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
-func ValidarInstruccion(tipo string, instruccion string) bool {
-	switch tipo {
-	case "GENERICA":
-		return instruccion == "IO_GEN_SLEEP"
-	}
-	return false
-}
-
-// Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
-func DesalojarProceso(pid uint32, estado string) {
-	pcbDesalojado := blockedMap[pid]
-	//TODO: Hacer wrapper de delete
-	delete(blockedMap, pid)
-	pcbDesalojado.Estado = estado
-	administrarQueues(pcbDesalojado)
-	logueano.FinDeProceso(pcbDesalojado, estado)
-}
-
+// TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
 func Planificador(configJson config.Kernel) {
 
@@ -232,7 +259,7 @@ func Planificador(configJson config.Kernel) {
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
 		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
 
-		// Se actualizan las colas de procesos según la respuesta del CPU
+		// Se administra el PCB devuelto por el CPU
 		administrarQueues(pcbActualizado)
 
 		// TODO: Usar motivo de desalojo para algo.
@@ -241,10 +268,63 @@ func Planificador(configJson config.Kernel) {
 	}
 }
 
-//=============================PRIVADAS===================================================
+//----------------------( ADMINISTRAR COLAS LOCALES )----------------------\\
 
-// ----------------APIs Enunciado------------------------------------------------------------------------------
-// Dispatch envía un PCB al CPU para su ejecución y maneja la respuesta del servidor CPU.
+// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
+func administrarQueues(pcb structs.PCB) {
+
+	switch pcb.Estado {
+	case "NEW":
+
+		// Agrega el PCB a la cola de nuevos procesos
+		NewQueue = append(NewQueue, pcb)
+
+	case "READY":
+
+		// Agrega el PCB a la cola de procesos listos
+		ReadyQueue = append(ReadyQueue, pcb)
+		readyQueueVacia = false
+		logueano.PidsReady(ReadyQueue)
+
+	//TODO: Deberia ser una por cada IO.
+	case "BLOCK":
+
+		// Agrega el PCB al mapa de procesos bloqueados
+		blockedMap[pcb.PID] = pcb
+
+		//TODO: Implementar log para el manejo de listas BLOCK con map
+		//logPidsBlock(blockedMap)
+
+	case "EXIT":
+
+		// Agrega el PCB a la cola de procesos finalizados
+		exitQueue = append(exitQueue, pcb)
+		//TODO: momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el PCB (o alguna estructura que la contenga)
+		//motivoDeFinalizacion := "SUCCESS"
+		//logFinDeProceso(pcb, motivoDeFinalizacion)
+	}
+}
+
+// ? ES NECESARIA ESTA FUNCION
+// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos Procesos, y avisa que la lista está vacía
+func estadoAExec(pcb *structs.PCB) {
+
+	// Cambia el estado del PCB a "EXEC"
+	(*pcb).Estado = "EXEC"
+
+	// Registra el proceso que está en ejecución
+	procesoExec = *pcb
+}
+
+// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
+func dequeuePCB(listaPCB []structs.PCB) ([]structs.PCB, structs.PCB) {
+	return listaPCB[1:], listaPCB[0]
+}
+
+//----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\
+
+// TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
+// Envía un PCB al CPU para su ejecución, Tras volver lo manda a la cola correspondiente
 func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	//Envia PCB al CPU.
@@ -299,7 +379,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 }
 
 // TODO: La función no está en uso. (27/05/24)
-// Envía una interrupción al ciclo de instrucción del CPU.
+// Desaloja el Proceso enviando una interrupción al CPU
 func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
 
 	cliente := &http.Client{}
@@ -337,73 +417,4 @@ func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
 	}
 
 	fmt.Println("Interrupción enviada correctamente.")
-}
-
-//----------------------------------Funciones auxiliares----------------------------------------------------------------------------
-
-// Asigna un PCB recién creado a la lista de PCBs en estado READY.
-func asignarPCBAReady(nuevoPCB structs.PCB, respuesta structs.ResponseIniciarProceso) {
-
-	// Crea un nuevo PCB en base a un pid
-	nuevoPCB.PID = uint32(respuesta.PID)
-
-	// Almacena el estado viejo de un PCB
-	pcb_estado_viejo := nuevoPCB.Estado
-	nuevoPCB.Estado = "READY"
-
-	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	logueano.CambioDeEstado(pcb_estado_viejo, nuevoPCB)
-
-	// Agrega el nuevo PCB a readyQueue
-	administrarQueues(nuevoPCB)
-}
-
-// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
-func administrarQueues(pcb structs.PCB) {
-
-	switch pcb.Estado {
-	case "NEW":
-
-		// Agrega el PCB a la cola de nuevos procesos
-		NewQueue = append(NewQueue, pcb)
-
-	case "READY":
-
-		// Agrega el PCB a la cola de procesos listos
-		ReadyQueue = append(ReadyQueue, pcb)
-		readyQueueVacia = false
-		logueano.PidsReady(ReadyQueue)
-
-	//TODO: Deberia ser una por cada IO.
-	case "BLOCK":
-
-		// Agrega el PCB al mapa de procesos bloqueados
-		blockedMap[pcb.PID] = pcb
-
-		//TODO: Implementar log para el manejo de listas BLOCK con map
-		//logPidsBlock(blockedMap)
-
-	case "EXIT":
-
-		// Agrega el PCB a la cola de procesos finalizados
-		exitQueue = append(exitQueue, pcb)
-		//TODO: momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el PCB (o alguna estructura que la contenga)
-		//motivoDeFinalizacion := "SUCCESS"
-		//logFinDeProceso(pcb, motivoDeFinalizacion)
-	}
-}
-
-// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos Procesos, y avisa que la lista está vacía
-func dequeuePCB(listaPCB []structs.PCB) ([]structs.PCB, structs.PCB) {
-	//TODO: Manejar el error en caso de que la lista esté vacía.
-	return listaPCB[1:], listaPCB[0]
-}
-
-func estadoAExec(pcb *structs.PCB) {
-
-	// Cambia el estado del PCB a "EXEC"
-	(*pcb).Estado = "EXEC"
-
-	// Registra el proceso que está en ejecución
-	procesoExec = *pcb
 }

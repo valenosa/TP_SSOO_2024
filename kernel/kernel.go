@@ -12,7 +12,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//================================| MAIN |================================\\
+//*======================================| MAIN |=======================================\\
 
 func main() {
 
@@ -46,7 +46,7 @@ func main() {
 
 }
 
-//-------------------------- FUNCIONES ---------------------------------------------
+//*======================================| HANDLERS |=======================================\\
 
 // Recibe una interfazConectada y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +97,6 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Si no se encontró la interfazConectada de la request, se desaloja el structs.
 	if !encontrado {
-
 		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
 		fmt.Println("Interfaz no conectada.")
 		return
@@ -143,7 +142,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//-------------------------- TEST --------------------------------------------------
+//*======================================| FUNC de TESTEO |=======================================\\
 // !ESTO NO SE MIGRÓ A NINGÚN PAQUETE.
 // Testea la conectividad con otros módulos
 
