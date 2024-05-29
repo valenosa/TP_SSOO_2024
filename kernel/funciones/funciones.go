@@ -99,89 +99,13 @@ func DesalojarProceso(pid uint32, estado string) {
 	//TODO: Hacer wrapper de delete
 	delete(blockedMap, pid)
 	pcbDesalojado.Estado = estado
-	administrarQueues(pcbDesalojado)
+	AdministrarQueues(pcbDesalojado)
 	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
 //*======================================================| PLANIFICADORES |======================================================\\
 
 //*======================================[ PLANI LARGO PLAZO ]=======================================\\
-
-//----------------------( CREAR PROCESOS )----------------------\\
-
-//! BORRAR SI EL TEST QUE VA A HACER DEVE AHORITA FUNCIONA PIOLA (29/5/24 4:22 PM hora ARG)
-/*
-func IniciarProceso(configJson config.Kernel, path string) {
-
-	// Se crea un nuevo PCB en estado NEW
-	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(CounterPID)
-	nuevoPCB.Estado = "NEW"
-
-	// Incrementa el contador de Procesos
-	CounterPID++
-
-	// Codificar Body en JSON
-	body, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: path})
-	if err != nil {
-		fmt.Printf("error codificando body: %s", err.Error())
-		return
-	}
-
-	//TODO: Quizá debería mandar el path a memoria solamente si hay "espacio" en la readyQueue (depende del grado de multiprogramación)
-	// Enviar solicitud al servidor de memoria para almacenar el proceso.
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", body)
-	// Verificar que no hubo error en la request
-	if respuesta == nil {
-		return
-	}
-	var responseIniciarProceso structs.ResponseListarProceso
-
-	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente.
-	err = json.NewDecoder(respuesta.Body).Decode(&responseIniciarProceso)
-	if err != nil {
-		fmt.Printf("Error decodificando\n")
-		return
-	}
-
-	//log obligatorio(1/6): creacion de Proceso
-	//logNuevoProceso(nuevoPCB)
-
-	// Asigna un PCB al proceso recién creado y lo manda a READY
-	CrearPCB(nuevoPCB, responseIniciarProceso)
-}
-*/
-
-// Asigna un PCB al Proceso recién creado y lo envía a la lista de READY para su ejecución
-func CrearPCB(nuevoPCB structs.PCB, respuesta structs.ResponseListarProceso) {
-
-	// Crea un nuevo PCB en base a un pid
-	nuevoPCB.PID = uint32(respuesta.PID)
-	nuevoPCB.Estado = "READY"
-
-	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	logueano.CambioDeEstado("NEW", nuevoPCB)
-
-	// Agrega el nuevo PCB a readyQueue
-	administrarQueues(nuevoPCB)
-}
-
-//----------------------( FINALIZAR PROCESOS )----------------------\\
-
-// Envía una solicitud a memoria para finalizar un proceso específico mediante su PID
-func FinalizarProceso(configJson config.Kernel) {
-
-	// PID del proceso a finalizar (hardcodeado).
-	pid := 0
-
-	// Enviar solicitud al servidor de memoria para finalizar el proceso.
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "DELETE", fmt.Sprintf("process/%d", pid))
-
-	// Verifica si ocurrió un error en la solicitud.
-	if respuesta == nil {
-		return
-	}
-}
 
 //*=======================================[ PLANI CORTO PLAZO ]=======================================\\
 
@@ -223,7 +147,7 @@ func Planificador(configJson config.Kernel) {
 		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
 
 		// Se administra el PCB devuelto por el CPU
-		administrarQueues(pcbActualizado)
+		AdministrarQueues(pcbActualizado)
 
 		// TODO: Usar motivo de desalojo para algo.
 		fmt.Println(motivoDesalojo)
@@ -234,7 +158,7 @@ func Planificador(configJson config.Kernel) {
 //----------------------( ADMINISTRAR COLAS LOCALES )----------------------\\
 
 // Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
-func administrarQueues(pcb structs.PCB) {
+func AdministrarQueues(pcb structs.PCB) {
 
 	switch pcb.Estado {
 	case "NEW":

@@ -29,11 +29,12 @@ func main() {
 	http.HandleFunc("PUT /plani", handlerIniciarPlanificacion)
 	http.HandleFunc("DELETE /plani", handlerDetenerPlanificacion)
 
-	//PROCESAMIENTO
+	//PROCESOS
 	http.HandleFunc("GET /process/{pid}", handlerEstadoProceso)
 	http.HandleFunc("GET /process", handlerListarProceso)
 
 	http.HandleFunc("PUT /process", handlerIniciarProceso)
+	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
 
 	//ENTRADA SALIDA
 	http.HandleFunc("POST /interfazConectada", handlerIniciarInterfaz)
@@ -46,7 +47,7 @@ func main() {
 
 //*======================================| HANDLERS |======================================\\
 
-//----------------------( HANDLERS APIs )----------------------\\
+//----------------------( PLANIFICACION )----------------------\\
 
 // TODO:Al recibir esta peticion comienza la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +67,8 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//----------------------( PROCESOS )----------------------\\
+
 // TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
 func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
@@ -73,7 +76,6 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- RECIBE ---------
 	pid, error := strconv.Atoi(r.PathValue("pid"))
-
 	if error != nil {
 		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
 		return
@@ -99,6 +101,28 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+}
+
+// TODO:
+func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("DetenerEstadoProceso")
+
+	//--------- RECIBE ---------
+	pid, error := strconv.Atoi(r.PathValue("pid"))
+	if error != nil {
+		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("PID:", pid)
+
+	//--------- EJECUTA ---------
+
+	//* Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
+
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
 }
 
 // TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
@@ -150,8 +174,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Path: %s\n", request.Path)
 
-	funciones.IniciarProceso(configJson, request.Path)
-
 	//----------- EJECUTA ---------
 
 	// Se crea un nuevo PCB en estado NEW
@@ -169,7 +191,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
 	if respuesta == nil {
 		return
-
 	}
 
 	var respMemoIniciarProceso structs.BodyIniciarProceso
@@ -177,27 +198,39 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
 		fmt.Println("Error al decodificar request body")
+		return
 	}
 	//----------------------------
 
-	funciones.CrearPCB(nuevoPCB, respMemoIniciarProceso)
+	// Si todo es correcto agregamos el PID al PCB
+	nuevoPCB.PID = funciones.CounterPID
+	nuevoPCB.Estado = "READY"
+
+	// Agrega el nuevo PCB a readyQueue
+	funciones.AdministrarQueues(nuevoPCB)
+
+	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	logueano.CambioDeEstado("NEW", nuevoPCB)
 
 	//Asigna un nuevo valor pid para la proxima response.
 	funciones.CounterPID++
 
+	//! Solo para testeoi eliminar al finalizar
+	funciones.Planificador(configJson)
+
 	// ----------- DEVUELVE -----------
 
-	jsonResponse, err := json.Marshal(respBody)
+	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
 	if err != nil {
 		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(jsonResponse)
+	w.Write(respIniciarProceso)
 }
 
-//----------------------( HANDLERS I/O )----------------------\\
+//----------------------( I/O )----------------------\\
 
 // Recibe una interfazConectada y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
@@ -293,7 +326,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 //*======================================| FUNC de TESTEO |======================================\\
 // !ESTO NO SE MIGRO A NINGUN PAQUETE
-// Testea la conectividad con otros modulos
+// ! TRAS LOS CAMBIOS DUDO QUE FUNCIONEN (29/5/24)
 
 /*
 func testConectividad(configJson config.Kernel) {

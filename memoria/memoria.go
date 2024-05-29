@@ -26,8 +26,6 @@ func main() {
 
 	// ======== HandleFunctions ========
 	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones))
-	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
-
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 
 	//inicio el servidor de Memoria
@@ -68,28 +66,6 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(htt
 		w.WriteHeader(http.StatusOK)
 		w.Write(respuesta)
 	}
-}
-
-// TODO: busca el pid y lo interrumpe si está en ejecución y lo pasa a EXIT, de estar encolado, solamente lo desencola y lo pasa a EXIT
-func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
-
-	//es posible que en un futuro sea necesario convertir esta string a un int
-	pid := r.PathValue("pid")
-
-	// Imprime el pid (solo para pruebas)
-	fmt.Printf("pid: %s", pid)
-
-	// Pasa a JSON un string vacío.
-	respuesta, err := json.Marshal("")
-
-	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Envía respuesta (con estatus como header) al cliente
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
 }
 
 // Envía a CPU la instrucción correspondiente al pid y el pc del map de memoria
