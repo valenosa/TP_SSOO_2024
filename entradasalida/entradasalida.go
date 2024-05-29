@@ -11,11 +11,15 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 )
 
+type RequestInterfaz struct {
+	NombreInterfaz string
+	Interfaz       Interfaz
+}
+
 // MOVELO A UTILS (struct tambien usada por kernel.go)
 type Interfaz struct {
-	Nombre string
-	Tipo   string
-	Puerto int
+	TipoInterfaz   string
+	PuertoInterfaz int
 }
 
 func main() {
@@ -26,7 +30,7 @@ func main() {
 	log.Printf("Soy un logeano")
 
 	// Crear interfaz (TESTING)
-	conectarInterfaz("GENERICO", "config.json")
+	conectarInterfaz("GENERIC_SHIT", "config.json")
 }
 
 func conectarInterfaz(nombre string, filePath string) {
@@ -37,10 +41,12 @@ func conectarInterfaz(nombre string, filePath string) {
 	config.Iniciar(filePath, &configInterfaz)
 
 	//Insertar Nombre, Puerto, Tipo de interfaz
-	body, err := json.Marshal(Interfaz{
-		Nombre: nombre,
-		Tipo:   configInterfaz.Type,
-		Puerto: configInterfaz.Port,
+	body, err := json.Marshal(RequestInterfaz{
+		NombreInterfaz: nombre,
+		Interfaz: Interfaz{
+			TipoInterfaz:   configInterfaz.Type,
+			PuertoInterfaz: configInterfaz.Port,
+		},
 	})
 
 	if err != nil {
@@ -61,7 +67,7 @@ func conectarInterfaz(nombre string, filePath string) {
 
 func iniciarServidorInterfaz(configInterfaz config.IO) {
 
-	http.HandleFunc("POST /IO_GEN_SLEEP", createHandlerIO_GEN_SLEEP(configInterfaz))
+	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP(configInterfaz))
 	//http.HandleFunc("POST /IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
 	//http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDOUT_WRITE)
 
@@ -75,7 +81,7 @@ func iniciarServidorInterfaz(configInterfaz config.IO) {
 
 // Implemantación de la Interfaz Génerica
 
-func createHandlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
+func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la unidadesDeTrabajo)
@@ -92,12 +98,13 @@ func createHandlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 		}
 
 		// Imprime el request por consola (del lado del server)
-		fmt.Println("Request path:", unidadesDeTrabajo)
+		fmt.Println("Unidades de Trabajo:", unidadesDeTrabajo)
 
 		//Ejecuta IO_GEN_SLEEP
 		sleepTime := configIO.Unit_Work_Time * unidadesDeTrabajo
-		time.Sleep(time.Duration(sleepTime))
-
+		fmt.Println("Zzzzzz...")
+		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		fmt.Println("Wakey wakey, its time for school")
 		// Responde al cliente
 		w.WriteHeader(http.StatusOK)
 

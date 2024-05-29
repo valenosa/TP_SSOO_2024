@@ -1,7 +1,7 @@
 {
     "port": 8005,
     "type": "GENERICA",
-    "unit_work_time": 250,
+    "unit_work_time": 1000,
     "ip_kernel": "127.0.0.1",
     "port_kernel": 8001,
     "ip_memory": "127.0.0.1",

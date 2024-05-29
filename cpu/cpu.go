@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/APIs/kernel-memoria/proceso"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -19,6 +21,10 @@ type IO_GEN_SLEEP struct {
 	UnidadesDeTrabajo int
 }
 
+var registrosCPU proceso.RegistrosUsoGeneral
+
+var configJson config.Cpu
+
 func main() {
 
 	// Configura el logger
@@ -30,11 +36,10 @@ func main() {
 	// http.HandleFunc("PUT /plani", handlerIniciarPlanificacion)
 	// http.HandleFunc("DELETE /plani", handlerDetenerPlanificacion)
 
-	http.HandleFunc("POST /exec", ejecutarProceso)
+	http.HandleFunc("POST /exec", handlerEjecutarProceso)
+	http.HandleFunc("POST /interrupciones", handlerInterrupcion)
 
 	// Extrae info de config.json
-	var configJson config.Cpu
-
 	config.Iniciar("config.json", &configJson)
 
 	// declaro puerto
@@ -75,7 +80,6 @@ func enviarInstruccionIO_GEN_SLEEP(instruccion IO_GEN_SLEEP) {
 	if respuesta == nil{
 		fmt.Println("Fallo en el envío de instrucción desde CPU a Kernel.")
 	}
-
 }*/
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
@@ -108,12 +112,23 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-func ejecutarProceso(w http.ResponseWriter, r *http.Request) {
-	// Crea uan variable tipo BodyIniciar (para interpretar lo que se recibe de la request)
-	var request proceso.PCB
+// Contiene el pid del proceso que dispatch mandó a ejecutar
+var pidEnEjecucion uint32
+
+type RespuestaDispatch struct {
+	MotivoDeDesalojo string
+	PCB              proceso.PCB
+}
+
+// Hay que pasarlla a local
+var motivoDeDesalojo string
+
+func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
+	// Crea uan variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
+	var pcbRecibido proceso.PCB
 
 	// Decodifica el request (codificado en formato json)
-	err := json.NewDecoder(r.Body).Decode(&request)
+	err := json.NewDecoder(r.Body).Decode(&pcbRecibido)
 
 	// Error Handler de la decodificación
 	if err != nil {
@@ -122,14 +137,17 @@ func ejecutarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simula ejecutar el proceso
-	fmt.Println("Se está ejecutando el proceso: ", request.PID)
+	// Ejecuta el ciclo de instrucción.
+	pidEnEjecucion = pcbRecibido.PID
+	ejecutarCiclosDeInstruccion(&pcbRecibido)
 
-	// Responde que se terminó de ejecutar el proceso (respuesta en caso de que se haya podido terminar de ejecutar el proceso)
-	var respBody string = "Se termino de ejecutar el proceso: " + strconv.FormatUint(uint64(request.PID), 10) + "\n" //el choclo este convierte uint32 a string
+	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
-	// Codificar Response en un array de bytes (formato json)
-	respuesta, err := json.Marshal(respBody)
+	// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
+	respuesta, err := json.Marshal(RespuestaDispatch{
+		MotivoDeDesalojo: motivoDeDesalojo,
+		PCB:              pcbRecibido,
+	})
 
 	// Error Handler de la codificación
 	if err != nil {
@@ -140,4 +158,268 @@ func ejecutarProceso(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+}
+
+var hayInterrupcion bool = false
+
+// Checkea que Kernel no haya enviado interrupciones
+func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+
+	// Está en una global; despues cambiar.
+	motivoDeDesalojo = queryParams.Get("interrupt_type")
+
+	PID, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
+
+	if errPid != nil {
+		return
+	}
+
+	if uint32(PID) != pidEnEjecucion {
+		return
+	}
+
+	hayInterrupcion = true
+
+	/*en caso de que haya interrupcion,
+	se devuelve el Contexto de Ejecución actualizado al Kernel con motivo de la interrupción.*/
+
+	// respuesta, err := json.Marshal(instruccion)
+	// fmt.Println(respuesta)
+
+	// if err != nil {
+	// 	http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// w.WriteHeader(http.StatusOK)
+	// w.Write([]byte(instruccion))
+}
+
+//---------------------FUNCIONES CICLO DE INSTRUCCION---------------------
+
+// Ejecuta un ciclo de instruccion.
+func ejecutarCiclosDeInstruccion(PCB *proceso.PCB) {
+	var cicloFinalizado bool = false
+
+	//Itera el ciclo de instruccion si hay instrucciones a ejecutar y no hay interrupciones
+	for !hayInterrupcion && !cicloFinalizado {
+		instruccion := fetch(PCB.PID, registrosCPU.PC)
+		decodeAndExecute(PCB, instruccion, &registrosCPU.PC, &cicloFinalizado)
+	}
+	PCB.RegistrosUsoGeneral = registrosCPU
+
+}
+
+// Trae de memoria las instrucciones indicadas por el PC y el PID.
+func fetch(PID uint32, PC uint32) string {
+
+	// Se pasan PID y PC a string
+	pid := strconv.FormatUint(uint64(PID), 10)
+	pc := strconv.FormatUint(uint64(PC), 10)
+
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/instrucciones", configJson.Ip_Memory, configJson.Port_Memory)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return ""
+	}
+
+	//Paso como parametros pid y pc.
+	q := req.URL.Query()
+	q.Add("PID", pid)
+	q.Add("PC", pc)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("Content-Type", "text/plain")
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		return ""
+	}
+
+	// Verificar el código de estado de la respuesta
+	if respuesta.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return ""
+	}
+
+	return string(bodyBytes)
+}
+
+// Ejecuta las instrucciones traidas de memoria.
+func decodeAndExecute(PCB *proceso.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
+
+	var registrosMap = map[string]*uint8{
+		"AX": &registrosCPU.AX,
+		"BX": &registrosCPU.BX,
+		"CX": &registrosCPU.CX,
+		"DX": &registrosCPU.DX,
+	}
+
+	//Parsea las instrucciones de string a string[]
+	variable := strings.Split(instruccion, " ")
+
+	fmt.Println("Instruccion: ", variable[0], " Parametros: ", variable[1:])
+
+	switch variable[0] {
+	case "SET":
+		set(variable[1], variable[2], registrosMap, PC)
+
+	case "SUM":
+		sum(variable[1], variable[2], registrosMap)
+
+	case "SUB":
+		sub(variable[1], variable[2], registrosMap)
+
+	case "JNZ":
+		jnz(variable[1], variable[2], PC, registrosMap)
+
+	case "IO_GEN_SLEEP":
+		*cicloFinalizado = true
+		PCB.Estado = "BLOCK"
+		IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
+
+	case "EXIT":
+		*cicloFinalizado = true
+		PCB.Estado = "EXIT"
+		motivoDeDesalojo = "EXIT"
+
+		return
+
+	default:
+		fmt.Println("------")
+	}
+
+	*PC++
+}
+
+//---------------------FUNCIONES DE INSTRUCCIONES---------------------
+
+// Asigna al registro el valor pasado como parámetro.
+func set(reg string, dato string, registroMap map[string]*uint8, PC *uint32) {
+
+	//Checkea si existe el registro obtenido de la instruccion.
+	if reg == "PC" {
+
+		valorInt64, err := strconv.ParseUint(dato, 10, 32)
+
+		if err != nil {
+			fmt.Println("Dato no valido")
+		}
+
+		*PC = uint32(valorInt64) - 1
+		return
+	}
+
+	registro, encontrado := registroMap[reg]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	//Parsea string a entero el valor que va a tomar el registro.
+	valor, err := strconv.Atoi(dato)
+
+	if err != nil {
+		fmt.Println("Dato no valido")
+	}
+
+	//Asigna el nuevo valor al registro.
+	*registro = uint8(valor)
+}
+
+// Suma al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
+func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
+	//Checkea si existe el registro obtenido de la instruccion.
+	registro1, encontrado := registroMap[reg1]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	registro2, encontrado := registroMap[reg2]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	*registro1 += *registro2
+
+}
+
+// Resta al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
+func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
+	//Checkea si existe el registro obtenido de la instruccion.
+	registro1, encontrado := registroMap[reg1]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	registro2, encontrado := registroMap[reg2]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	*registro1 -= *registro2
+}
+
+// Si el valor del registro es distinto de cero, actualiza el PC al numero de instruccion pasada por parametro.
+func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
+	registro, encontrado := registroMap[reg]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	valorInt64, err := strconv.ParseUint(valor, 10, 32)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	nuevoValor := uint32(valorInt64) - 1
+
+	if *registro != 0 {
+		*PC = nuevoValor
+	}
+}
+
+type InstruccionIO struct {
+	PidDesalojado  uint32
+	NombreInterfaz string
+	Instruccion    string
+	UnitWorkTime   int
+}
+
+// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
+func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
+
+	// int(unitWorkTime)
+	unitWorkTime, err := strconv.Atoi(unitWorkTimeString)
+	if err != nil {
+		return
+	}
+
+	//Pasa la instruccion a formato JSON.
+	body, err := json.Marshal(InstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		Instruccion:    "IO_GEN_SLEEP",
+		UnitWorkTime:   unitWorkTime,
+	})
+	if err != nil {
+		return
+	}
+
+	//Envía la request
+	respuesta := config.Request(configJson.Port_Kernel, configJson.Ip_Kernel, "POST", "instruccion", body)
+
+	//TODO: Implementar respuesta si es necesario.
+	fmt.Print(respuesta)
 }
