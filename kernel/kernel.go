@@ -150,10 +150,17 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Path: %s\n", request.Path)
 
+	funciones.IniciarProceso(configJson, request.Path)
+
 	//----------- EJECUTA ---------
 
-	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
+	// Se crea un nuevo PCB en estado NEW
+	var nuevoPCB structs.PCB
+	nuevoPCB.PID = uint32(funciones.CounterPID)
+	nuevoPCB.Estado = "NEW"
 
+	//----------- Va a memoria ---------
+	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
 	if err != nil {
 		return
 	}
@@ -165,26 +172,29 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	// Escribe el cuerpo de la respuesta
-
-	var respBody structs.BodyIniciarProceso
+	var respMemoIniciarProceso structs.BodyIniciarProceso
 	// Decodifica en formato JSON la request.
-	err = json.NewDecoder(respuesta.Body).Decode(&respBody)
+	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println("AGUANTE BOCA")
+		fmt.Println("Error al decodificar request body")
 	}
+	//----------------------------
+
+	funciones.CrearPCB(nuevoPCB, respMemoIniciarProceso)
+
+	//Asigna un nuevo valor pid para la proxima response.
+	funciones.CounterPID++
+
+	// ----------- DEVUELVE -----------
 
 	jsonResponse, err := json.Marshal(respBody)
 	if err != nil {
 		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
 		return
 	}
-	// ----------- DEVUELVE -----------
+
 	w.WriteHeader(http.StatusOK)
 	w.Write(jsonResponse)
-
-	//Asigna un nuevo valor pid para la proxima response.
-	funciones.CounterPID++
 }
 
 //----------------------( HANDLERS I/O )----------------------\\

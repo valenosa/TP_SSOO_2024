@@ -109,6 +109,8 @@ func DesalojarProceso(pid uint32, estado string) {
 
 //----------------------( CREAR PROCESOS )----------------------\\
 
+//! BORRAR SI EL TEST QUE VA A HACER DEVE AHORITA FUNCIONA PIOLA (29/5/24 4:22 PM hora ARG)
+/*
 func IniciarProceso(configJson config.Kernel, path string) {
 
 	// Se crea un nuevo PCB en estado NEW
@@ -119,13 +121,8 @@ func IniciarProceso(configJson config.Kernel, path string) {
 	// Incrementa el contador de Procesos
 	CounterPID++
 
-	// Codificar Body en un array de bytes (formato json)
-	body, err := json.Marshal(structs.BodyIniciarProceso{
-		PID:  nuevoPCB.PID,
-		Path: path,
-	})
-
-	// Maneja errores de codificación.
+	// Codificar Body en JSON
+	body, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: path})
 	if err != nil {
 		fmt.Printf("error codificando body: %s", err.Error())
 		return
@@ -138,14 +135,10 @@ func IniciarProceso(configJson config.Kernel, path string) {
 	if respuesta == nil {
 		return
 	}
-
-	// Se declara una nueva variable que contendrá la respuesta del servidor.
 	var responseIniciarProceso structs.ResponseListarProceso
 
 	// Se decodifica la variable (codificada en formato json) en la estructura correspondiente.
 	err = json.NewDecoder(respuesta.Body).Decode(&responseIniciarProceso)
-
-	// Maneja errores para al decodificación.
 	if err != nil {
 		fmt.Printf("Error decodificando\n")
 		return
@@ -154,22 +147,20 @@ func IniciarProceso(configJson config.Kernel, path string) {
 	//log obligatorio(1/6): creacion de Proceso
 	//logNuevoProceso(nuevoPCB)
 
-	// Asigna un PCB al proceso recién creado.
-	asignarPCB(nuevoPCB, responseIniciarProceso)
+	// Asigna un PCB al proceso recién creado y lo manda a READY
+	CrearPCB(nuevoPCB, responseIniciarProceso)
 }
+*/
 
 // Asigna un PCB al Proceso recién creado y lo envía a la lista de READY para su ejecución
-func asignarPCB(nuevoPCB structs.PCB, respuesta structs.ResponseListarProceso) {
+func CrearPCB(nuevoPCB structs.PCB, respuesta structs.ResponseListarProceso) {
 
 	// Crea un nuevo PCB en base a un pid
 	nuevoPCB.PID = uint32(respuesta.PID)
-
-	// Almacena el estado viejo de un PCB
-	pcb_estado_viejo := nuevoPCB.Estado
 	nuevoPCB.Estado = "READY"
 
 	//log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	logueano.CambioDeEstado(pcb_estado_viejo, nuevoPCB)
+	logueano.CambioDeEstado("NEW", nuevoPCB)
 
 	// Agrega el nuevo PCB a readyQueue
 	administrarQueues(nuevoPCB)
