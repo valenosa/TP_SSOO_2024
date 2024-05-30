@@ -18,6 +18,8 @@ func main() {
 
 	config.Iniciar("config.json", &funciones.ConfigJson)
 
+	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
+
 	// Configura el logger
 	config.Logger("Kernel.log")
 
@@ -38,8 +40,6 @@ func main() {
 	http.HandleFunc("POST /interfazConectada", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
-	go funciones.Planificador()
-
 	//Inicio el servidor de Kernel
 	config.IniciarServidor(funciones.ConfigJson.Port)
 
@@ -54,6 +54,7 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	//* Creo que esta funcion solo le hace un signal a un semaforo, que inicia la plani
 	fmt.Println("IniciarPlanificacion")
+	go funciones.Planificador()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -91,13 +92,13 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//----------- EJECUTA ---------
 
-	//Verifica si puede producir un PCB (por Multiprogramacion)
-	funciones.Cont_producirPCB <- 0
-
 	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB structs.PCB
 	nuevoPCB.PID = uint32(funciones.CounterPID)
 	nuevoPCB.Estado = "NEW"
+
+	//Verifica si puede producir un PCB (por Multiprogramacion)
+	funciones.Cont_producirPCB <- 0
 
 	//----------- Va a memoria ---------
 	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})

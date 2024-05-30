@@ -36,8 +36,7 @@ var procesoExec structs.PCB //Verificar que sea necesario
 //---------------------------- Semaforos Sincronizacion
 
 // Planificadores (Largo y Corto Plazo)
-// var Cont_producirPCB = make(chan int, ConfigJson.Multiprogramming) // *No se xq cuando le paso el ConfigJson.Multiprogramming no pasa el semaforo (raaaaroo)
-var Cont_producirPCB = make(chan int, 3)
+var Cont_producirPCB chan int
 var Bin_hayPCBenREADY = make(chan int)
 var mx_CPUOcupado sync.Mutex
 
@@ -148,8 +147,6 @@ func Planificador() {
 		estadoAExec(&siguientePCB)
 		logueano.CambioDeEstado("READY", siguientePCB)
 
-		<-Cont_producirPCB
-
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
 
@@ -199,6 +196,7 @@ func AdministrarQueues(pcb structs.PCB) {
 	case "EXIT":
 
 		//PCB --> cola de EXIT
+		<-Cont_producirPCB
 		mx_EXIT.Lock()
 		listaEXIT = append(listaEXIT, pcb)
 		mx_EXIT.Unlock()
