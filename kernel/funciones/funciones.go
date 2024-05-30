@@ -36,10 +36,10 @@ var procesoExec structs.PCB //Verificar que sea necesario
 //---------------------------- Semaforos Sincronizacion
 
 // Planificadores (Largo y Corto Plazo)
-// var Cont_producirPCB = make(chan int, ConfigJson.Multiprogramming)  // *No se xq cuando le paso el ConfigJson.Multiprogramming no pasa el semaforo (raaaaroo)
+// var Cont_producirPCB = make(chan int, ConfigJson.Multiprogramming) // *No se xq cuando le paso el ConfigJson.Multiprogramming no pasa el semaforo (raaaaroo)
 var Cont_producirPCB = make(chan int, 3)
 var Bin_hayPCBenREADY = make(chan int)
-var mx_CPUOcupado = make(chan int)
+var mx_CPUOcupado sync.Mutex
 
 var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
 var CounterPID uint32 = 0                                    //TODO: Debe tener mutex
@@ -124,11 +124,7 @@ func DesalojarProceso(pid uint32, estado string) {
 	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
-//*======================================================| PLANIFICADORES |======================================================\\
-
-////======================================[ PLANI LARGO PLAZO ]=======================================\\
-
-//*=======================================[ PLANI CORTO PLAZO ]=======================================\\
+//*======================================================| PLANIFICADOR |======================================================\\
 
 // TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
@@ -137,10 +133,10 @@ func Planificador() {
 	for {
 
 		//Espero a que el CPU este libre
-		mx_CPUOcupado <- 0
+		mx_CPUOcupado.Lock()
 
 		// Espero que exista PCB en READY
-		Bin_hayPCBenREADY <- 0
+		<-Bin_hayPCBenREADY
 
 		// Proceso READY -> EXEC
 		var siguientePCB structs.PCB
@@ -157,13 +153,14 @@ func Planificador() {
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
 
+		//Aviso que esta libre el CPU
+		mx_CPUOcupado.Unlock()
+
 		// Se administra el PCB devuelto por el CPU
 		AdministrarQueues(pcbActualizado)
 
 		// TODO: Usar motivo de desalojo para algo.
 		fmt.Println(motivoDesalojo)
-
-		<-mx_CPUOcupado
 
 	}
 }

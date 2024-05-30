@@ -91,6 +91,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//----------- EJECUTA ---------
 
+	//Verifica si puede producir un PCB (por Multiprogramacion)
 	funciones.Cont_producirPCB <- 0
 
 	// Se crea un nuevo PCB en estado NEW
@@ -132,7 +133,8 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	//Asigna un nuevo valor pid para la proxima response.
 	funciones.CounterPID++
 
-	<-funciones.Bin_hayPCBenREADY
+	//Avisa al planificador que hay un PCB en READY
+	funciones.Bin_hayPCBenREADY <- 0
 
 	// ----------- DEVUELVE -----------
 
