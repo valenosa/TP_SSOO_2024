@@ -16,24 +16,33 @@ import (
 
 //----------------------( VARIABLES )---------------------------\\
 
-var mxNEW sync.Mutex
+var ConfigJson config.Kernel
+
+// ----------------------------Listas de Estados
+var mx_NEW sync.Mutex
 var listaNEW []structs.PCB
 
-var mxREADY sync.Mutex
+var mx_READY sync.Mutex
 var listaREADY []structs.PCB
 
-var mxBLOCK sync.Mutex
+var mx_BLOCK sync.Mutex
 var mapBLOK = make(map[uint32]structs.PCB)
 
-var mxEXIT sync.Mutex
+var mx_EXIT sync.Mutex
 var listaEXIT []structs.PCB
 
-// var procesoExec structs.PCB  //Verificar que sea necesario
-var CPUOcupado bool = false                                  //TODO: Esto se hace con un sem binario
-var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
+var procesoExec structs.PCB //Verificar que sea necesario
+
+//---------------------------- Semaforos Sincronizacion
+
+// Planificadores (Largo y Corto Plazo)
+// var Cont_producirPCB = make(chan int, ConfigJson.Multiprogramming)  // *No se xq cuando le paso el ConfigJson.Multiprogramming no pasa el semaforo (raaaaroo)
+var Cont_producirPCB = make(chan int, 3)
+var Bin_hayPCBenREADY = make(chan int)
+var mx_CPUOcupado = make(chan int)
+
 var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
-var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
-var CounterPID uint32 = 0                                    //TODO: Esto se hace con un sem binario
+var CounterPID uint32 = 0                                    //TODO: Debe tener mutex
 
 //var hayInterfaz = make(chan int)
 
@@ -105,10 +114,10 @@ func ValidarInstruccion(tipo string, instruccion string) bool {
 // Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
 func DesalojarProceso(pid uint32, estado string) {
 
-	mxBLOCK.Lock()
+	mx_BLOCK.Lock()
 	pcbDesalojado := mapBLOK[pid]
 	delete(mapBLOK, pid)
-	mxBLOCK.Unlock()
+	mx_BLOCK.Unlock()
 
 	pcbDesalojado.Estado = estado
 	AdministrarQueues(pcbDesalojado)
@@ -123,48 +132,38 @@ func DesalojarProceso(pid uint32, estado string) {
 
 // TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
-func Planificador(configJson config.Kernel) {
+func Planificador() {
 
-	// Verifica si el CPU no está ocupado y la lista de procesos listos no está vacía.
-	if !CPUOcupado && !readyQueueVacia {
-		planificadorActivo = true
-	}
-	for planificadorActivo {
-		// Si el CPU está ocupado, detiene el planificador
-		if CPUOcupado {
-			planificadorActivo = false
-			break
-		}
+	for {
 
-		// Si la lista de procesos en READY está vacía, se detiene el planificador.
-		if len(listaREADY) == 0 {
-			// Si la lista está vacía, se detiene el planificador.
-			logueano.EsperaNuevosProcesos()
-			readyQueueVacia = true
-			planificadorActivo = false
-			break
-		}
+		//Espero a que el CPU este libre
+		mx_CPUOcupado <- 0
 
-		// Si la lista no está vacía, se envía el Proceso al CPU.
-		// Se envía el primer Proceso y se hace un dequeue del mismo de la lista READY.
+		// Espero que exista PCB en READY
+		Bin_hayPCBenREADY <- 0
+
+		// Proceso READY -> EXEC
 		var siguientePCB structs.PCB
-		mxREADY.Lock()
+		mx_READY.Lock()
 		listaREADY, siguientePCB = dequeuePCB(listaREADY)
-		mxREADY.Unlock()
+		mx_READY.Unlock()
 
 		// ? Debería estar en dispatch?
 		estadoAExec(&siguientePCB)
-		// ? Será siempre READY cuando pasa a EXEC?
 		logueano.CambioDeEstado("READY", siguientePCB)
 
+		<-Cont_producirPCB
+
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
-		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, configJson)
+		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
 
 		// Se administra el PCB devuelto por el CPU
 		AdministrarQueues(pcbActualizado)
 
 		// TODO: Usar motivo de desalojo para algo.
 		fmt.Println(motivoDesalojo)
+
+		<-mx_CPUOcupado
 
 	}
 }
@@ -177,18 +176,16 @@ func AdministrarQueues(pcb structs.PCB) {
 	switch pcb.Estado {
 	case "NEW":
 		//PCB --> cola de NEW
-		mxNEW.Lock()
+		mx_NEW.Lock()
 		listaNEW = append(listaNEW, pcb)
-		mxNEW.Unlock()
+		mx_NEW.Unlock()
 
 	case "READY":
 
 		//PCB --> cola de READY
-		mxREADY.Lock()
+		mx_READY.Lock()
 		listaREADY = append(listaREADY, pcb)
-		mxREADY.Unlock()
-
-		readyQueueVacia = false
+		mx_READY.Unlock()
 
 		//^ log obligatorio (3/6)
 		logueano.PidsReady(listaREADY)
@@ -196,18 +193,18 @@ func AdministrarQueues(pcb structs.PCB) {
 	case "BLOCK":
 
 		//PCB --> mapa de BLOCK
-		mxBLOCK.Lock()
+		mx_BLOCK.Lock()
 		mapBLOK[pcb.PID] = pcb
-		mxBLOCK.Unlock()
+		mx_BLOCK.Unlock()
 
 		//logPidsBlock(blockedMap)
 
 	case "EXIT":
 
 		//PCB --> cola de EXIT
-		mxEXIT.Lock()
+		mx_EXIT.Lock()
 		listaEXIT = append(listaEXIT, pcb)
-		mxEXIT.Unlock()
+		mx_EXIT.Unlock()
 
 	}
 }
@@ -236,9 +233,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	//Envia PCB al CPU.
 	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
-
-	// Se realizan las acciones necesarias para la comunicación HTTP y la ejecución del proceso.
-	CPUOcupado = true
 
 	//-------------------Request al CPU------------------------
 
@@ -275,9 +269,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Imprime el motivo de desalojo.
 	fmt.Println("Motivo de desalojo:", respuestaDispatch.MotivoDeDesalojo)
-
-	// Actualiza el estado del CPU.
-	CPUOcupado = false
 
 	// Retorna el PCB y el motivo de desalojo.
 	return respuestaDispatch.PCB, respuestaDispatch.MotivoDeDesalojo

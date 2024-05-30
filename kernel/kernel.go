@@ -14,11 +14,9 @@ import (
 
 //*======================================| MAIN |======================================\\
 
-var configJson config.Kernel
-
 func main() {
 
-	config.Iniciar("config.json", &configJson)
+	config.Iniciar("config.json", &funciones.ConfigJson)
 
 	// Configura el logger
 	config.Logger("Kernel.log")
@@ -40,8 +38,10 @@ func main() {
 	http.HandleFunc("POST /interfazConectada", handlerIniciarInterfaz)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
+	go funciones.Planificador()
+
 	//Inicio el servidor de Kernel
-	config.IniciarServidor(configJson.Port)
+	config.IniciarServidor(funciones.ConfigJson.Port)
 
 }
 
@@ -69,38 +69,81 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 //----------------------( PROCESOS )----------------------\\
 
-// TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
-func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
+func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("DetenerEstadoProceso")
+	fmt.Println("IniciarProceso")
 
-	//--------- RECIBE ---------
-	pid, error := strconv.Atoi(r.PathValue("pid"))
-	if error != nil {
-		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
-		return
-	}
+	//----------- RECIBE ---------
+	//variable que recibirá la request.
+	var request structs.RequestIniciarProceso
 
-	fmt.Println("PID:", pid)
-
-	//--------- EJECUTA ---------
-
-	//TODO: Busca en base al pid el proceso en todas las colas (y el map de BLOCK) y devuelvo el estado
-	var respIniciarProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
-
-	//--------- DEVUELVE ---------
-	//Crea una variable tipo Response
-	respuesta, err := json.Marshal(respIniciarProceso)
-
-	// Error Handler de la codificación
+	// Decodifica en formato JSON la request.
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		fmt.Println("Error al decodificar request body: ")
+		fmt.Println(err)
+
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Envía respuesta (con estatus como header) al cliente
+	fmt.Printf("Path: %s\n", request.Path)
+
+	//----------- EJECUTA ---------
+
+	funciones.Cont_producirPCB <- 0
+
+	// Se crea un nuevo PCB en estado NEW
+	var nuevoPCB structs.PCB
+	nuevoPCB.PID = uint32(funciones.CounterPID)
+	nuevoPCB.Estado = "NEW"
+
+	//----------- Va a memoria ---------
+	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
+	if err != nil {
+		return
+	}
+
+	//Envía el path a memoria para que cree el proceso
+	respuesta := config.Request(funciones.ConfigJson.Port_Memory, funciones.ConfigJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
+	if respuesta == nil {
+		return
+	}
+
+	var respMemoIniciarProceso structs.BodyIniciarProceso
+	// Decodifica en formato JSON la request.
+	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
+	if err != nil {
+		fmt.Println("Error al decodificar request body")
+		return
+	}
+	//----------------------------
+
+	// Si todo es correcto agregamos el PID al PCB
+	nuevoPCB.PID = funciones.CounterPID
+	nuevoPCB.Estado = "READY"
+
+	// Agrega el nuevo PCB a readyQueue
+	funciones.AdministrarQueues(nuevoPCB)
+
+	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	logueano.CambioDeEstado("NEW", nuevoPCB)
+
+	//Asigna un nuevo valor pid para la proxima response.
+	funciones.CounterPID++
+
+	<-funciones.Bin_hayPCBenREADY
+
+	// ----------- DEVUELVE -----------
+
+	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
+	if err != nil {
+		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
+	w.Write(respIniciarProceso)
 }
 
 // TODO:
@@ -154,80 +197,38 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
+// TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
+func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("IniciarProceso")
+	fmt.Println("DetenerEstadoProceso")
 
-	//----------- RECIBE ---------
-	//variable que recibirá la request.
-	var request structs.RequestIniciarProceso
+	//--------- RECIBE ---------
+	pid, error := strconv.Atoi(r.PathValue("pid"))
+	if error != nil {
+		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+		return
+	}
 
-	// Decodifica en formato JSON la request.
-	err := json.NewDecoder(r.Body).Decode(&request)
+	fmt.Println("PID:", pid)
+
+	//--------- EJECUTA ---------
+
+	//TODO: Busca en base al pid el proceso en todas las colas (y el map de BLOCK) y devuelvo el estado
+	var respIniciarProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
+
+	//--------- DEVUELVE ---------
+	//Crea una variable tipo Response
+	respuesta, err := json.Marshal(respIniciarProceso)
+
+	// Error Handler de la codificación
 	if err != nil {
-		fmt.Println("Error al decodificar request body: ")
-		fmt.Println(err)
-
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("Path: %s\n", request.Path)
-
-	//----------- EJECUTA ---------
-
-	// Se crea un nuevo PCB en estado NEW
-	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(funciones.CounterPID)
-	nuevoPCB.Estado = "NEW"
-
-	//----------- Va a memoria ---------
-	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
-	if err != nil {
-		return
-	}
-
-	//Envía el path a memoria para que cree el proceso
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
-	if respuesta == nil {
-		return
-	}
-
-	var respMemoIniciarProceso structs.BodyIniciarProceso
-	// Decodifica en formato JSON la request.
-	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
-	if err != nil {
-		fmt.Println("Error al decodificar request body")
-		return
-	}
-	//----------------------------
-
-	// Si todo es correcto agregamos el PID al PCB
-	nuevoPCB.PID = funciones.CounterPID
-	nuevoPCB.Estado = "READY"
-
-	// Agrega el nuevo PCB a readyQueue
-	funciones.AdministrarQueues(nuevoPCB)
-
-	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	logueano.CambioDeEstado("NEW", nuevoPCB)
-
-	//Asigna un nuevo valor pid para la proxima response.
-	funciones.CounterPID++
-
-	//! Solo para testeoi eliminar al finalizar
-	funciones.Planificador(configJson)
-
-	// ----------- DEVUELVE -----------
-
-	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
-	if err != nil {
-		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
-		return
-	}
-
+	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
-	w.Write(respIniciarProceso)
+	w.Write(respuesta)
 }
 
 //----------------------( I/O )----------------------\\
