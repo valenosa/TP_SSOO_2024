@@ -44,8 +44,8 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 
 	// Error Handler de la decodificación
 	if err != nil {
-		fmt.Printf("Error al decodificar request body: ")
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -92,19 +92,4 @@ func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	funciones.HayInterrupcion = true
-
-	//TODO: Checkear si es necesario lo de abajo (27/05/24).
-	/*En caso de que haya interrupcion,
-	se devuelve el Contexto de Ejecución actualizado al Kernel con motivo de la interrupción.*/
-
-	// respuesta, err := json.Marshal(instruccion)
-	// fmt.Println(respuesta)
-
-	// if err != nil {
-	// 	http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// w.WriteHeader(http.StatusOK)
-	// w.Write([]byte(instruccion))
 }

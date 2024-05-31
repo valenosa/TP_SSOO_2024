@@ -38,7 +38,7 @@ func main() {
 
 	//ENTRADA SALIDA
 	http.HandleFunc("POST /interfazConectada", handlerConexionInterfazIO)
-	http.HandleFunc("POST /instruccion", handlerInstrucciones)
+	http.HandleFunc("POST /instruccion", handlerEjecutarInstruccionEnIO)
 
 	//Inicio el servidor de Kernel
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -83,9 +83,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		fmt.Println("Error al decodificar request body: ")
-		fmt.Println(err)
-
+		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -119,7 +117,8 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println("Error al decodificar request body")
+		fmt.Println(err) ////! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	//----------------------------
@@ -145,7 +144,8 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
 	if err != nil {
-		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -153,19 +153,20 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respIniciarProceso)
 }
 
-// TODO:
+// TODO: Probar
 func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
-	pid, error := strconv.Atoi(r.PathValue("pid"))
-	if error != nil {
-		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 32)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Println("PID:", pid)
+	funciones.Interrupt(uint32(pid), "Finalizar PROCESO") // Interrumpe el proceso
 
 	//--------- EJECUTA ---------
 
@@ -192,10 +193,9 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
-
-	//Check si hubo algún error al parsear el JSON
 	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -210,9 +210,10 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
-	pid, error := strconv.Atoi(r.PathValue("pid"))
-	if error != nil {
-		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+	pid, err := strconv.Atoi(r.PathValue("pid"))
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -221,15 +222,16 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- EJECUTA ---------
 
 	//TODO: Busca en base al pid el proceso en todas las colas (y el map de BLOCK) y devuelvo el estado
-	var respIniciarProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
+	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
 
 	//--------- DEVUELVE ---------
 	//Crea una variable tipo Response
-	respuesta, err := json.Marshal(respIniciarProceso)
+	respuesta, err := json.Marshal(respEstadoProceso)
 
 	// Error Handler de la codificación
 	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -240,150 +242,110 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 //----------------------( I/O )----------------------\\
 
-// Recibe una interfazConectada y la agrega al map de interfaces conectadas.
+// Recibe una iterfaz y la guarda en InterfacesConectadas
 func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("ConexionInterfazIO-------------------------")
 
 	// Almaceno la interfazConectada en una variable
 	var interfazConectada structs.RequestConectarInterfazIO
-	marshalErr := json.NewDecoder(r.Body).Decode(&interfazConectada)
-	if marshalErr != nil {
-		http.Error(w, marshalErr.Error(), http.StatusBadRequest) //? Esta bien esto?
+	err := json.NewDecoder(r.Body).Decode(&interfazConectada)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Imprime la solicitud
-	fmt.Println("Request path:", interfazConectada) //!Borrar despues
+	fmt.Println("Request path:", interfazConectada) //! Borrar despues
 
-	//Guarda la interfazConectada en el map de interfaces conectadas.
+	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
+
+	//go planificarInterfaz()
+}
+
+var Bin_hayInterfaz = make(chan int, 1)
+
+func planificarInterfaz() {
+
+	for {
+		//Espero a que la interfaz tenga elementos en su cola de BLOCK
+		<-Bin_hayInterfaz
+
+	}
 
 }
 
-// TODO: implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
-func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
+// TODO: Implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
+func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
-	// Se crea una variable para almacenar la instrucción recibida en la solicitud.
-	var request structs.RequestEjecutarInstruccionIO
+	// Se crea una variable para almacenar la instrucción recibida en la solicitud
+	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 
-	// Se decodifica el cuerpo de la solicitud en formato JSON.
-	err := json.NewDecoder(r.Body).Decode(&request)
-	if err != nil {
-		logueano.ErrorDecode()
+	// Se decodifica el cuerpo de la solicitud en formato JSON
+	marshalError := json.NewDecoder(r.Body).Decode(&requestInstruccionIO)
+	if marshalError != nil {
+		fmt.Println(marshalError) //! Borrar despues.
+		http.Error(w, marshalError.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Imprime la solicitud
-	fmt.Println("Request path:", request)
+	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //!Borrar despues
 
-	// Busca la interfaz conectada en el mapa de funciones.InterfacesConectadas.
-	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(request.NombreInterfaz)
-	// Si no se encontró la interfazConectada de la request, se desaloja el structs.
+	// Verifica que la Interfaz este Conectada
+	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
 	if !encontrado {
-		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
+		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		fmt.Println("Interfaz no conectada.")
+		http.Error(w, "Interfaz no conectada.", http.StatusNotFound)
 		return
 	}
 
-	//Verifica que la instruccion sea compatible con el tipo de interfazConectada.
-	isValid := funciones.ValidarInstruccion(interfazConectada.TipoInterfaz, request.Instruccion)
-
-	// Si la instrucción no es compatible, se desaloja el proceso y se marca como "EXIT".
-	if !isValid {
-
-		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
+	//Verifica que la instruccion sea compatible con el tipo de interfazConectada
+	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazConectada.TipoInterfaz, requestInstruccionIO.Instruccion)
+	if !laInstruccionEsValida {
+		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		fmt.Println("Interfaz incompatible.")
+		http.Error(w, "Interfaz incompatible.", http.StatusBadRequest)
 		return
 	}
 
-	// Agrega el Proceso a la cola de bloqueados de la interfazConectada.
-	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, request.PidDesalojado)
-	funciones.InterfacesConectadas.Set(request.NombreInterfaz, interfazConectada)
+	// Agrega el Proceso a la cola de bloqueados de la interfazConectada
+	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, requestInstruccionIO.PidDesalojado)
+	//Actualiza la lista de interfaces conectadas
+	funciones.InterfacesConectadas.Set(requestInstruccionIO.NombreInterfaz, interfazConectada)
 
-	// Prepara la interfazConectada para enviarla en el body.
-	body, err := json.Marshal(request.UnitWorkTime)
+	//Bin_hayInterfaz <- 0
 
-	// Maneja los errores al crear el body.
-	if err != nil {
-		fmt.Printf("error codificando body: %s", err.Error())
+	//TODO: ----------------------------------------(ESTO LO HACE EL PLANIFICADOR)
+
+	// Manda a ejecutar a la interfaz
+	body, marshalError := json.Marshal(requestInstruccionIO)
+	if marshalError != nil {
+		fmt.Println(marshalError) //! Borrar despues.
+		http.Error(w, marshalError.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Envía la instrucción a ejecutar a la interfazConectada (Puerto).
-	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", request.Instruccion, body)
+	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
+	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", requestInstruccionIO.Instruccion, body)
 
 	// Verifica que no hubo error en la request
 	if respuesta == nil {
+		fmt.Println(respuesta) //! Borrar despues.
+		http.Error(w, "Respuesta vacia.", http.StatusInternalServerError)
 		return
 	}
 
 	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
 	if respuesta.StatusCode == http.StatusOK {
 		// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-		funciones.DesalojarProceso(request.PidDesalojado, "READY")
+		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
+		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+		pcbDesalojado.Estado = "READY"
+		funciones.AdministrarQueues(pcbDesalojado)
 		return
 	}
 }
-
-//*======================================| FUNC de TESTEO |======================================\\
-// !ESTO NO SE MIGRO A NINGUN PAQUETE
-// ! TRAS LOS CAMBIOS DUDO QUE FUNCIONEN (29/5/24)
-
-/*
-func testConectividad(configJson config.Kernel) {
-	fmt.Println("\nIniciar Proceso:")
-	funciones.IniciarProceso(configJson, "path")
-	funciones.IniciarProceso(configJson, "path")
-	funciones.IniciarProceso(configJson, "path")
-	funciones.IniciarProceso(configJson, "path")
-	fmt.Println("\nFinalizar Proceso:")
-	funciones.FinalizarProceso(configJson)
-	fmt.Println("\nEstado Proceso:")
-	funciones.EstadoProceso(configJson)
-	fmt.Println("\nListar Procesos:")
-	funciones.ListarProceso(configJson)
-	fmt.Println("\nDetener Planificación:")
-	//funciones.DetenerPlanificacion(configJson)
-	fmt.Println("\nIniciar Planificación:")
-	//funciones.IniciarPlanificacion(configJson)
-}
-
-func testPlanificacion(configJson config.Kernel) {
-
-	printList := func() {
-		fmt.Println("readyQueue:")
-		var ready []uint32
-		for _, pcb := range funciones.ReadyQueue {
-			ready = append(ready, pcb.PID)
-		}
-		fmt.Println(ready)
-	}
-
-	//
-	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
-	for i := 0; i < 2; i++ {
-		path := "procesos" + strconv.Itoa(funciones.Counter) + ".txt"
-		funciones.IniciarProceso(configJson, path)
-	}
-
-	fmt.Printf("\nSe testea el planificador-------------\n\n")
-	funciones.Planificador(configJson)
-	printList()
-
-	fmt.Printf("\nSe crean 2 procesos-------------\n\n")
-	for i := 0; i < 2; i++ {
-		path := "proceso" + strconv.Itoa(funciones.Counter) + ".txt"
-		funciones.IniciarProceso(configJson, path)
-	}
-}
-
-func testCicloDeInstruccion(configJson config.Kernel) {
-
-	fmt.Printf("\nSe crean 1 proceso-------------\n\n")
-	funciones.IniciarProceso(configJson, "proceso_test")
-
-	fmt.Printf("\nSe testea el planificador-------------\n\n")
-	funciones.Planificador(configJson)
-}
-*/

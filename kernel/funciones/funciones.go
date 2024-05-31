@@ -22,7 +22,8 @@ var ConfigJson config.Kernel
 var listaNEW = ListaSegura{}
 var listaREADY = ListaSegura{}
 var listaEXIT = ListaSegura{}
-var mapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
+var MapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
+var ProcesoExec structs.PCB
 
 //var procesoExec structs.PCB //* Verificar que sea necesario
 
@@ -53,8 +54,6 @@ func EstadoProceso(configJson config.Kernel) {
 
 	// Enviar solicitud a memoria para obtener el estado del proceso.
 	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", fmt.Sprintf("process/%d", pid))
-
-	// Verifica si ocurrió un error en la solicitud.
 	if respuesta == nil {
 		return
 	}
@@ -82,8 +81,6 @@ func ListarProceso(configJson config.Kernel) {
 
 	// Enviar solicitud al servidor de memoria
 	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", "process")
-
-	// Verificar si ocurrió un error en la solicitud.
 	if respuesta == nil {
 		return
 	}
@@ -102,22 +99,25 @@ func ListarProceso(configJson config.Kernel) {
 //*======================================| ENTRADA SALIDA (I/O) |=======================================\\
 
 // Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
-func ValidarInstruccion(tipo string, instruccion string) bool {
+func ValidarInstruccionIO(tipo string, instruccion string) bool {
 	switch tipo {
 	case "GENERICA":
 		return instruccion == "IO_GEN_SLEEP"
+
+	case "STDIN":
+		return instruccion == "IO_STDIN_READ"
+
+	case "STDOUT":
+		return instruccion == "IO_STDOUT_WRITE"
 	}
 	return false
 }
 
-// Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
-func DesalojarProceso(pid uint32, estado string) {
-
-	pcbDesalojado := mapBLOCK.Delete(pid)
-
-	pcbDesalojado.Estado = estado
+// Toma un pid del map general de BLOCK y manda un proceso a EXIT.
+func DesalojarProcesoIO(pid uint32) {
+	pcbDesalojado := MapBLOCK.Delete(pid)
+	pcbDesalojado.Estado = "EXIT"
 	AdministrarQueues(pcbDesalojado)
-	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
 //*=======================================| PLANIFICADOR |=======================================\\
@@ -139,6 +139,8 @@ func Planificador() {
 		var siguientePCB = listaREADY.Dequeue()
 		siguientePCB.Estado = "EXEC"
 
+		ProcesoExec = siguientePCB
+
 		logueano.CambioDeEstado("READY", siguientePCB)
 
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
@@ -159,7 +161,9 @@ func administrarInterrupciones(pcb *structs.PCB, motivoDesalojo string) {
 	switch motivoDesalojo {
 	case "Fin de QUANTUM":
 		pcb.Estado = "READY"
-	case "I/O":
+
+	case "Finalizar PROCESO":
+		pcb.Estado = "EXIT"
 	}
 
 }
@@ -168,7 +172,7 @@ func administrarInterrupciones(pcb *structs.PCB, motivoDesalojo string) {
 
 func roundRobin(PID uint32, quantum int) {
 	time.Sleep(time.Duration(quantum) * time.Millisecond)
-	interrupt(PID, "Fin de QUANTUM")
+	Interrupt(PID, "Fin de QUANTUM")
 }
 
 //----------------------( ADMINISTRAR COLAS )----------------------\\
@@ -178,6 +182,7 @@ func AdministrarQueues(pcb structs.PCB) {
 
 	switch pcb.Estado {
 	case "NEW":
+
 		//PCB --> cola de NEW
 		listaNEW.Append(pcb)
 
@@ -195,7 +200,7 @@ func AdministrarQueues(pcb structs.PCB) {
 	case "BLOCK":
 
 		//PCB --> mapa de BLOCK
-		mapBLOCK.Set(pcb.PID, pcb)
+		MapBLOCK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
 
@@ -238,8 +243,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Envía una solicitud al servidor CPU.
 	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
-
-	// Verifica si hubo un error en la solicitud.
 	if respuesta == nil {
 		return structs.PCB{}, "ERROR"
 	}
@@ -267,8 +270,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 // TODO: La función no está en uso. (27/05/24)
 // Desaloja el Proceso enviando una interrupción al CPU
-func interrupt(PID uint32, tipoDeInterrupcion string) {
-
+func Interrupt(PID uint32, tipoDeInterrupcion string) {
 	cliente := &http.Client{}
 	url := fmt.Sprintf("http://%s:%d/interrupciones", ConfigJson.Ip_CPU, ConfigJson.Port_CPU)
 	req, err := http.NewRequest("POST", url, nil)
@@ -374,8 +376,8 @@ func (sMap *MapSeguroInterfaz) Delete(key string) structs.Interfaz {
 
 func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
 	sMap.mx.Lock()
-	var pcb, find = sMap.m[key]
+	var interfaz, find = sMap.m[key]
 	sMap.mx.Unlock()
 
-	return pcb, find
+	return interfaz, find
 }

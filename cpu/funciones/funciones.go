@@ -257,20 +257,23 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 		return
 	}
 
-	// Convierte la instrucción a formato JSON.
-	body, err := json.Marshal(structs.RequestEjecutarInstruccionIO{
+	//Creo estructura de request
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
 		PidDesalojado:  PID,
 		NombreInterfaz: nombreInterfaz,
 		Instruccion:    "IO_GEN_SLEEP",
 		UnitWorkTime:   unitWorkTime,
-	})
+	}
+
+	//Convierto request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
 	if err != nil {
 		return
 	}
 
-	// Envía la solicitud a Kernel.
+	// Envía la solicitud de ejecucion a Kernel
 	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccion", body)
-
-	//TODO: Implementar respuesta si es necesario.
-	fmt.Print(respuesta)
+	if respuesta == nil {
+		return
+	}
 }
