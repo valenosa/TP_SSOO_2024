@@ -51,7 +51,7 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
-	funciones.PidEnEjecucion = pcbRecibido.PID //! ineceario (CREO)
+	funciones.PidEnEjecucion = pcbRecibido.PID
 
 	// Ejecuta el ciclo de instrucción.
 	funciones.RegistrosCPU = pcbRecibido.RegistrosUsoGeneral
@@ -78,8 +78,8 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
 
-	// Está en una global; despues cambiar.
 	funciones.MotivoDeDesalojo = queryParams.Get("interrupt_type")
+	fmt.Println("Se recibió una interrupción de tipo: ", funciones.MotivoDeDesalojo) //!Solamente para chequear que reciba todo bien, después se borra.
 
 	PID, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
 

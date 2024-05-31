@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
 
@@ -21,7 +22,7 @@ var ConfigJson config.Kernel
 var listaNEW = ListaSegura{}
 var listaREADY = ListaSegura{}
 var listaEXIT = ListaSegura{}
-var mapBLOK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
+var mapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
 
 //var procesoExec structs.PCB //* Verificar que sea necesario
 
@@ -112,7 +113,7 @@ func ValidarInstruccion(tipo string, instruccion string) bool {
 // Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
 func DesalojarProceso(pid uint32, estado string) {
 
-	pcbDesalojado := mapBLOK.Delete(pid)
+	pcbDesalojado := mapBLOCK.Delete(pid)
 
 	pcbDesalojado.Estado = estado
 	AdministrarQueues(pcbDesalojado)
@@ -146,13 +147,28 @@ func Planificador() {
 		//Aviso que esta libre el CPU
 		mx_CPUOcupado.Unlock()
 
+		administrarInterrupciones(&pcbActualizado, motivoDesalojo)
+
 		// Se administra el PCB devuelto por el CPU
 		AdministrarQueues(pcbActualizado)
 
-		// TODO: Usar motivo de desalojo para algo.
-		fmt.Println(motivoDesalojo)
-
 	}
+}
+
+func administrarInterrupciones(pcb *structs.PCB, motivoDesalojo string) {
+	switch motivoDesalojo {
+	case "Fin de QUANTUM":
+		pcb.Estado = "READY"
+	case "I/O":
+	}
+
+}
+
+//----------------------( ROUND ROBIN )----------------------\\
+
+func roundRobin(PID uint32, quantum int) {
+	time.Sleep(time.Duration(quantum) * time.Millisecond)
+	interrupt(PID, "Fin de QUANTUM")
 }
 
 //----------------------( ADMINISTRAR COLAS )----------------------\\
@@ -179,7 +195,7 @@ func AdministrarQueues(pcb structs.PCB) {
 	case "BLOCK":
 
 		//PCB --> mapa de BLOCK
-		mapBLOK.Set(pcb.PID, pcb)
+		mapBLOCK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
 
@@ -212,6 +228,14 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 		return structs.PCB{}, "ERROR"
 	}
 
+	/*
+		*Si el algoritmo de planificación es Round Robin, "contabiliza" el quantum
+		?Es correcto?
+	*/
+	if configJson.Planning_Algorithm == "RR" {
+		go roundRobin(pcb.PID, configJson.Quantum)
+	}
+
 	// Envía una solicitud al servidor CPU.
 	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
 
@@ -235,7 +259,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 	//-------------------Fin Request al CPU------------------------
 
 	// Imprime el motivo de desalojo.
-	fmt.Println("Motivo de desalojo:", respuestaDispatch.MotivoDeDesalojo)
+	fmt.Println("Proceso", respuestaDispatch.PCB.PID, "desalojado por:", respuestaDispatch.MotivoDeDesalojo)
 
 	// Retorna el PCB y el motivo de desalojo.
 	return respuestaDispatch.PCB, respuestaDispatch.MotivoDeDesalojo
@@ -243,10 +267,10 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 // TODO: La función no está en uso. (27/05/24)
 // Desaloja el Proceso enviando una interrupción al CPU
-func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
+func interrupt(PID uint32, tipoDeInterrupcion string) {
 
 	cliente := &http.Client{}
-	url := fmt.Sprintf("http://%s:%d/interrupciones", configJson.Ip_CPU, configJson.Port_CPU)
+	url := fmt.Sprintf("http://%s:%d/interrupciones", ConfigJson.Ip_CPU, ConfigJson.Port_CPU)
 	req, err := http.NewRequest("POST", url, nil)
 
 	if err != nil {
@@ -254,11 +278,11 @@ func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
 	}
 
 	// Convierte el PID a string
-	pidString := strconv.Itoa(pid)
+	pidString := strconv.FormatUint(uint64(PID), 10)
 
 	// Agrega el PID y el tipo de interrupción como parámetros de la URL
 	q := req.URL.Query()
-	q.Add("pid", string(pidString))
+	q.Add("PID", string(pidString))
 	q.Add("interrupt_type", tipoDeInterrupcion)
 
 	req.URL.RawQuery = q.Encode()
@@ -279,7 +303,7 @@ func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
 		return
 	}
 
-	fmt.Println("Interrupción enviada correctamente.")
+	fmt.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 // *=======================================| TADs SINCRONIZACION |=======================================\\

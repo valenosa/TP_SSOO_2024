@@ -5,22 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
-
-type RequestInterfaz struct {
-	NombreInterfaz string
-	Interfaz       Interfaz
-}
-
-// MOVELO A UTILS (struct tambien usada por kernel.go)
-type Interfaz struct {
-	TipoInterfaz   string
-	PuertoInterfaz int
-}
 
 //*======================================| MAIN |======================================\\
 
@@ -32,56 +21,52 @@ func main() {
 	log.Printf("Soy un logeano")
 
 	// Crear interfaz (TESTING)
-	conectarInterfaz("GENERIC_SHIT", "config.json")
+	conectarInterfazIO("GENERIC_SHIT", "config.json")
 }
 
-//*======================================| HANDLERS |======================================\\
+//*======================================| FUNCIONES |======================================\\
 
-func conectarInterfaz(nombre string, filePath string) {
+func conectarInterfazIO(nombre string, filePath string) {
 
 	// Extrae info de config.json
-	var configInterfaz config.IO
+	var configNuevaInterfaz config.IO
 
-	config.Iniciar(filePath, &configInterfaz)
+	config.Iniciar(filePath, &configNuevaInterfaz)
 
-	//Insertar Nombre, Puerto, Tipo de interfaz
-	body, err := json.Marshal(RequestInterfaz{
-		NombreInterfaz: nombre,
-		Interfaz: Interfaz{
-			TipoInterfaz:   configInterfaz.Type,
-			PuertoInterfaz: configInterfaz.Port,
-		},
-	})
-
-	if err != nil {
-		fmt.Printf("error codificando body: %s", err.Error())
+	//Levanto el server de la nuevaInterfazIO
+	serevrErr := iniciarServidorInterfaz(configNuevaInterfaz)
+	if serevrErr != nil {
+		fmt.Printf("Error al iniciar servidor de interfaz: %s", serevrErr.Error())
 		return
 	}
 
-	// Enviar request al servidor
-	respuesta := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfaz", body)
+	//Creo Interfaz base
+	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configNuevaInterfaz.Type, PuertoInterfaz: configNuevaInterfaz.Port}
 
-	// verificamos si hubo error en la request
+	//Creo y codifico la request de coneccion a Kernel
+	var requestConectarIO = structs.RequestConectarInterfazIO{NombreInterfaz: nombre, Interfaz: nuevaInterfazIO}
+	body, marshalErr := json.Marshal(requestConectarIO)
+	if marshalErr != nil {
+		fmt.Printf("error codificando body: %s", marshalErr.Error())
+		return
+	}
+
+	// Si todo es correcto envio la request de coneccion a Kernel
+	respuesta := config.Request(configNuevaInterfaz.Port_Kernel, configNuevaInterfaz.Ip_Kernel, "POST", "interfaz", body)
 	if respuesta == nil {
 		return
 	}
-
-	iniciarServidorInterfaz(configInterfaz)
 }
 
-func iniciarServidorInterfaz(configInterfaz config.IO) {
+func iniciarServidorInterfaz(configInterfaz config.IO) error {
 
 	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP(configInterfaz))
-	//http.HandleFunc("POST /IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
-	//http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDOUT_WRITE)
 
-	port := ":" + strconv.Itoa(configInterfaz.Port)
-
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Error al esuchar en el puerto " + port)
-	}
+	var err = config.IniciarServidor(configInterfaz.Port)
+	return err
 }
+
+//*======================================| HANDLERS |======================================\\
 
 // Implemantación de la Interfaz Génerica
 

@@ -37,7 +37,7 @@ func main() {
 	http.HandleFunc("DELETE /process/{pid}", handlerFinalizarProceso)
 
 	//ENTRADA SALIDA
-	http.HandleFunc("POST /interfazConectada", handlerIniciarInterfaz)
+	http.HandleFunc("POST /interfazConectada", handlerConexionInterfazIO)
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
 	//Inicio el servidor de Kernel
@@ -49,7 +49,6 @@ func main() {
 
 //----------------------( PLANIFICACION )----------------------\\
 
-// TODO:Al recibir esta peticion comienza la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("IniciarPlanificacion-------------------------")
@@ -61,7 +60,6 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO:Al recibir esta peticion detiene la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("DetenerPlanificacion-------------------------")
@@ -243,30 +241,23 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 //----------------------( I/O )----------------------\\
 
 // Recibe una interfazConectada y la agrega al map de interfaces conectadas.
-func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
+func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("IniciarInterfaz-------------------------")
+	fmt.Println("ConexionInterfazIO-------------------------")
 
-	// Se crea una variable para almacenar la interfaz recibida en la solicitud.
-	var requestInterfaz structs.RequestInterfaz
-
-	// Se decodifica el cuerpo de la solicitud en formato JSON.
-	err := json.NewDecoder(r.Body).Decode(&requestInterfaz)
-
-	// Maneja el error en la decodificación.
-	if err != nil {
-		logueano.ErrorDecode()
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Almaceno la interfazConectada en una variable
+	var interfazConectada structs.RequestConectarInterfazIO
+	marshalErr := json.NewDecoder(r.Body).Decode(&interfazConectada)
+	if marshalErr != nil {
+		http.Error(w, marshalErr.Error(), http.StatusBadRequest) //? Esta bien esto?
 		return
 	}
 
 	// Imprime la solicitud
-	fmt.Println("Request path:", requestInterfaz)
+	fmt.Println("Request path:", interfazConectada) //!Borrar despues
 
-	//Guarda la interfazConectada en la lista de interfaces conectadas.
-	funciones.InterfacesConectadas.Set(requestInterfaz.NombreInterfaz, requestInterfaz.Interfaz)
-
-	// Envía una señal al canal 'hayInterfaz' para indicar que hay una nueva interfaz conectada.
+	//Guarda la interfazConectada en el map de interfaces conectadas.
+	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
 
 }
 
@@ -274,7 +265,7 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Se crea una variable para almacenar la instrucción recibida en la solicitud.
-	var request structs.InstruccionIO
+	var request structs.RequestEjecutarInstruccionIO
 
 	// Se decodifica el cuerpo de la solicitud en formato JSON.
 	err := json.NewDecoder(r.Body).Decode(&request)

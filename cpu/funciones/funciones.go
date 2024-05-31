@@ -14,17 +14,17 @@ import (
 
 //----------------------( VARIABLES )----------------------\\
 
-// Contiene el pid del proceso que dispatch mandó a ejecutar
-var PidEnEjecucion uint32 //! Esta variable esta al pedo, cuando reescribamos interupt volara (creo)
-
-// TODO: Hay que pasarla a local
-var MotivoDeDesalojo string
+// Contiene el pid del proceso que dispatch mandó a ejecutar (se usa para que el handler de la interrupción pueda chequear que el pid del proceso que mandó la interrupción sea el mismo que el pid del proceso que está en ejecución)
+var PidEnEjecucion uint32
 
 var HayInterrupcion bool = false
 
 var RegistrosCPU structs.RegistrosUsoGeneral
 
 var ConfigJson config.Cpu
+
+// Es global porque la uso para "depositar" el motivo de desalojo del proceso (que a excepción de EXIT, es traído por una interrupción)
+var MotivoDeDesalojo string
 
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
 
@@ -40,6 +40,7 @@ func EjecutarCiclosDeInstruccion(PCB *structs.PCB) {
 		// Decodifica y ejecuta la instrucción.
 		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado)
 	}
+	HayInterrupcion = false // Resetea la interrupción
 
 	// Actualiza los registros de uso general del PCB con los registros de la CPU.
 	PCB.RegistrosUsoGeneral = RegistrosCPU
@@ -257,7 +258,7 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	}
 
 	// Convierte la instrucción a formato JSON.
-	body, err := json.Marshal(structs.InstruccionIO{
+	body, err := json.Marshal(structs.RequestEjecutarInstruccionIO{
 		PidDesalojado:  PID,
 		NombreInterfaz: nombreInterfaz,
 		Instruccion:    "IO_GEN_SLEEP",

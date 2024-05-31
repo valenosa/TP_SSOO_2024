@@ -64,41 +64,23 @@ type RespuestaDispatch struct {
 
 //=====================================| I/O |=====================================\\
 
-//!VER PORQUE TENEMOS TANTAS DISTINTAS
-
-// CPU, Kernel
-// Estructura de comunicacion al ejecutar una instrucción
-type InstruccionIO struct {
-	PidDesalojado  uint32
-	NombreInterfaz string
-	Instruccion    string
-	UnitWorkTime   int
-}
-
-// CPU, Kernel
-// TODO: Completar
-type IO_GEN_SLEEP struct {
-	Instruccion       string
-	NombreInterfaz    string
-	UnidadesDeTrabajo int
-}
-
-// Kernel, I/O
-type RequestInterfaz struct {
-	NombreInterfaz string
-	Interfaz       Interfaz
-}
-
-// Kernel, I/O
+// Estructura basica de InterfazIO que se guardara Kernel
 type Interfaz struct {
 	TipoInterfaz   string
 	PuertoInterfaz int
 	QueueBlock     []uint32 //? Necesita mutex?
 }
 
-// Kernel, I/O
-type NuevaInterfaz struct {
-	Nombre string
-	Tipo   string
-	Puerto int
+// Estructura de comunicacion al conectar una interfaz (Contiene su nombre/identificador y lo necesario para validar en Kernel)
+type RequestConectarInterfazIO struct {
+	NombreInterfaz string
+	Interfaz       Interfaz
+}
+
+// Estructura de comunicacion entre CPU y Kernel para ejecutar una instruccion de I/O
+type RequestEjecutarInstruccionIO struct {
+	PidDesalojado  uint32
+	NombreInterfaz string
+	Instruccion    string
+	UnitWorkTime   int
 }

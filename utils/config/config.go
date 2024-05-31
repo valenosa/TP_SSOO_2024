@@ -166,7 +166,7 @@ func ifBody(bodies ...[]byte) io.Reader {
 	return bytes.NewBuffer(bodies[0])
 }
 
-func IniciarServidor(puerto int) {
+func IniciarServidor(puerto int) error {
 	// Declara el puerto
 	port := ":" + strconv.Itoa(puerto)
 
@@ -176,4 +176,5 @@ func IniciarServidor(puerto int) {
 		fmt.Println("Error al esuchar en el puerto " + port)
 		fmt.Println(err)
 	}
+	return err
 }

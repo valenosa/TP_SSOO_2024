@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/memoria/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -83,6 +84,9 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
 		fmt.Println(instruccion)
+
+		// Esperar un tiempo determinado a tiempo de retardo
+		time.Sleep(time.Duration(funciones.ConfigJson.Delay_Response) * time.Millisecond)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(instruccion))
