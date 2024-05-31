@@ -53,8 +53,10 @@ func main() {
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	//* Creo que esta funcion solo le hace un signal a un semaforo, que inicia la plani
-	fmt.Println("IniciarPlanificacion")
-	go funciones.Planificador()
+	fmt.Println("IniciarPlanificacion-------------------------")
+
+	//Indiferente a la cantidad de veces que se llame, Planificador solo se ejecuta una vez
+	funciones.OncePlani.Do(func() { go funciones.Planificador() })
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -63,7 +65,7 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	//* Creo que esta funcion solo le hace un wait a un semaforo, que detiene la plani
-	fmt.Printf("DetenerPlanificacion")
+	fmt.Printf("DetenerPlanificacion-------------------------")
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -72,7 +74,7 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("IniciarProceso")
+	fmt.Println("IniciarProceso-------------------------")
 
 	//----------- RECIBE ---------
 	//variable que recibirá la request.
@@ -152,7 +154,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 // TODO:
 func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("DetenerEstadoProceso")
+	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
 	pid, error := strconv.Atoi(r.PathValue("pid"))
@@ -174,7 +176,7 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 // TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
 func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Printf("ListarProceso")
+	fmt.Printf("ListarProceso-------------------------")
 
 	//----------- EJECUTA -----------
 
@@ -203,7 +205,7 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 // TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
 func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("DetenerEstadoProceso")
+	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
 	pid, error := strconv.Atoi(r.PathValue("pid"))
@@ -238,6 +240,8 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 // Recibe una interfazConectada y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("IniciarInterfaz-------------------------")
 
 	// Se crea una variable para almacenar la interfaz recibida en la solicitud.
 	var requestInterfaz structs.RequestInterfaz

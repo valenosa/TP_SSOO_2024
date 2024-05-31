@@ -14,29 +14,40 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
+//----------------------( MONITORES )---------------------------\\
+
+type ListaSegura struct {
+	mx   sync.Mutex
+	list []structs.PCB
+}
+
+type MapSeguro struct {
+	mx sync.Mutex
+	m  map[uint32]structs.PCB
+}
+
 //----------------------( VARIABLES )---------------------------\\
 
 var ConfigJson config.Kernel
 
 // ----------------------------Listas de Estados
-var mx_NEW sync.Mutex
-var listaNEW []structs.PCB
+var listaNEW = ListaSegura{}
+var listaREADY = ListaSegura{}
+var listaEXIT = ListaSegura{}
+var mapBLOK = MapSeguro{m: make(map[uint32]structs.PCB)}
 
-var mx_READY sync.Mutex
-var listaREADY []structs.PCB
+//var procesoExec structs.PCB //* Verificar que sea necesario
 
-var mx_BLOCK sync.Mutex
-var mapBLOK = make(map[uint32]structs.PCB)
+// ---------------------------- Semaforos PLANIFICADORES
+// Iniciar/Detener
+var OncePlani sync.Once
 
-var mx_EXIT sync.Mutex
-var listaEXIT []structs.PCB
+// var togglePlanificador
 
-var procesoExec structs.PCB //Verificar que sea necesario
-
-//---------------------------- Semaforos Sincronizacion
-
-// Planificadores (Largo y Corto Plazo)
+// Largo Plazo
 var Cont_producirPCB chan int
+
+// Corto Plazo
 var Bin_hayPCBenREADY = make(chan int)
 var mx_CPUOcupado sync.Mutex
 
@@ -113,21 +124,20 @@ func ValidarInstruccion(tipo string, instruccion string) bool {
 // Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
 func DesalojarProceso(pid uint32, estado string) {
 
-	mx_BLOCK.Lock()
-	pcbDesalojado := mapBLOK[pid]
-	delete(mapBLOK, pid)
-	mx_BLOCK.Unlock()
+	pcbDesalojado := mapBLOK.Delete(pid)
 
 	pcbDesalojado.Estado = estado
 	AdministrarQueues(pcbDesalojado)
 	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
-//*======================================================| PLANIFICADOR |======================================================\\
+//*=======================================| PLANIFICADOR |=======================================\\
 
 // TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
 func Planificador() {
+
+	fmt.Println("Planificador iniciado")
 
 	for {
 
@@ -138,13 +148,9 @@ func Planificador() {
 		<-Bin_hayPCBenREADY
 
 		// Proceso READY -> EXEC
-		var siguientePCB structs.PCB
-		mx_READY.Lock()
-		listaREADY, siguientePCB = dequeuePCB(listaREADY)
-		mx_READY.Unlock()
+		var siguientePCB = listaREADY.Dequeue()
+		siguientePCB.Estado = "EXEC"
 
-		// ? Debería estar en dispatch?
-		estadoAExec(&siguientePCB)
 		logueano.CambioDeEstado("READY", siguientePCB)
 
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
@@ -170,54 +176,62 @@ func AdministrarQueues(pcb structs.PCB) {
 	switch pcb.Estado {
 	case "NEW":
 		//PCB --> cola de NEW
-		mx_NEW.Lock()
-		listaNEW = append(listaNEW, pcb)
-		mx_NEW.Unlock()
+		listaNEW.Append(pcb)
 
 	case "READY":
 
 		//PCB --> cola de READY
-		mx_READY.Lock()
-		listaREADY = append(listaREADY, pcb)
-		mx_READY.Unlock()
+		listaREADY.Append(pcb)
 
 		//^ log obligatorio (3/6)
-		logueano.PidsReady(listaREADY)
+		logueano.PidsReady(listaREADY.list) //!No se si tengo que sync esto
 
 	case "BLOCK":
 
 		//PCB --> mapa de BLOCK
-		mx_BLOCK.Lock()
-		mapBLOK[pcb.PID] = pcb
-		mx_BLOCK.Unlock()
+		mapBLOK.Append(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
 
 	case "EXIT":
 
 		//PCB --> cola de EXIT
+		listaEXIT.Append(pcb)
 		<-Cont_producirPCB
-		mx_EXIT.Lock()
-		listaEXIT = append(listaEXIT, pcb)
-		mx_EXIT.Unlock()
 
 	}
 }
 
-// ? ES NECESARIA ESTA FUNCION
-// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos Procesos, y avisa que la lista está vacía
-func estadoAExec(pcb *structs.PCB) {
-
-	// Cambia el estado del PCB a "EXEC"
-	(*pcb).Estado = "EXEC"
-
-	// Registra el proceso que está en ejecución
-	procesoExec = *pcb
+// ----------------------( FUNCIONES DE SINCRONIZACION )----------------------\\
+func (sList *ListaSegura) Append(value structs.PCB) {
+	sList.mx.Lock()
+	sList.list = append(sList.list, value)
+	sList.mx.Unlock()
 }
 
 // TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
-func dequeuePCB(listaPCB []structs.PCB) ([]structs.PCB, structs.PCB) {
-	return listaPCB[1:], listaPCB[0]
+func (sList *ListaSegura) Dequeue() structs.PCB {
+	sList.mx.Lock()
+	var pcb = sList.list[0]
+	sList.list = sList.list[1:]
+	sList.mx.Unlock()
+
+	return pcb
+}
+
+func (sMap *MapSeguro) Append(key uint32, value structs.PCB) {
+	sMap.mx.Lock()
+	sMap.m[key] = value
+	sMap.mx.Unlock()
+}
+
+func (sMap *MapSeguro) Delete(key uint32) structs.PCB {
+	sMap.mx.Lock()
+	var pcb = sMap.m[key]
+	delete(sMap.m, key)
+	sMap.mx.Unlock()
+
+	return pcb
 }
 
 //----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\
