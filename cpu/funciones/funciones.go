@@ -15,7 +15,7 @@ import (
 //----------------------( VARIABLES )----------------------\\
 
 // Contiene el pid del proceso que dispatch mandó a ejecutar
-var PidEnEjecucion uint32
+var PidEnEjecucion uint32 //! Esta variable esta al pedo, cuando reescribamos interupt volara (creo)
 
 // TODO: Hay que pasarla a local
 var MotivoDeDesalojo string

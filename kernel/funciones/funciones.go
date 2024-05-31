@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
 
@@ -13,20 +14,35 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//----------------------( VARIABLES )---------------------------\\
+// ----------------------( VARIABLES )---------------------------\\
+var ConfigJson config.Kernel
 
-var NewQueue []structs.PCB                                   //TODO: Debe tener mutex
-var ReadyQueue []structs.PCB                                 //TODO: Debe tener mutex
-var blockedMap = make(map[uint32]structs.PCB)                //TODO: Debe tener mutex
-var exitQueue []structs.PCB                                  //TODO: Debe tener mutex
-var procesoExec structs.PCB                                  //TODO: Debe tener mutex
-var CPUOcupado bool = false                                  //TODO: Esto se hace con un sem binario
-var planificadorActivo bool = true                           //TODO: Esto se hace con un sem binario
-var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
-var readyQueueVacia bool = true                              //TODO: Esto se hace con un sem binario
+// ----------------------------Listas de Estados
+var listaNEW = ListaSegura{}
+var listaREADY = ListaSegura{}
+var listaEXIT = ListaSegura{}
+var mapBLOK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
+
+//var procesoExec structs.PCB //* Verificar que sea necesario
+
+// ---------------------------- Semaforos PLANIFICADORES
+
+// Iniciar/Detener
+var OnePlani sync.Mutex
+var TogglePlanificador bool
+
+// Largo Plazo
+var Cont_producirPCB chan int
+
+// Corto Plazo
+var Bin_hayPCBenREADY chan int //Se inicializa con el buffer = grado de multiprogramacion +1 ya que los semaforos en go tmb se bloquean si no pueden meter algo en el buffer
+var mx_CPUOcupado sync.Mutex
+
+var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz)}
+var Mx_ConterPID sync.Mutex
 var CounterPID uint32 = 0
 
-var hayInterfaz = make(chan int)
+//var hayInterfaz = make(chan int)
 
 // Envía una solicitud a memoria para obtener el estado de un proceso específico mediante su PID.
 func EstadoProceso(configJson config.Kernel) {
@@ -95,56 +111,40 @@ func ValidarInstruccion(tipo string, instruccion string) bool {
 
 // Cambia el estado del PCB y lo envía a encolar segun el nuevo estado.
 func DesalojarProceso(pid uint32, estado string) {
-	pcbDesalojado := blockedMap[pid]
-	//TODO: Hacer wrapper de delete
-	delete(blockedMap, pid)
+
+	pcbDesalojado := mapBLOK.Delete(pid)
+
 	pcbDesalojado.Estado = estado
 	AdministrarQueues(pcbDesalojado)
 	logueano.FinDeProceso(pcbDesalojado, estado)
 }
 
-//*======================================================| PLANIFICADORES |======================================================\\
+//*=======================================| PLANIFICADOR |=======================================\\
 
-//*======================================[ PLANI LARGO PLAZO ]=======================================\\
-
-//*=======================================[ PLANI CORTO PLAZO ]=======================================\\
-
-// TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
+// TODO: Verificar el tema del semaforo de hay pcb en ready (31/05/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
-func Planificador(configJson config.Kernel) {
+func Planificador() {
 
-	// Verifica si el CPU no está ocupado y la lista de procesos listos no está vacía.
-	if !CPUOcupado && !readyQueueVacia {
-		planificadorActivo = true
-	}
-	for planificadorActivo {
-		// Si el CPU está ocupado, detiene el planificador
-		if CPUOcupado {
-			planificadorActivo = false
-			break
-		}
+	//Espero a que se active el planificador
+	for TogglePlanificador {
 
-		// Si la lista de procesos en READY está vacía, se detiene el planificador.
-		if len(ReadyQueue) == 0 {
-			// Si la lista está vacía, se detiene el planificador.
-			logueano.EsperaNuevosProcesos()
-			readyQueueVacia = true
-			planificadorActivo = false
-			break
-		}
+		//Espero a que el CPU este libre
+		mx_CPUOcupado.Lock()
 
-		// Si la lista no está vacía, se envía el Proceso al CPU.
-		// Se envía el primer Proceso y se hace un dequeue del mismo de la lista READY.
-		var poppedPCB structs.PCB
-		ReadyQueue, poppedPCB = dequeuePCB(ReadyQueue)
+		// Espero que exista PCB en READY
+		<-Bin_hayPCBenREADY
 
-		// ? Debería estar en dispatch?
-		estadoAExec(&poppedPCB)
-		// ? Será siempre READY cuando pasa a EXEC?
-		logueano.CambioDeEstado("READY", poppedPCB)
+		// Proceso READY -> EXEC
+		var siguientePCB = listaREADY.Dequeue()
+		siguientePCB.Estado = "EXEC"
+
+		logueano.CambioDeEstado("READY", siguientePCB)
 
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
-		pcbActualizado, motivoDesalojo := dispatch(poppedPCB, configJson)
+		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
+
+		//Aviso que esta libre el CPU
+		mx_CPUOcupado.Unlock()
 
 		// Se administra el PCB devuelto por el CPU
 		AdministrarQueues(pcbActualizado)
@@ -155,57 +155,41 @@ func Planificador(configJson config.Kernel) {
 	}
 }
 
-//----------------------( ADMINISTRAR COLAS LOCALES )----------------------\\
+//----------------------( ADMINISTRAR COLAS )----------------------\\
 
-// Función que según que se haga con un PCB se lo puede enviar a la lista de planificación o a la de bloqueo
+// Administra las colas de los procesos según el estado indicado en el PCB
 func AdministrarQueues(pcb structs.PCB) {
 
 	switch pcb.Estado {
 	case "NEW":
-
-		// Agrega el PCB a la cola de nuevos procesos
-		NewQueue = append(NewQueue, pcb)
+		//PCB --> cola de NEW
+		listaNEW.Append(pcb)
 
 	case "READY":
 
-		// Agrega el PCB a la cola de procesos listos
-		ReadyQueue = append(ReadyQueue, pcb)
-		readyQueueVacia = false
-		logueano.PidsReady(ReadyQueue)
+		//PCB --> cola de READY
+		listaREADY.Append(pcb)
 
-	//TODO: Deberia ser una por cada IO.
+		//Avisa al planificador que hay un PCB en READY (se usa dentro del select para que no se bloquee si ya metieron algo "buffer infinito")
+		Bin_hayPCBenREADY <- 0
+
+		//^ log obligatorio (3/6)
+		logueano.PidsReady(listaREADY.list) //!No se si tengo que sync esto
+
 	case "BLOCK":
 
-		// Agrega el PCB al mapa de procesos bloqueados
-		blockedMap[pcb.PID] = pcb
+		//PCB --> mapa de BLOCK
+		mapBLOK.Set(pcb.PID, pcb)
 
-		//TODO: Implementar log para el manejo de listas BLOCK con map
 		//logPidsBlock(blockedMap)
 
 	case "EXIT":
 
-		// Agrega el PCB a la cola de procesos finalizados
-		exitQueue = append(exitQueue, pcb)
-		//TODO: momentaneamente sera un string constante, pero el motivo de Finalizacion deberá venir con el PCB (o alguna estructura que la contenga)
-		//motivoDeFinalizacion := "SUCCESS"
-		//logFinDeProceso(pcb, motivoDeFinalizacion)
+		//PCB --> cola de EXIT
+		listaEXIT.Append(pcb)
+		<-Cont_producirPCB
+
 	}
-}
-
-// ? ES NECESARIA ESTA FUNCION
-// Desencola el PCB de la lista, si esta está vacía, simplemente espera nuevos Procesos, y avisa que la lista está vacía
-func estadoAExec(pcb *structs.PCB) {
-
-	// Cambia el estado del PCB a "EXEC"
-	(*pcb).Estado = "EXEC"
-
-	// Registra el proceso que está en ejecución
-	procesoExec = *pcb
-}
-
-// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
-func dequeuePCB(listaPCB []structs.PCB) ([]structs.PCB, structs.PCB) {
-	return listaPCB[1:], listaPCB[0]
 }
 
 //----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\
@@ -216,9 +200,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	//Envia PCB al CPU.
 	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
-
-	// Se realizan las acciones necesarias para la comunicación HTTP y la ejecución del proceso.
-	CPUOcupado = true
 
 	//-------------------Request al CPU------------------------
 
@@ -255,11 +236,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Imprime el motivo de desalojo.
 	fmt.Println("Motivo de desalojo:", respuestaDispatch.MotivoDeDesalojo)
-
-	// Actualiza el estado del CPU.
-	CPUOcupado = false
-
-	fmt.Println("Exit queue:", exitQueue)
 
 	// Retorna el PCB y el motivo de desalojo.
 	return respuestaDispatch.PCB, respuestaDispatch.MotivoDeDesalojo
@@ -304,4 +280,78 @@ func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
 	}
 
 	fmt.Println("Interrupción enviada correctamente.")
+}
+
+// *=======================================| TADs SINCRONIZACION |=======================================\\
+
+// ----------------------( LISTA )----------------------\\
+type ListaSegura struct {
+	mx   sync.Mutex
+	list []structs.PCB
+}
+
+func (sList *ListaSegura) Append(value structs.PCB) {
+	sList.mx.Lock()
+	sList.list = append(sList.list, value)
+	sList.mx.Unlock()
+}
+
+// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
+func (sList *ListaSegura) Dequeue() structs.PCB {
+	sList.mx.Lock()
+	var pcb = sList.list[0]
+	sList.list = sList.list[1:]
+	sList.mx.Unlock()
+
+	return pcb
+}
+
+// ----------------------( MAP PCB )----------------------\\
+type MapSeguroPCB struct {
+	mx sync.Mutex
+	m  map[uint32]structs.PCB
+}
+
+func (sMap *MapSeguroPCB) Set(key uint32, value structs.PCB) {
+	sMap.mx.Lock()
+	sMap.m[key] = value
+	sMap.mx.Unlock()
+}
+
+func (sMap *MapSeguroPCB) Delete(key uint32) structs.PCB {
+	sMap.mx.Lock()
+	var pcb = sMap.m[key]
+	delete(sMap.m, key)
+	sMap.mx.Unlock()
+
+	return pcb
+}
+
+// ----------------------( MAP Interfaz )----------------------\\
+type MapSeguroInterfaz struct {
+	mx sync.Mutex
+	m  map[string]structs.Interfaz
+}
+
+func (sMap *MapSeguroInterfaz) Set(key string, value structs.Interfaz) {
+	sMap.mx.Lock()
+	sMap.m[key] = value
+	sMap.mx.Unlock()
+}
+
+func (sMap *MapSeguroInterfaz) Delete(key string) structs.Interfaz {
+	sMap.mx.Lock()
+	var pcb = sMap.m[key]
+	delete(sMap.m, key)
+	sMap.mx.Unlock()
+
+	return pcb
+}
+
+func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
+	sMap.mx.Lock()
+	var pcb, find = sMap.m[key]
+	sMap.mx.Unlock()
+
+	return pcb, find
 }

@@ -14,11 +14,11 @@ import (
 
 //*======================================| MAIN |======================================\\
 
-var configJson config.Kernel
-
 func main() {
 
-	config.Iniciar("config.json", &configJson)
+	config.Iniciar("config.json", &funciones.ConfigJson)
+	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
+	funciones.Bin_hayPCBenREADY = make(chan int, funciones.ConfigJson.Multiprogramming+1)
 
 	// Configura el logger
 	config.Logger("Kernel.log")
@@ -41,7 +41,7 @@ func main() {
 	http.HandleFunc("POST /instruccion", handlerInstrucciones)
 
 	//Inicio el servidor de Kernel
-	config.IniciarServidor(configJson.Port)
+	config.IniciarServidor(funciones.ConfigJson.Port)
 
 }
 
@@ -52,8 +52,11 @@ func main() {
 // TODO:Al recibir esta peticion comienza la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	//* Creo que esta funcion solo le hace un signal a un semaforo, que inicia la plani
-	fmt.Println("IniciarPlanificacion")
+	fmt.Println("IniciarPlanificacion-------------------------")
+	funciones.TogglePlanificador = true
+
+	funciones.OnePlani.Lock()
+	go funciones.Planificador()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -61,18 +64,152 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 // TODO:Al recibir esta peticion detiene la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	//* Creo que esta funcion solo le hace un wait a un semaforo, que detiene la plani
-	fmt.Printf("DetenerPlanificacion")
+	fmt.Printf("DetenerPlanificacion-------------------------")
+
+	funciones.TogglePlanificador = false
+	funciones.OnePlani.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 }
 
 //----------------------( PROCESOS )----------------------\\
 
+func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("IniciarProceso-------------------------")
+
+	//----------- RECIBE ---------
+	//variable que recibirá la request.
+	var request structs.RequestIniciarProceso
+
+	// Decodifica en formato JSON la request.
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		fmt.Println("Error al decodificar request body: ")
+		fmt.Println(err)
+
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("Path: %s\n", request.Path)
+
+	//----------- EJECUTA ---------
+
+	// Se crea un nuevo PCB en estado NEW
+	var nuevoPCB structs.PCB
+
+	funciones.Mx_ConterPID.Lock()
+	nuevoPCB.PID = funciones.CounterPID
+	funciones.Mx_ConterPID.Unlock()
+
+	nuevoPCB.Estado = "NEW"
+
+	//----------- Va a memoria ---------
+	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
+	if err != nil {
+		return
+	}
+
+	//Envía el path a memoria para que cree el proceso
+	respuesta := config.Request(funciones.ConfigJson.Port_Memory, funciones.ConfigJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
+	if respuesta == nil {
+		return
+	}
+
+	var respMemoIniciarProceso structs.BodyIniciarProceso
+	// Decodifica en formato JSON la request.
+	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
+	if err != nil {
+		fmt.Println("Error al decodificar request body")
+		return
+	}
+	//----------------------------
+
+	//Asigna un nuevo valor pid para la proxima response.
+	funciones.Mx_ConterPID.Lock()
+	funciones.CounterPID++
+	funciones.Mx_ConterPID.Unlock()
+
+	//Verifica si puede producir un PCB (por Multiprogramacion)
+	funciones.Cont_producirPCB <- 0
+
+	// Si todo es correcto agregamos el PID al PCB
+	nuevoPCB.Estado = "READY"
+
+	// Agrega el nuevo PCB a readyQueue
+	funciones.AdministrarQueues(nuevoPCB)
+
+	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	logueano.CambioDeEstado("NEW", nuevoPCB)
+
+	// ----------- DEVUELVE -----------
+
+	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
+	if err != nil {
+		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respIniciarProceso)
+}
+
+// TODO:
+func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("DetenerEstadoProceso-------------------------")
+
+	//--------- RECIBE ---------
+	pid, error := strconv.Atoi(r.PathValue("pid"))
+	if error != nil {
+		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("PID:", pid)
+
+	//--------- EJECUTA ---------
+
+	//* Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
+
+	// Envía respuesta (con estatus como header) al cliente
+	w.WriteHeader(http.StatusOK)
+}
+
+// TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
+func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Printf("ListarProceso-------------------------")
+
+	//----------- EJECUTA -----------
+
+	//Harcodea una lista de procesos, más adelante deberá ser dinámico
+	var listaDeProcesos []structs.ResponseListarProceso = []structs.ResponseListarProceso{
+		{PID: 0, Estado: "READY"},
+		{PID: 1, Estado: "BLOCK"},
+	}
+
+	//----------- DEVUELVE -----------
+
+	//Paso a formato JSON la lista de procesos
+	respuesta, err := json.Marshal(listaDeProcesos)
+
+	//Check si hubo algún error al parsear el JSON
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
 // TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
 func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("DetenerEstadoProceso")
+	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
 	pid, error := strconv.Atoi(r.PathValue("pid"))
@@ -103,137 +240,12 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-// TODO:
-func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("DetenerEstadoProceso")
-
-	//--------- RECIBE ---------
-	pid, error := strconv.Atoi(r.PathValue("pid"))
-	if error != nil {
-		http.Error(w, "Error al obtener el ID del proceso", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println("PID:", pid)
-
-	//--------- EJECUTA ---------
-
-	//* Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
-
-	// Envía respuesta (con estatus como header) al cliente
-	w.WriteHeader(http.StatusOK)
-}
-
-// TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
-func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Printf("ListarProceso")
-
-	//----------- EJECUTA -----------
-
-	//Harcodea una lista de procesos, más adelante deberá ser dinámico
-	var listaDeProcesos []structs.ResponseListarProceso = []structs.ResponseListarProceso{
-		{PID: 0, Estado: "READY"},
-		{PID: 1, Estado: "BLOCK"},
-	}
-
-	//----------- DEVUELVE -----------
-
-	//Paso a formato JSON la lista de procesos
-	respuesta, err := json.Marshal(listaDeProcesos)
-
-	//Check si hubo algún error al parsear el JSON
-	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Envía respuesta al cliente
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
-}
-
-func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("IniciarProceso")
-
-	//----------- RECIBE ---------
-	//variable que recibirá la request.
-	var request structs.RequestIniciarProceso
-
-	// Decodifica en formato JSON la request.
-	err := json.NewDecoder(r.Body).Decode(&request)
-	if err != nil {
-		fmt.Println("Error al decodificar request body: ")
-		fmt.Println(err)
-
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	fmt.Printf("Path: %s\n", request.Path)
-
-	//----------- EJECUTA ---------
-
-	// Se crea un nuevo PCB en estado NEW
-	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(funciones.CounterPID)
-	nuevoPCB.Estado = "NEW"
-
-	//----------- Va a memoria ---------
-	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
-	if err != nil {
-		return
-	}
-
-	//Envía el path a memoria para que cree el proceso
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
-	if respuesta == nil {
-		return
-	}
-
-	var respMemoIniciarProceso structs.BodyIniciarProceso
-	// Decodifica en formato JSON la request.
-	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
-	if err != nil {
-		fmt.Println("Error al decodificar request body")
-		return
-	}
-	//----------------------------
-
-	// Si todo es correcto agregamos el PID al PCB
-	nuevoPCB.PID = funciones.CounterPID
-	nuevoPCB.Estado = "READY"
-
-	// Agrega el nuevo PCB a readyQueue
-	funciones.AdministrarQueues(nuevoPCB)
-
-	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
-	logueano.CambioDeEstado("NEW", nuevoPCB)
-
-	//Asigna un nuevo valor pid para la proxima response.
-	funciones.CounterPID++
-
-	//! Solo para testeoi eliminar al finalizar
-	funciones.Planificador(configJson)
-
-	// ----------- DEVUELVE -----------
-
-	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
-	if err != nil {
-		http.Error(w, "Error al codificar el JSON de la respuesta", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(respIniciarProceso)
-}
-
 //----------------------( I/O )----------------------\\
 
 // Recibe una interfazConectada y la agrega al map de interfaces conectadas.
 func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("IniciarInterfaz-------------------------")
 
 	// Se crea una variable para almacenar la interfaz recibida en la solicitud.
 	var requestInterfaz structs.RequestInterfaz
@@ -252,7 +264,7 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", requestInterfaz)
 
 	//Guarda la interfazConectada en la lista de interfaces conectadas.
-	funciones.InterfacesConectadas[requestInterfaz.NombreInterfaz] = requestInterfaz.Interfaz
+	funciones.InterfacesConectadas.Set(requestInterfaz.NombreInterfaz, requestInterfaz.Interfaz)
 
 	// Envía una señal al canal 'hayInterfaz' para indicar que hay una nueva interfaz conectada.
 
@@ -275,8 +287,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", request)
 
 	// Busca la interfaz conectada en el mapa de funciones.InterfacesConectadas.
-	interfazConectada, encontrado := funciones.InterfacesConectadas[request.NombreInterfaz]
-
+	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(request.NombreInterfaz)
 	// Si no se encontró la interfazConectada de la request, se desaloja el structs.
 	if !encontrado {
 		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
@@ -297,7 +308,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Agrega el Proceso a la cola de bloqueados de la interfazConectada.
 	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, request.PidDesalojado)
-	funciones.InterfacesConectadas[request.NombreInterfaz] = interfazConectada
+	funciones.InterfacesConectadas.Set(request.NombreInterfaz, interfazConectada)
 
 	// Prepara la interfazConectada para enviarla en el body.
 	body, err := json.Marshal(request.UnitWorkTime)

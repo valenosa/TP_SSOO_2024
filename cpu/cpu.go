@@ -34,7 +34,7 @@ func main() {
 // *======================================| HANDLERS |=======================================\\
 
 // Maneja la ejecución de un proceso a través de un PCB
-// Devuelve al despachador el contexto de ejecución y el motivo del desalojo.
+// Devuelve a dispatch el contexto de ejecución y el motivo del desalojo.
 func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 	// Crea una variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
 	var pcbRecibido structs.PCB
@@ -49,11 +49,13 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ejecuta el ciclo de instrucción.
-	funciones.PidEnEjecucion = pcbRecibido.PID
-	funciones.EjecutarCiclosDeInstruccion(&pcbRecibido)
-
 	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
+
+	funciones.PidEnEjecucion = pcbRecibido.PID //! ineceario (CREO)
+
+	// Ejecuta el ciclo de instrucción.
+	funciones.RegistrosCPU = pcbRecibido.RegistrosUsoGeneral
+	funciones.EjecutarCiclosDeInstruccion(&pcbRecibido)
 
 	// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
 	respuesta, err := json.Marshal(structs.RespuestaDispatch{
