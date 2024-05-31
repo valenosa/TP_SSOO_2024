@@ -28,7 +28,8 @@ var mapBLOK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
 // ---------------------------- Semaforos PLANIFICADORES
 
 // Iniciar/Detener
-var Bin_togglePlanificador = make(chan int, 2) //TODO: implementar
+var OnePlani sync.Mutex
+var TogglePlanificador bool
 
 // Largo Plazo
 var Cont_producirPCB chan int
@@ -124,8 +125,8 @@ func DesalojarProceso(pid uint32, estado string) {
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
 func Planificador() {
 
-	for {
-		//Espero a que se active el planificador
+	//Espero a que se active el planificador
+	for TogglePlanificador {
 
 		//Espero a que el CPU este libre
 		mx_CPUOcupado.Lock()

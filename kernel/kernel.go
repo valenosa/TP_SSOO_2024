@@ -23,9 +23,6 @@ func main() {
 	// Configura el logger
 	config.Logger("Kernel.log")
 
-	//======== Planificador ========
-	go funciones.Planificador()
-
 	// ======== HandleFunctions ========
 
 	//PLANIFICACION
@@ -56,9 +53,10 @@ func main() {
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("IniciarPlanificacion-------------------------")
+	funciones.TogglePlanificador = true
 
-	//Signal a el planificador
-	//<-funciones.Bin_togglePlanificador
+	funciones.OnePlani.Lock()
+	go funciones.Planificador()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -68,8 +66,8 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("DetenerPlanificacion-------------------------")
 
-	//Wait a el planificador
-	//funciones.Bin_togglePlanificador <- 0
+	funciones.TogglePlanificador = false
+	funciones.OnePlani.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -107,9 +105,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	nuevoPCB.Estado = "NEW"
 
-	//Verifica si puede producir un PCB (por Multiprogramacion)
-	funciones.Cont_producirPCB <- 0
-
 	//----------- Va a memoria ---------
 	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
 	if err != nil {
@@ -131,6 +126,14 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	}
 	//----------------------------
 
+	//Asigna un nuevo valor pid para la proxima response.
+	funciones.Mx_ConterPID.Lock()
+	funciones.CounterPID++
+	funciones.Mx_ConterPID.Unlock()
+
+	//Verifica si puede producir un PCB (por Multiprogramacion)
+	funciones.Cont_producirPCB <- 0
+
 	// Si todo es correcto agregamos el PID al PCB
 	nuevoPCB.Estado = "READY"
 
@@ -139,11 +142,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
 	logueano.CambioDeEstado("NEW", nuevoPCB)
-
-	//Asigna un nuevo valor pid para la proxima response.
-	funciones.Mx_ConterPID.Lock()
-	funciones.CounterPID++
-	funciones.Mx_ConterPID.Unlock()
 
 	// ----------- DEVUELVE -----------
 
