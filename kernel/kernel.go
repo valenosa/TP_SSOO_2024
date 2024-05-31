@@ -100,14 +100,18 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB structs.PCB
-	nuevoPCB.PID = uint32(funciones.CounterPID)
+
+	funciones.Mx_ConterPID.Lock()
+	nuevoPCB.PID = funciones.CounterPID
+	funciones.Mx_ConterPID.Unlock()
+
 	nuevoPCB.Estado = "NEW"
 
 	//Verifica si puede producir un PCB (por Multiprogramacion)
 	funciones.Cont_producirPCB <- 0
 
 	//----------- Va a memoria ---------
-	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: funciones.CounterPID, Path: request.Path})
+	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
 	if err != nil {
 		return
 	}
@@ -128,7 +132,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	//----------------------------
 
 	// Si todo es correcto agregamos el PID al PCB
-	nuevoPCB.PID = funciones.CounterPID
 	nuevoPCB.Estado = "READY"
 
 	// Agrega el nuevo PCB a readyQueue
@@ -138,7 +141,9 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	logueano.CambioDeEstado("NEW", nuevoPCB)
 
 	//Asigna un nuevo valor pid para la proxima response.
+	funciones.Mx_ConterPID.Lock()
 	funciones.CounterPID++
+	funciones.Mx_ConterPID.Unlock()
 
 	// ----------- DEVUELVE -----------
 
