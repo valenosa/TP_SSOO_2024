@@ -1,6 +1,6 @@
 package structs
 
-// =====================================| ESTRUCTURAS BASE DE UN PROCESO |========================================================\\
+// =====================================| PROCESO |========================================================\\
 
 //	Kernel -> Cliente
 //
@@ -46,25 +46,13 @@ type RegistrosUsoGeneral struct {
 	DI  uint32
 }
 
-//=====================================|  |========================================================\\
+//=====================================|  |=====================================\\
 
 // Kernel, Memoria
 // Estructura de respuesta al iniciar un proceso
 type ResponseListarProceso struct {
 	PID    uint32 `json:"pid"`
 	Estado string `json:"estado"`
-}
-
-// Memoria
-// Variable global para llevar la cuenta de los procesos (y así poder nombrarlos de manera correcta)
-var Counter int = 0
-
-// CPU, Kernel
-// TODO: Completar
-type IO_GEN_SLEEP struct {
-	Instruccion       string
-	NombreInterfaz    string
-	UnidadesDeTrabajo int
 }
 
 // CPU, Kernel
@@ -74,6 +62,10 @@ type RespuestaDispatch struct {
 	PCB              PCB
 }
 
+//=====================================| I/O |=====================================\\
+
+//!VER PORQUE TENEMOS TANTAS DISTINTAS
+
 // CPU, Kernel
 // Estructura de comunicacion al ejecutar una instrucción
 type InstruccionIO struct {
@@ -81,6 +73,14 @@ type InstruccionIO struct {
 	NombreInterfaz string
 	Instruccion    string
 	UnitWorkTime   int
+}
+
+// CPU, Kernel
+// TODO: Completar
+type IO_GEN_SLEEP struct {
+	Instruccion       string
+	NombreInterfaz    string
+	UnidadesDeTrabajo int
 }
 
 // Kernel, I/O
@@ -93,7 +93,7 @@ type RequestInterfaz struct {
 type Interfaz struct {
 	TipoInterfaz   string
 	PuertoInterfaz int
-	QueueBlock     []uint32
+	QueueBlock     []uint32 //? Necesita mutex?
 }
 
 // Kernel, I/O

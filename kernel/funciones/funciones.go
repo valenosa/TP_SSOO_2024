@@ -14,45 +14,31 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-//----------------------( MONITORES )---------------------------\\
-
-type ListaSegura struct {
-	mx   sync.Mutex
-	list []structs.PCB
-}
-
-type MapSeguro struct {
-	mx sync.Mutex
-	m  map[uint32]structs.PCB
-}
-
-//----------------------( VARIABLES )---------------------------\\
-
+// ----------------------( VARIABLES )---------------------------\\
 var ConfigJson config.Kernel
 
 // ----------------------------Listas de Estados
 var listaNEW = ListaSegura{}
 var listaREADY = ListaSegura{}
 var listaEXIT = ListaSegura{}
-var mapBLOK = MapSeguro{m: make(map[uint32]structs.PCB)}
+var mapBLOK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
 
 //var procesoExec structs.PCB //* Verificar que sea necesario
 
 // ---------------------------- Semaforos PLANIFICADORES
-// Iniciar/Detener
-var OncePlani sync.Once
 
-// var togglePlanificador
+// Iniciar/Detener
+var Bin_togglePlanificador = make(chan int, 2) //TODO: implementar
 
 // Largo Plazo
 var Cont_producirPCB chan int
 
 // Corto Plazo
-var Bin_hayPCBenREADY = make(chan int)
+var Bin_hayPCBenREADY chan int //Se inicializa con el buffer = grado de multiprogramacion +1 ya que los semaforos en go tmb se bloquean si no pueden meter algo en el buffer
 var mx_CPUOcupado sync.Mutex
 
-var InterfacesConectadas = make(map[string]structs.Interfaz) //TODO: Debe tener mutex
-var CounterPID uint32 = 0                                    //TODO: Debe tener mutex
+var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz)}
+var CounterPID uint32 = 0 //TODO: Debe tener mutex
 
 //var hayInterfaz = make(chan int)
 
@@ -133,13 +119,12 @@ func DesalojarProceso(pid uint32, estado string) {
 
 //*=======================================| PLANIFICADOR |=======================================\\
 
-// TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
+// TODO: Verificar el tema del semaforo de hay pcb en ready (31/05/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
 func Planificador() {
 
-	fmt.Println("Planificador iniciado")
-
 	for {
+		//Espero a que se active el planificador
 
 		//Espero a que el CPU este libre
 		mx_CPUOcupado.Lock()
@@ -183,13 +168,16 @@ func AdministrarQueues(pcb structs.PCB) {
 		//PCB --> cola de READY
 		listaREADY.Append(pcb)
 
+		//Avisa al planificador que hay un PCB en READY (se usa dentro del select para que no se bloquee si ya metieron algo "buffer infinito")
+		Bin_hayPCBenREADY <- 0
+
 		//^ log obligatorio (3/6)
 		logueano.PidsReady(listaREADY.list) //!No se si tengo que sync esto
 
 	case "BLOCK":
 
 		//PCB --> mapa de BLOCK
-		mapBLOK.Append(pcb.PID, pcb)
+		mapBLOK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
 
@@ -200,38 +188,6 @@ func AdministrarQueues(pcb structs.PCB) {
 		<-Cont_producirPCB
 
 	}
-}
-
-// ----------------------( FUNCIONES DE SINCRONIZACION )----------------------\\
-func (sList *ListaSegura) Append(value structs.PCB) {
-	sList.mx.Lock()
-	sList.list = append(sList.list, value)
-	sList.mx.Unlock()
-}
-
-// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
-func (sList *ListaSegura) Dequeue() structs.PCB {
-	sList.mx.Lock()
-	var pcb = sList.list[0]
-	sList.list = sList.list[1:]
-	sList.mx.Unlock()
-
-	return pcb
-}
-
-func (sMap *MapSeguro) Append(key uint32, value structs.PCB) {
-	sMap.mx.Lock()
-	sMap.m[key] = value
-	sMap.mx.Unlock()
-}
-
-func (sMap *MapSeguro) Delete(key uint32) structs.PCB {
-	sMap.mx.Lock()
-	var pcb = sMap.m[key]
-	delete(sMap.m, key)
-	sMap.mx.Unlock()
-
-	return pcb
 }
 
 //----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\
@@ -322,4 +278,78 @@ func interrupt(pid int, tipoDeInterrupcion string, configJson config.Kernel) {
 	}
 
 	fmt.Println("Interrupción enviada correctamente.")
+}
+
+// *=======================================| TADs SINCRONIZACION |=======================================\\
+
+// ----------------------( LISTA )----------------------\\
+type ListaSegura struct {
+	mx   sync.Mutex
+	list []structs.PCB
+}
+
+func (sList *ListaSegura) Append(value structs.PCB) {
+	sList.mx.Lock()
+	sList.list = append(sList.list, value)
+	sList.mx.Unlock()
+}
+
+// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
+func (sList *ListaSegura) Dequeue() structs.PCB {
+	sList.mx.Lock()
+	var pcb = sList.list[0]
+	sList.list = sList.list[1:]
+	sList.mx.Unlock()
+
+	return pcb
+}
+
+// ----------------------( MAP PCB )----------------------\\
+type MapSeguroPCB struct {
+	mx sync.Mutex
+	m  map[uint32]structs.PCB
+}
+
+func (sMap *MapSeguroPCB) Set(key uint32, value structs.PCB) {
+	sMap.mx.Lock()
+	sMap.m[key] = value
+	sMap.mx.Unlock()
+}
+
+func (sMap *MapSeguroPCB) Delete(key uint32) structs.PCB {
+	sMap.mx.Lock()
+	var pcb = sMap.m[key]
+	delete(sMap.m, key)
+	sMap.mx.Unlock()
+
+	return pcb
+}
+
+// ----------------------( MAP Interfaz )----------------------\\
+type MapSeguroInterfaz struct {
+	mx sync.Mutex
+	m  map[string]structs.Interfaz
+}
+
+func (sMap *MapSeguroInterfaz) Set(key string, value structs.Interfaz) {
+	sMap.mx.Lock()
+	sMap.m[key] = value
+	sMap.mx.Unlock()
+}
+
+func (sMap *MapSeguroInterfaz) Delete(key string) structs.Interfaz {
+	sMap.mx.Lock()
+	var pcb = sMap.m[key]
+	delete(sMap.m, key)
+	sMap.mx.Unlock()
+
+	return pcb
+}
+
+func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
+	sMap.mx.Lock()
+	var pcb, find = sMap.m[key]
+	sMap.mx.Unlock()
+
+	return pcb, find
 }

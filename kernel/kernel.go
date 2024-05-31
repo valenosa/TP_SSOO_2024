@@ -17,11 +17,14 @@ import (
 func main() {
 
 	config.Iniciar("config.json", &funciones.ConfigJson)
-
 	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
+	funciones.Bin_hayPCBenREADY = make(chan int, funciones.ConfigJson.Multiprogramming+1)
 
 	// Configura el logger
 	config.Logger("Kernel.log")
+
+	//======== Planificador ========
+	go funciones.Planificador()
 
 	// ======== HandleFunctions ========
 
@@ -52,11 +55,10 @@ func main() {
 // TODO:Al recibir esta peticion comienza la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	//* Creo que esta funcion solo le hace un signal a un semaforo, que inicia la plani
 	fmt.Println("IniciarPlanificacion-------------------------")
 
-	//Indiferente a la cantidad de veces que se llame, Planificador solo se ejecuta una vez
-	funciones.OncePlani.Do(func() { go funciones.Planificador() })
+	//Signal a el planificador
+	//<-funciones.Bin_togglePlanificador
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -64,8 +66,10 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 // TODO:Al recibir esta peticion detiene la ejecucion de el planificador de largo plazo (y corto plazo)
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	//* Creo que esta funcion solo le hace un wait a un semaforo, que detiene la plani
 	fmt.Printf("DetenerPlanificacion-------------------------")
+
+	//Wait a el planificador
+	//funciones.Bin_togglePlanificador <- 0
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -135,9 +139,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//Asigna un nuevo valor pid para la proxima response.
 	funciones.CounterPID++
-
-	//Avisa al planificador que hay un PCB en READY
-	funciones.Bin_hayPCBenREADY <- 0
 
 	// ----------- DEVUELVE -----------
 
@@ -260,7 +261,7 @@ func handlerIniciarInterfaz(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", requestInterfaz)
 
 	//Guarda la interfazConectada en la lista de interfaces conectadas.
-	funciones.InterfacesConectadas[requestInterfaz.NombreInterfaz] = requestInterfaz.Interfaz
+	funciones.InterfacesConectadas.Set(requestInterfaz.NombreInterfaz, requestInterfaz.Interfaz)
 
 	// Envía una señal al canal 'hayInterfaz' para indicar que hay una nueva interfaz conectada.
 
@@ -283,8 +284,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request path:", request)
 
 	// Busca la interfaz conectada en el mapa de funciones.InterfacesConectadas.
-	interfazConectada, encontrado := funciones.InterfacesConectadas[request.NombreInterfaz]
-
+	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(request.NombreInterfaz)
 	// Si no se encontró la interfazConectada de la request, se desaloja el structs.
 	if !encontrado {
 		funciones.DesalojarProceso(request.PidDesalojado, "EXIT")
@@ -305,7 +305,7 @@ func handlerInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Agrega el Proceso a la cola de bloqueados de la interfazConectada.
 	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, request.PidDesalojado)
-	funciones.InterfacesConectadas[request.NombreInterfaz] = interfazConectada
+	funciones.InterfacesConectadas.Set(request.NombreInterfaz, interfazConectada)
 
 	// Prepara la interfazConectada para enviarla en el body.
 	body, err := json.Marshal(request.UnitWorkTime)
