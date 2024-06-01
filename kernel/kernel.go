@@ -277,7 +277,7 @@ func planificarInterfaz() {
 
 }
 
-// TODO: Implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
+// TODO: Implementar para DialFS
 func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	// Se crea una variable para almacenar la instrucción recibida en la solicitud
@@ -340,12 +340,30 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
-	if respuesta.StatusCode == http.StatusOK {
+	if respuesta.StatusCode == http.StatusOK && interfazConectada.TipoInterfaz != "STDIN" {
 		// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 		pcbDesalojado.Estado = "READY"
 		funciones.AdministrarQueues(pcbDesalojado)
 		return
+	}
+
+	//Si no hubo error en la respuesta, y la interfaz es STDIN, pasa el proceso a READY y envía a STDIN el input del usuario.
+	if respuesta.StatusCode == http.StatusOK && interfazConectada.TipoInterfaz == "STDIN" {
+		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+		pcbDesalojado.Estado = "READY"
+		funciones.AdministrarQueues(pcbDesalojado)
+
+		// Se decodifica el cuerpo de la respuesta en formato JSON
+		respuestaSTDIN, err := json.Marshal(respuesta.Body)
+		if err != nil {
+			fmt.Println(err) //! Borrar despues.
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Envia el texto ingresado por el usuario a STDIN
+		w.WriteHeader(http.StatusOK)
+		w.Write(respuestaSTDIN)
 	}
 }

@@ -129,6 +129,11 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		PCB.Estado = "BLOCK"
 		IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
 
+	case "IO_STDIN_READ":
+		*cicloFinalizado = true
+		PCB.Estado = "BLOCK"
+		IO_STDIN_READ(variable[1], PCB.PID)
+
 	case "EXIT":
 		*cicloFinalizado = true
 		PCB.Estado = "EXIT"
@@ -272,8 +277,66 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccion", body)
+
+}
+
+func IO_STDIN_READ(nombreInterfaz string, PID uint32) {
+
+	// Creo estructura de request
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		Instruccion:    "IO_STDIN_READ",
+	}
+
+	// Convierto request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
 	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccion", body)
 	if respuesta == nil {
 		return
 	}
+
+	/*
+	   El texto de la respuesta se va a guardar en la memoria a partir de la
+	   DIRECCION FISICA indicada en la petición que recibió por parte del Kernel.
+	*/
+
+	//TODO: Testear.
+	var inputDelUsuario structs.RequestInputSTDIN
+
+	// Decodifica en formato JSON la request.
+	err = json.NewDecoder(respuesta.Body).Decode(&inputDelUsuario)
+	if err != nil {
+		fmt.Println(err) ////! Borrar despues.
+		return
+	}
+
+	//! Borrar despues. DEVETEST
+	fmt.Println(inputDelUsuario.TextoUsuario)
+
+	// Pasa a JSON el input del usuario.
+	bodyInputUsuarioSTDIN, err := json.Marshal(structs.RequestInputSTDIN{TextoUsuario: inputDelUsuario.TextoUsuario})
+	if err != nil {
+		fmt.Println(err) ////! Borrar despues.
+	}
+
+	//Envia a memoria el texto introducido por el usuario.
+	respuesta = config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "PUT", "process", bodyInputUsuarioSTDIN)
+
+	if respuesta.StatusCode == http.StatusOK {
+		fmt.Println("NT BRO, TA MAL LA R1CU357.")
+	} else {
+		fmt.Println("AGUANTE BOCA")
+	}
+
 }
+
+// func IO_STDOUT_READ(){
+
+// }

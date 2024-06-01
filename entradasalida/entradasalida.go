@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -58,6 +60,7 @@ func conectarInterfazIO(nombre string, filePath string) {
 func iniciarServidorInterfaz(configInterfaz config.IO) error {
 
 	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP(configInterfaz))
+	http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDIN_READ)
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -78,8 +81,8 @@ func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 
 		// Error de la decodificación
 		if err != nil {
-			fmt.Printf("Error al decodificar request body: ")
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			fmt.Println(err) ////! Borrar despues.
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -94,4 +97,55 @@ func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 		// Responde al cliente
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
+
+	//--------- REQUEST ---------
+
+	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la instruccionIO)
+	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	// Decodifica el request (codificado en formato json)
+	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+
+	// Error de la decodificación
+	if err != nil {
+		fmt.Println(err) ////! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//--------- EJECUTA IO_STDIN_READ ---------
+
+	//Genera un lector de texto.
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("Por favor ingresa un texto:")
+
+	//Lee hasta que haya un salto de linea, y guarda el texto incluyendo '\n'
+	input, err := reader.ReadString('\n')
+
+	if err != nil {
+		fmt.Println(err) ////! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Eliminar el salto de línea al final de la cadena
+	input = input[:len(input)-1]
+
+	//--------- RESPUESTA ---------
+	responseInputUsuario := structs.RequestInputSTDIN{TextoUsuario: input}
+
+	respuesta, err := json.Marshal(responseInputUsuario)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Envía respuesta al cliente
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
 }
