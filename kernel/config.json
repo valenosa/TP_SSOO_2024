@@ -8,5 +8,5 @@
     "quantum": 2000,
     "resources": ["RA","RB","RC"],
     "resource_instances": [1,2,1],
-    "multiprogramming": 3    
+    "multiprogramming": 4    
 }

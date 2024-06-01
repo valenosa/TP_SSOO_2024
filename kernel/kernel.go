@@ -38,7 +38,7 @@ func main() {
 
 	//ENTRADA SALIDA
 	http.HandleFunc("POST /interfazConectada", handlerConexionInterfazIO)
-	http.HandleFunc("POST /instruccion", handlerEjecutarInstruccionEnIO)
+	http.HandleFunc("POST /instruccionIO", handlerEjecutarInstruccionEnIO)
 
 	//Inicio el servidor de Kernel
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -261,20 +261,6 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
-
-	//go planificarInterfaz()
-}
-
-var Bin_hayInterfaz = make(chan int, 1)
-
-func planificarInterfaz() {
-
-	for {
-		//Espero a que la interfaz tenga elementos en su cola de BLOCK
-		<-Bin_hayInterfaz
-
-	}
-
 }
 
 // TODO: Implementar para DialFS
@@ -317,10 +303,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//Actualiza la lista de interfaces conectadas
 	funciones.InterfacesConectadas.Set(requestInstruccionIO.NombreInterfaz, interfazConectada)
 
-	//Bin_hayInterfaz <- 0
-
-	//TODO: ----------------------------------------(ESTO LO HACE EL PLANIFICADOR DE LA INTERFAZ)
-
 	// Manda a ejecutar a la interfaz
 	body, marshalError := json.Marshal(requestInstruccionIO)
 	if marshalError != nil {
@@ -331,8 +313,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
 	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", requestInstruccionIO.Instruccion, body)
-
-	// Verifica que no hubo error en la request
 	if respuesta == nil {
 		fmt.Println(respuesta) //! Borrar despues.
 		http.Error(w, "Respuesta vacia.", http.StatusInternalServerError)
@@ -340,30 +320,22 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
-	if respuesta.StatusCode == http.StatusOK && interfazConectada.TipoInterfaz != "STDIN" {
+	if respuesta.StatusCode == http.StatusOK {
 		// Pasa el proceso a READY y lo quita de la lista de bloqueados.
 		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 		pcbDesalojado.Estado = "READY"
 		funciones.AdministrarQueues(pcbDesalojado)
-		return
-	}
 
-	//Si no hubo error en la respuesta, y la interfaz es STDIN, pasa el proceso a READY y envía a STDIN el input del usuario.
-	if respuesta.StatusCode == http.StatusOK && interfazConectada.TipoInterfaz == "STDIN" {
-		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
-		pcbDesalojado.Estado = "READY"
-		funciones.AdministrarQueues(pcbDesalojado)
-
-		// Se decodifica el cuerpo de la respuesta en formato JSON
-		respuestaSTDIN, err := json.Marshal(respuesta.Body)
-		if err != nil {
-			fmt.Println(err) //! Borrar despues.
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if interfazConectada.TipoInterfaz == "STDIN" {
+			// Se decodifica el cuerpo de la respuesta en formato JSON
+			respuestaSTDIN, err := json.Marshal(respuesta.Body)
+			if err != nil {
+				fmt.Println(err) //! Borrar despues.
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write(respuestaSTDIN)
 		}
-
-		// Envia el texto ingresado por el usuario a STDIN
-		w.WriteHeader(http.StatusOK)
-		w.Write(respuestaSTDIN)
 	}
 }

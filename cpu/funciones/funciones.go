@@ -127,7 +127,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
+		go IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
 
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
@@ -277,7 +277,7 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccion", body)
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 
 }
 

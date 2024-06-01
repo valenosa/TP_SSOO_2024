@@ -6,21 +6,28 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
+// Este mutex hace que se ejecute una sola instrucción de IO a la vez
+var mx_interfaz sync.Mutex
+
 //*======================================| MAIN |======================================\\
 
 func main() {
+
+	nombreInterfaz := os.Args[1]
+	path := os.Args[2]
 
 	// Configura el logger
 	config.Logger("IO.log")
 
 	// Crear interfaz (TESTING)
-	conectarInterfazIO("GENERIC_SHIT", "config.json")
+	conectarInterfazIO(nombreInterfaz, path)
 }
 
 //*======================================| FUNCIONES |======================================\\
@@ -69,10 +76,10 @@ func iniciarServidorInterfaz(configInterfaz config.IO) error {
 //*======================================| HANDLERS |======================================\\
 
 // Implemantación de la Interfaz Génerica
-
 func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
 
+	return func(w http.ResponseWriter, r *http.Request) {
+		mx_interfaz.Lock()
 		//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la instruccionIO)
 		var instruccionIO structs.RequestEjecutarInstruccionIO
 
@@ -91,11 +98,12 @@ func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 
 		//Ejecuta IO_GEN_SLEEP
 		sleepTime := configIO.Unit_Work_Time * instruccionIO.UnitWorkTime
-		fmt.Println("Zzzzzz...")
+		fmt.Println(instruccionIO.PidDesalojado, " Zzzzzz...")
 		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-		fmt.Println("Wakey wakey, its time for school")
+		fmt.Println("Wakey wakey, ", instruccionIO.PidDesalojado, ", its time for school")
 		// Responde al cliente
 		w.WriteHeader(http.StatusOK)
+		mx_interfaz.Unlock()
 	}
 }
 
