@@ -319,7 +319,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	//Bin_hayInterfaz <- 0
 
-	//TODO: ----------------------------------------(ESTO LO HACE EL PLANIFICADOR)
+	//TODO: ----------------------------------------(ESTO LO HACE EL PLANIFICADOR DE LA INTERFAZ)
 
 	// Manda a ejecutar a la interfaz
 	body, marshalError := json.Marshal(requestInstruccionIO)

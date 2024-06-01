@@ -30,13 +30,6 @@ func conectarInterfazIO(nombre string, filePath string) {
 
 	config.Iniciar(filePath, &configNuevaInterfaz)
 
-	// Levanta el server de la nuevaInterfazIO
-	serverErr := iniciarServidorInterfaz(configNuevaInterfaz)
-	if serverErr != nil {
-		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
-		return
-	}
-
 	// Crea Interfaz base
 	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configNuevaInterfaz.Type, PuertoInterfaz: configNuevaInterfaz.Port}
 
@@ -51,6 +44,13 @@ func conectarInterfazIO(nombre string, filePath string) {
 	// Si todo es correcto envia la request de conexion a Kernel
 	respuesta := config.Request(configNuevaInterfaz.Port_Kernel, configNuevaInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
 	if respuesta == nil {
+		return
+	}
+
+	// Levanta el server de la nuevaInterfazIO
+	serverErr := iniciarServidorInterfaz(configNuevaInterfaz)
+	if serverErr != nil {
+		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
 		return
 	}
 }
