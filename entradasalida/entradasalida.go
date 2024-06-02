@@ -108,7 +108,6 @@ func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
 }
 
 func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
-
 	//--------- REQUEST ---------
 
 	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la instruccionIO)
@@ -139,6 +138,8 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Printf("EL MALDITO IO")
 
 	// Eliminar el salto de línea al final de la cadena
 	input = input[:len(input)-1]

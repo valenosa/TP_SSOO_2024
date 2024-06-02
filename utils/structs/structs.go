@@ -68,7 +68,6 @@ type RespuestaDispatch struct {
 type Interfaz struct {
 	TipoInterfaz   string
 	PuertoInterfaz int
-	QueueBlock     []uint32 //? Es necesaria? podemos usar un mutex en IO y listo?
 }
 
 // Estructura de comunicacion al conectar una interfaz (Contiene su nombre/identificador y lo necesario para validar en Kernel)

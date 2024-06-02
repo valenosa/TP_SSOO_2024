@@ -265,7 +265,6 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 
 // TODO: Implementar para DialFS
 func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
-
 	// Se crea una variable para almacenar la instrucción recibida en la solicitud
 	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 
@@ -298,11 +297,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Agrega el Proceso a la cola de bloqueados de la interfazConectada
-	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, requestInstruccionIO.PidDesalojado)
-	//Actualiza la lista de interfaces conectadas
-	funciones.InterfacesConectadas.Set(requestInstruccionIO.NombreInterfaz, interfazConectada)
-
 	// Manda a ejecutar a la interfaz
 	body, marshalError := json.Marshal(requestInstruccionIO)
 	if marshalError != nil {
@@ -314,28 +308,37 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
 	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", requestInstruccionIO.Instruccion, body)
 	if respuesta == nil {
-		fmt.Println(respuesta) //! Borrar despues.
-		http.Error(w, "Respuesta vacia.", http.StatusInternalServerError)
+		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
+		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
+		funciones.InterfacesConectadas.Delete(requestInstruccionIO.NombreInterfaz)
+		fmt.Println("Interfaz desconectada.")
+		http.Error(w, "Interfaz desconectada.", http.StatusInternalServerError)
+		return
+	}
+
+	if respuesta.StatusCode != http.StatusOK {
+		fmt.Println("Error en la respuesta de I/O. Status: ", respuesta.StatusCode)
+		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		return
 	}
 
 	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
-	if respuesta.StatusCode == http.StatusOK {
-		// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
-		pcbDesalojado.Estado = "READY"
-		funciones.AdministrarQueues(pcbDesalojado)
+	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
+	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado.Estado = "READY"
+	funciones.AdministrarQueues(pcbDesalojado)
 
-		if interfazConectada.TipoInterfaz == "STDIN" {
-			// Se decodifica el cuerpo de la respuesta en formato JSON
-			respuestaSTDIN, err := json.Marshal(respuesta.Body)
-			if err != nil {
-				fmt.Println(err) //! Borrar despues.
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			w.Write(respuestaSTDIN)
+	//Si la interfaz es STDIN, enviar el input a CPU.
+	if interfazConectada.TipoInterfaz == "STDIN" {
+		// Se decodifica el cuerpo de la respuesta en formato JSON.
+		respuestaSTDIN, err := json.Marshal(respuesta.Body)
+		if err != nil {
+			fmt.Println(err) //! Borrar despues.
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write(respuestaSTDIN)
 	}
 }

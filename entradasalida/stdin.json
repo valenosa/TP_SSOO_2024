@@ -1,5 +1,5 @@
 {
-    "port": 8006,
+    "port": 8007,
     "type": "STDIN",
     "unit_work_time": 1000,
     "ip_kernel": "127.0.0.1",

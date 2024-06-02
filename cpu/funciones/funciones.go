@@ -281,6 +281,7 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 }
 
+// TODO: Agregar Registro de Direccion y De Tamaño. Enviar a Memoria el resultado.
 func IO_STDIN_READ(nombreInterfaz string, PID uint32) {
 
 	// Creo estructura de request
@@ -297,7 +298,7 @@ func IO_STDIN_READ(nombreInterfaz string, PID uint32) {
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccion", body)
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 	if respuesta == nil {
 		return
 	}
@@ -307,36 +308,24 @@ func IO_STDIN_READ(nombreInterfaz string, PID uint32) {
 	   DIRECCION FISICA indicada en la petición que recibió por parte del Kernel.
 	*/
 
-	//TODO: Testear.
-	var inputDelUsuario structs.RequestInputSTDIN
-
-	// Decodifica en formato JSON la request.
-	err = json.NewDecoder(respuesta.Body).Decode(&inputDelUsuario)
-	if err != nil {
-		fmt.Println(err) ////! Borrar despues.
-		return
-	}
-
-	//! Borrar despues. DEVETEST
-	fmt.Println(inputDelUsuario.TextoUsuario)
-
-	// Pasa a JSON el input del usuario.
-	bodyInputUsuarioSTDIN, err := json.Marshal(structs.RequestInputSTDIN{TextoUsuario: inputDelUsuario.TextoUsuario})
-	if err != nil {
-		fmt.Println(err) ////! Borrar despues.
-	}
-
-	//Envia a memoria el texto introducido por el usuario.
-	respuesta = config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "PUT", "process", bodyInputUsuarioSTDIN)
-
-	if respuesta.StatusCode == http.StatusOK {
-		fmt.Println("NT BRO, TA MAL LA R1CU357.")
-	} else {
-		fmt.Println("AGUANTE BOCA")
-	}
-
 }
 
 // func IO_STDOUT_READ(){
+
+// }
+
+// func MOV_IN(){
+
+// }
+
+// func MOV_OUT(){
+
+// }
+
+// func RESIZE(){
+
+// }
+
+// func COPY_STRING(){
 
 // }
