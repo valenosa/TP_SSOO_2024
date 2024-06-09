@@ -117,7 +117,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println(err) ////! Borrar despues.
+		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -263,8 +263,10 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
 }
 
-// TODO: Implementar para DialFS
 func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
 	// Se crea una variable para almacenar la instrucción recibida en la solicitud
 	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 
@@ -277,7 +279,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Imprime la solicitud
-	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //!Borrar despues
+	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //! Borrar despues
+
+	//--------- EJECUTA ---------
 
 	// Verifica que la Interfaz este Conectada
 	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
@@ -317,7 +321,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
-		fmt.Println("Error en la respuesta de I/O. Status: ", respuesta.StatusCode)
+		fmt.Println("Error en la respuesta de I/O. Status: ", respuesta.StatusCode) //! Borrar despues.
 		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		return
 	}
@@ -327,18 +331,4 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 	pcbDesalojado.Estado = "READY"
 	funciones.AdministrarQueues(pcbDesalojado)
-
-	//Si la interfaz es STDIN, enviar el input a CPU.
-	if interfazConectada.TipoInterfaz == "STDIN" {
-		// Se decodifica el cuerpo de la respuesta en formato JSON.
-		respuestaSTDIN, err := json.Marshal(respuesta.Body)
-		if err != nil {
-			fmt.Println(err) //! Borrar despues.
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write(respuestaSTDIN)
-	}
 }

@@ -38,10 +38,10 @@ type RegistrosUsoGeneral struct {
 	BX  uint8
 	CX  uint8
 	DX  uint8
-	EAX uint16
-	EBX uint16
-	ECX uint16
-	EDX uint16
+	EAX uint32
+	EBX uint32
+	ECX uint32
+	EDX uint32
 	SI  uint32
 	DI  uint32
 }
@@ -79,14 +79,17 @@ type RequestConectarInterfazIO struct {
 // TODO: Implementar para DialFS
 // Estructura de comunicacion entre CPU y Kernel para ejecutar una instruccion de I/O
 type RequestEjecutarInstruccionIO struct {
-	PidDesalojado  uint32
-	NombreInterfaz string
-	Instruccion    string
-	UnitWorkTime   int
+	PidDesalojado     uint32
+	NombreInterfaz    string
+	Instruccion       string
+	UnitWorkTime      int
+	RegistroDireccion uint32
+	RegistroTamaño    uint8
 }
 
 // Estructura que comunica Kernel con CPU y CPU con memoria para la instruccion STDIN.
 type RequestInputSTDIN struct {
-	TextoUsuario string
+	TextoUsuario      string
+	RegistroDireccion uint32
 	//? Tambien deberia estar el pid?
 }

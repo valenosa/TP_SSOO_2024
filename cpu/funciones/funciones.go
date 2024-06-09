@@ -97,11 +97,18 @@ func Fetch(PID uint32, PC uint32) string {
 func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
 
 	// Mapa de registros para acceder a los registros de la CPU por nombre
-	var registrosMap = map[string]*uint8{
+	var registrosMap8 = map[string]*uint8{
 		"AX": &RegistrosCPU.AX,
 		"BX": &RegistrosCPU.BX,
 		"CX": &RegistrosCPU.CX,
 		"DX": &RegistrosCPU.DX,
+	}
+
+	var registrosMap32 = map[string]*uint32{
+		"EAX": &RegistrosCPU.EAX,
+		"EBX": &RegistrosCPU.EBX,
+		"ECX": &RegistrosCPU.ECX,
+		"EDX": &RegistrosCPU.EDX,
 	}
 
 	// Parsea las instrucciones de la cadena de instrucción
@@ -113,26 +120,26 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	// Switch para determinar la operación a realizar según la instrucción
 	switch variable[0] {
 	case "SET":
-		Set(variable[1], variable[2], registrosMap, PC)
+		Set(variable[1], variable[2], registrosMap8, PC)
 
 	case "SUM":
-		Sum(variable[1], variable[2], registrosMap)
+		Sum(variable[1], variable[2], registrosMap8)
 
 	case "SUB":
-		Sub(variable[1], variable[2], registrosMap)
+		Sub(variable[1], variable[2], registrosMap8)
 
 	case "JNZ":
-		Jnz(variable[1], variable[2], PC, registrosMap)
+		Jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		go IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
+		go IoGenSleep(variable[1], variable[2], registrosMap8, PCB.PID)
 
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		IO_STDIN_READ(variable[1], PCB.PID)
+		IO_STDIN_READ(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID)
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -253,7 +260,7 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 }
 
-// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
+// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
 func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
 
 	// Convierte el tiempo de trabajo de la unidad de cadena a entero.
@@ -281,14 +288,31 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 }
 
-// TODO: Agregar Registro de Direccion y De Tamaño. Enviar a Memoria el resultado.
-func IO_STDIN_READ(nombreInterfaz string, PID uint32) {
+// Ejemplo de uso: IO_STDIN_READ Int2 EAX AX
+// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
+func IO_STDIN_READ(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32) {
+
+	// Verifica si existe el registro especificado en la instrucción.
+	registroDireccion, encontrado := registroMap32[regDir]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	// Verifica si existe el registro especificado en la instrucción.
+	registroTamaño, encontrado := registroMap8[regTamaño]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
 
 	// Creo estructura de request
 	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
-		PidDesalojado:  PID,
-		NombreInterfaz: nombreInterfaz,
-		Instruccion:    "IO_STDIN_READ",
+		PidDesalojado:     PID,
+		NombreInterfaz:    nombreInterfaz,
+		Instruccion:       "IO_STDIN_READ",
+		RegistroDireccion: *registroDireccion,
+		RegistroTamaño:    *registroTamaño,
 	}
 
 	// Convierto request a JSON
@@ -298,10 +322,7 @@ func IO_STDIN_READ(nombreInterfaz string, PID uint32) {
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
-	if respuesta == nil {
-		return
-	}
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 
 	/*
 	   El texto de la respuesta se va a guardar en la memoria a partir de la

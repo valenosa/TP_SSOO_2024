@@ -13,34 +13,40 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-// Este mutex hace que se ejecute una sola instrucción de IO a la vez
-var mx_interfaz sync.Mutex
+var mx_interfaz sync.Mutex // Mutex para Ejecutar las intrucciones IO en orden FIFO
+var configInterfaz config.IO
 
-//*======================================| MAIN |======================================\\
-
+// *======================================| MAIN |======================================\\
 func main() {
-
-	nombreInterfaz := os.Args[1]
-	path := os.Args[2]
 
 	// Configura el logger
 	config.Logger("IO.log")
 
-	// Crear interfaz (TESTING)
-	conectarInterfazIO(nombreInterfaz, path)
+	//Toma los parametros pasados por argumento
+	nombreInterfaz := os.Args[1]
+	configPath := os.Args[2]
+
+	config.Iniciar(configPath, &configInterfaz)
+
+	//----------( INICIAMOS INTERFAZ )----------
+
+	// Envio a Kernel que se guarde la interfaz
+	conectarInterfazIO(nombreInterfaz)
+
+	// Levanta el server de la nuevaInterfazIO
+	serverErr := iniciarServidorInterfaz(configInterfaz)
+	if serverErr != nil {
+		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
+		return
+	}
 }
 
-//*======================================| FUNCIONES |======================================\\
+//*======================================| CONEXION CON KERNEL |======================================\\
 
-func conectarInterfazIO(nombre string, filePath string) {
-
-	// Extrae info de config.json
-	var configNuevaInterfaz config.IO
-
-	config.Iniciar(filePath, &configNuevaInterfaz)
+func conectarInterfazIO(nombre string) {
 
 	// Crea Interfaz base
-	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configNuevaInterfaz.Type, PuertoInterfaz: configNuevaInterfaz.Port}
+	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configInterfaz.Type, PuertoInterfaz: configInterfaz.Port}
 
 	// Crea y codifica la request de conexion a Kernel
 	var requestConectarIO = structs.RequestConectarInterfazIO{NombreInterfaz: nombre, Interfaz: nuevaInterfazIO}
@@ -51,110 +57,123 @@ func conectarInterfazIO(nombre string, filePath string) {
 	}
 
 	// Si todo es correcto envia la request de conexion a Kernel
-	respuesta := config.Request(configNuevaInterfaz.Port_Kernel, configNuevaInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
+	respuesta := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
 	if respuesta == nil {
-		return
-	}
-
-	// Levanta el server de la nuevaInterfazIO
-	serverErr := iniciarServidorInterfaz(configNuevaInterfaz)
-	if serverErr != nil {
-		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
 		return
 	}
 }
 
 func iniciarServidorInterfaz(configInterfaz config.IO) error {
 
-	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP(configInterfaz))
+	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
 	http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDIN_READ)
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
 }
 
-//*======================================| HANDLERS |======================================\\
+//*======================================| INTERFACES |======================================\\
 
-// Implemantación de la Interfaz Génerica
-func handlerIO_GEN_SLEEP(configIO config.IO) http.HandlerFunc {
+//*---------------( GENERICA )------------------
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		mx_interfaz.Lock()
-		//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la instruccionIO)
-		var instruccionIO structs.RequestEjecutarInstruccionIO
+func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 
-		// Decodifica el request (codificado en formato json)
-		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+	mx_interfaz.Lock()
 
-		// Error de la decodificación
-		if err != nil {
-			fmt.Println(err) ////! Borrar despues.
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	//--------- RECIBE ---------
 
-		// Imprime el request por consola (del lado del server)
-		fmt.Println("Unidades de Trabajo:", instruccionIO)
-
-		//Ejecuta IO_GEN_SLEEP
-		sleepTime := configIO.Unit_Work_Time * instruccionIO.UnitWorkTime
-		fmt.Println(instruccionIO.PidDesalojado, " Zzzzzz...")
-		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-		fmt.Println("Wakey wakey, ", instruccionIO.PidDesalojado, ", its time for school")
-		// Responde al cliente
-		w.WriteHeader(http.StatusOK)
-		mx_interfaz.Unlock()
-	}
-}
-
-func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
-	//--------- REQUEST ---------
-
-	//Crea una variable tipo Interfaz (para interpretar lo que se recibe de la instruccionIO)
+	//Recibo la request
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	// Decodifica el request (codificado en formato json)
+	// Decodifica el request (codificado en formato json).
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 
-	// Error de la decodificación
-	if err != nil {
-		fmt.Println(err) ////! Borrar despues.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	//--------- EJECUTA IO_STDIN_READ ---------
-
-	//Genera un lector de texto.
-	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Println("Por favor ingresa un texto:")
-
-	//Lee hasta que haya un salto de linea, y guarda el texto incluyendo '\n'
-	input, err := reader.ReadString('\n')
-
-	if err != nil {
-		fmt.Println(err) ////! Borrar despues.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Printf("EL MALDITO IO")
-
-	// Eliminar el salto de línea al final de la cadena
-	input = input[:len(input)-1]
-
-	//--------- RESPUESTA ---------
-	responseInputUsuario := structs.RequestInputSTDIN{TextoUsuario: input}
-
-	respuesta, err := json.Marshal(responseInputUsuario)
+	// Error de la decodificación.
 	if err != nil {
 		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Envía respuesta al cliente
+	// Imprime el request por consola (del lado del server)
+	fmt.Println("Unidades de Trabajo:", instruccionIO)
+
+	//--------- EJECUTA ---------
+
+	//Ejecuta IO_GEN_SLEEP
+	sleepTime := configInterfaz.Unit_Work_Time * instruccionIO.UnitWorkTime
+	fmt.Println(instruccionIO.PidDesalojado, " Zzzzzz...")
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+
+	fmt.Println("Wakey wakey, ", instruccionIO.PidDesalojado, ", its time for school")
+
+	//--------- RESPUESTA ---------
+
 	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
+	mx_interfaz.Unlock()
+}
+
+//*---------------( STDIN )--------------------
+
+func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
+
+	mx_interfaz.Lock()
+
+	//--------- RECIBE ---------
+
+	//Recibo la request
+	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	// Decodifica el request (codificado en formato json).
+	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
+	//Prepara el reader para leer el input de la terminal.
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Por favor ingresa un texto:")
+
+	//Lee hasta que haya un salto de linea, y guarda el texto incluyendo '\n'
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Elimina el salto de línea al final de la cadena
+	input = input[:len(input)-1]
+
+	// Recorta la longitud del input en base al registroTamaño.
+	inputTruncado := input[0:instruccionIO.RegistroTamaño]
+
+	//--------- RESPUESTA ---------
+	responseInputUsuario := structs.RequestInputSTDIN{
+		TextoUsuario:      inputTruncado,
+		RegistroDireccion: instruccionIO.RegistroDireccion,
+	}
+
+	body, err := json.Marshal(responseInputUsuario)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//TODO: Cambiar endpoint de la request a memoria.
+	// Envía la request a memoria.
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/NOSEELENDPOINT", body)
+	if respuesta == nil {
+		return
+	}
+
+	// Envía el status al kernel.
+	w.WriteHeader(http.StatusOK)
+	mx_interfaz.Unlock()
+
 }

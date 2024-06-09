@@ -14,13 +14,29 @@ import (
 
 //================================| MAIN |================================\\
 
+// Tabla de páginas. Es un map que por cada página (key) tiene un marco (value). COntiene solamente las páginas validadas.
+type tabla map[uint32]uint32
+
+//================================| MAIN |================================\\
+
 func main() {
 
 	// Extrae info de config.json
 	config.Iniciar("config.json", &funciones.ConfigJson)
 
 	// Crea e inicializa la memoria de instrucciones
-	memoriaInstrucciones := make(map[uint32][]string)
+	memoriaInstrucciones := make(map[uint32][]string) // Contiene las instrucciones de cada proceso (pid = key). Almacena las instrucciones por separado en un slice de strings.
+
+	espacioUsuario := make([]byte, funciones.ConfigJson.Memory_Size) // Contiene todo lo que se guarda para cada proceso (a excepcion)
+
+	tablasDePaginas := make(map[uint32]tabla) // Contiene la tabla de cada proceso (pid = key)
+
+	bitMap := make([]bool, funciones.ConfigJson.Memory_Size/funciones.ConfigJson.Page_Size) // TRUE = ocupado, FALSE = libre
+
+	// Variables que no se usan pero se dejan para que no tire error el compilador
+	_ = bitMap
+	_ = tablasDePaginas
+	_ = espacioUsuario
 
 	// Configura el logger
 	config.Logger("Memoria.log")
