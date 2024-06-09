@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/memoria/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -46,8 +47,8 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(htt
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Printf("Error al decodificar request body: ")
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP.
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -58,7 +59,8 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(htt
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
 		if err != nil {
-			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP.
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -82,7 +84,10 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 		}
 
 		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
-		fmt.Println(instruccion)
+		fmt.Println(instruccion) //! Borrar despues
+
+		// Esperar un tiempo determinado a tiempo de retardo
+		time.Sleep(time.Duration(funciones.ConfigJson.Delay_Response) * time.Millisecond)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(instruccion))

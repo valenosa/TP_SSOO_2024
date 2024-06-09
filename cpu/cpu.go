@@ -44,14 +44,14 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 
 	// Error Handler de la decodificación
 	if err != nil {
-		fmt.Printf("Error al decodificar request body: ")
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
-	funciones.PidEnEjecucion = pcbRecibido.PID //! ineceario (CREO)
+	funciones.PidEnEjecucion = pcbRecibido.PID
 
 	// Ejecuta el ciclo de instrucción.
 	funciones.RegistrosCPU = pcbRecibido.RegistrosUsoGeneral
@@ -78,8 +78,8 @@ func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
 func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
 
-	// Está en una global; despues cambiar.
 	funciones.MotivoDeDesalojo = queryParams.Get("interrupt_type")
+	fmt.Println("Se recibió una interrupción de tipo: ", funciones.MotivoDeDesalojo) //!Solamente para chequear que reciba todo bien, después se borra.
 
 	PID, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
 
@@ -92,19 +92,4 @@ func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	funciones.HayInterrupcion = true
-
-	//TODO: Checkear si es necesario lo de abajo (27/05/24).
-	/*En caso de que haya interrupcion,
-	se devuelve el Contexto de Ejecución actualizado al Kernel con motivo de la interrupción.*/
-
-	// respuesta, err := json.Marshal(instruccion)
-	// fmt.Println(respuesta)
-
-	// if err != nil {
-	// 	http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// w.WriteHeader(http.StatusOK)
-	// w.Write([]byte(instruccion))
 }

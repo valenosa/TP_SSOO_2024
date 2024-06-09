@@ -68,8 +68,3 @@ func EsperaNuevosProcesos() {
 	fmt.Println("Esperando nuevos procesos...")
 
 }
-
-func ErrorDecode() {
-
-	fmt.Printf("Error al decodificar request body: ")
-}
