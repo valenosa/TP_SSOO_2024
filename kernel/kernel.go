@@ -20,6 +20,9 @@ func main() {
 	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
 	funciones.Bin_hayPCBenREADY = make(chan int, funciones.ConfigJson.Multiprogramming+1)
 
+	// Inicializar recursos
+	funciones.LeerRecursos(funciones.ConfigJson.Resources, funciones.ConfigJson.Resource_Instances)
+
 	// Configura el logger
 	config.Logger("Kernel.log")
 

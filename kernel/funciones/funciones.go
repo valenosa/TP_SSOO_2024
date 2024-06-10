@@ -18,6 +18,9 @@ import (
 // ----------------------( VARIABLES )---------------------------\\
 var ConfigJson config.Kernel
 
+// ---------------------------- Recursos
+var MapRecursos = make(map[string]structs.Recurso)
+
 // ----------------------------Listas de Estados
 var listaNEW = ListaSegura{}
 var listaREADY = ListaSegura{}
@@ -94,30 +97,6 @@ func ListarProceso(configJson config.Kernel) {
 
 	// Imprimir la lista de procesos.
 	fmt.Println(string(bodyBytes))
-}
-
-//*======================================| ENTRADA SALIDA (I/O) |=======================================\\
-
-// Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
-func ValidarInstruccionIO(tipo string, instruccion string) bool {
-	switch tipo {
-	case "GENERICA":
-		return instruccion == "IO_GEN_SLEEP"
-
-	case "STDIN":
-		return instruccion == "IO_STDIN_READ"
-
-	case "STDOUT":
-		return instruccion == "IO_STDOUT_WRITE"
-	}
-	return false
-}
-
-// Toma un pid del map general de BLOCK y manda un proceso a EXIT.
-func DesalojarProcesoIO(pid uint32) {
-	pcbDesalojado := MapBLOCK.Delete(pid)
-	pcbDesalojado.Estado = "EXIT"
-	AdministrarQueues(pcbDesalojado)
 }
 
 //*=======================================| PLANIFICADOR |=======================================\\
@@ -306,6 +285,41 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 	}
 
 	fmt.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
+}
+
+//*======================================| ENTRADA SALIDA (I/O) |=======================================\\
+
+// Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
+func ValidarInstruccionIO(tipo string, instruccion string) bool {
+	switch tipo {
+	case "GENERICA":
+		return instruccion == "IO_GEN_SLEEP"
+
+	case "STDIN":
+		return instruccion == "IO_STDIN_READ"
+
+	case "STDOUT":
+		return instruccion == "IO_STDOUT_WRITE"
+	}
+	return false
+}
+
+// Toma un pid del map general de BLOCK y manda un proceso a EXIT.
+func DesalojarProcesoIO(pid uint32) {
+	pcbDesalojado := MapBLOCK.Delete(pid)
+	pcbDesalojado.Estado = "EXIT"
+	AdministrarQueues(pcbDesalojado)
+}
+
+// *=======================================| RECURSOS |=======================================\\
+
+func LeerRecursos(recursos []string, instancia_recursos []int) {
+	//Tomo de resources y resource_instances los recursos y sus instancias y los guardo en Recursos
+	for i, recurso := range recursos {
+		MapRecursos[recurso] = structs.Recurso{Instancias: instancia_recursos[i]}
+	}
+
+	fmt.Println("Recursos: ", MapRecursos)
 }
 
 // *=======================================| TADs SINCRONIZACION |=======================================\\

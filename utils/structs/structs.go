@@ -62,6 +62,13 @@ type RespuestaDispatch struct {
 	PCB              PCB
 }
 
+// ====================================| RECURSOS | ====================================\\
+
+type Recurso struct {
+	Instancias int
+	ListaBlock []uint32
+}
+
 //=====================================| I/O |=====================================\\
 
 // Estructura basica de InterfazIO que se guardara Kernel
