@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
 var ConfigJson config.Memoria
@@ -47,5 +48,18 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 			fmt.Println(instruccion)
 		}
 		fmt.Println()
+	}
+}
+
+// *Probado
+func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
+	tablaDePaginas[pid] = structs.Tabla{}
+}
+
+// TODO: Probar
+func DesocuparMarcos(tablaProceso structs.Tabla, bitMap []bool) {
+	for _, marco := range tablaProceso {
+		fmt.Println()
+		bitMap[marco] = false
 	}
 }

@@ -14,9 +14,6 @@ import (
 
 //================================| MAIN |================================\\
 
-// Tabla de páginas. Es un map que por cada página (key) tiene un marco (value). COntiene solamente las páginas validadas.
-type tabla map[uint32]uint32
-
 //================================| MAIN |================================\\
 
 func main() {
@@ -29,7 +26,7 @@ func main() {
 
 	espacioUsuario := make([]byte, funciones.ConfigJson.Memory_Size) // Contiene todo lo que se guarda para cada proceso (a excepcion)
 
-	tablasDePaginas := make(map[uint32]tabla) // Contiene la tabla de cada proceso (pid = key)
+	tablasDePaginas := make(map[uint32]structs.Tabla) // Contiene la tabla de cada proceso (pid = key)
 
 	bitMap := make([]bool, funciones.ConfigJson.Memory_Size/funciones.ConfigJson.Page_Size) // TRUE = ocupado, FALSE = libre
 
@@ -42,7 +39,7 @@ func main() {
 	config.Logger("Memoria.log")
 
 	// ======== HandleFunctions ========
-	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones))
+	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 
 	//inicio el servidor de Memoria
@@ -52,7 +49,7 @@ func main() {
 //================================| HANDLERS |================================\\
 
 // Wrapper que crea un PCB con el pid recibido.
-func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
+func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
 
 	// Handler para iniciar un proceso.
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +67,8 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(htt
 
 		// Se guardan las instrucciones en un map de memoria.
 		funciones.GuardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
+
+		funciones.AsignarTabla(request.PID, tablaDePaginas)
 
 		// Crea una variable tipo Response (para confeccionar una respuesta)
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
@@ -107,5 +106,29 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(instruccion))
+	}
+}
+
+// TODO: Crear request que venga a este handler, el endpoint, y probar
+func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
+
+	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
+
+		if errPid != nil {
+			return
+		}
+
+		// Borrar instrucciones
+		delete(memoriaInstrucciones, uint32(pid))
+		// Desocupar marcos
+		funciones.DesocuparMarcos(tablaDePaginas[uint32(pid)], bitMap)
+		// Borrar tabla de páginas
+		delete(tablaDePaginas, uint32(pid))
+
+		w.WriteHeader(http.StatusOK)
+		// w.Write([]byte)
 	}
 }

@@ -93,3 +93,9 @@ type RequestInputSTDIN struct {
 	RegistroDireccion uint32
 	//? Tambien deberia estar el pid?
 }
+
+//=====================================| MEMORIA DE USUARIO |=====================================\\
+
+// Memoria
+// Tabla de páginas. Es un map que por cada página (key) tiene un marco (value). COntiene solamente las páginas validadas.
+type Tabla map[uint32]uint32

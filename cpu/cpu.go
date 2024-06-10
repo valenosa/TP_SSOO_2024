@@ -19,6 +19,11 @@ func main() {
 	// Configura el logger
 	config.Logger("CPU.log")
 
+	// ======== Make ========
+
+	TLB := make(funciones.TLB) // TLB (Translation Lookaside Buffer).
+	_ = TLB
+
 	// ======== HandleFunctions ========
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
 	http.HandleFunc("POST /exec", handlerEjecutarProceso)

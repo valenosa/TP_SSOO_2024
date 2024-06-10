@@ -26,6 +26,47 @@ var ConfigJson config.Cpu
 // Es global porque la uso para "depositar" el motivo de desalojo del proceso (que a excepción de EXIT, es traído por una interrupción)
 var MotivoDeDesalojo string
 
+// ----------------------( TLB )----------------------\\
+
+// TLB
+// Estructura de la TLB.
+// ? La página es el key, y el valor es un struct con el marco y el pid.
+type TLB map[uint32]struct {
+	Marco uint32
+	Pid   uint32
+}
+
+// Valida si el TLBA está lleno.
+func (tlb TLB) Full() bool {
+	return len(tlb) == ConfigJson.Number_Felling_tlb
+}
+
+// Hit or miss? I guess they never miss, huh?
+func (tlb TLB) Hit(pagina uint32) (uint32, bool) {
+	strct, encontrado := tlb[pagina]
+	return strct.Marco, encontrado
+}
+
+// ----------------------( MMU )----------------------\\
+
+// MMU
+// Estructura del MMU
+// ? El PID es el Key, y la dirección Lógica es el value
+type MMU map[uint32]int
+
+func MMUTraducir(dl int, pid uint32) {
+
+	obtenerNumeroPagina(dl)
+
+}
+
+// TODO: SEGUIR DESARROLLANDO
+func obtenerNumeroPagina(dl int) string {
+	binario := strconv.FormatInt(int64(dl), 2)
+
+	return binario
+}
+
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
 
 // Ejecuta un ciclo de instruccion.
