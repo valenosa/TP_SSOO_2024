@@ -251,13 +251,11 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 	var interfazConectada structs.RequestConectarInterfazIO
 	err := json.NewDecoder(r.Body).Decode(&interfazConectada)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Imprime la solicitud
-	fmt.Println("Request path:", interfazConectada) //! Borrar despues
+	fmt.Println("Interfaz Conectada:", interfazConectada) //! Borrar despues
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
@@ -267,10 +265,8 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	//--------- RECIBE ---------
 
-	// Se crea una variable para almacenar la instrucción recibida en la solicitud
-	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
-
 	// Se decodifica el cuerpo de la solicitud en formato JSON
+	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 	marshalError := json.NewDecoder(r.Body).Decode(&requestInstruccionIO)
 	if marshalError != nil {
 		fmt.Println(marshalError) //! Borrar despues.
@@ -283,8 +279,10 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
+	//--- VALIDA
+
 	// Verifica que la Interfaz este Conectada
-	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
+	interfazSolicitada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
 	if !encontrado {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		fmt.Println("Interfaz no conectada.")
@@ -293,15 +291,17 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Verifica que la instruccion sea compatible con el tipo de interfazConectada
-	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazConectada.TipoInterfaz, requestInstruccionIO.Instruccion)
+	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazSolicitada.TipoInterfaz, requestInstruccionIO.Instruccion)
 	if !laInstruccionEsValida {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		fmt.Println("Interfaz incompatible.")
-		http.Error(w, "Interfaz incompatible.", http.StatusBadRequest)
+		fmt.Println("Instruccion incompatible.")
+		http.Error(w, "Instruccion incompatible.", http.StatusBadRequest)
 		return
 	}
 
-	// Manda a ejecutar a la interfaz
+	//--- ENVIA A EJECUTAR A IO
+
+	// Codifica instruccion a ejecutar en JSON
 	body, marshalError := json.Marshal(requestInstruccionIO)
 	if marshalError != nil {
 		fmt.Println(marshalError) //! Borrar despues.
@@ -310,7 +310,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
-	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", requestInstruccionIO.Instruccion, body)
+	query := interfazSolicitada.TipoInterfaz + " /" + requestInstruccionIO.Instruccion
+
+	respuesta := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
 	if respuesta == nil {
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
@@ -321,12 +323,12 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
-		fmt.Println("Error en la respuesta de I/O. Status: ", respuesta.StatusCode) //! Borrar despues.
 		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		return
 	}
 
-	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
+	//--- VUELVE DE IO
+
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
 	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 	pcbDesalojado.Estado = "READY"

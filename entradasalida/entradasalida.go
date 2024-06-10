@@ -30,11 +30,11 @@ func main() {
 
 	//----------( INICIAMOS INTERFAZ )----------
 
-	// Envio a Kernel que se guarde la interfaz
+	// Envio a Kernel la nueva interfaz
 	conectarInterfazIO(nombreInterfaz)
 
 	// Levanta el server de la nuevaInterfazIO
-	serverErr := iniciarServidorInterfaz(configInterfaz)
+	serverErr := iniciarServidorInterfaz()
 	if serverErr != nil {
 		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
 		return
@@ -56,17 +56,17 @@ func conectarInterfazIO(nombre string) {
 		return
 	}
 
-	// Si todo es correcto envia la request de conexion a Kernel
+	// Envia la request de conexion a Kernel
 	respuesta := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
 	if respuesta == nil {
 		return
 	}
 }
 
-func iniciarServidorInterfaz(configInterfaz config.IO) error {
+func iniciarServidorInterfaz() error {
 
-	http.HandleFunc("POST /IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
-	http.HandleFunc("POST /IO_STDIN_READ", handlerIO_STDIN_READ)
+	http.HandleFunc("POST /GENERICA /IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
+	http.HandleFunc("POST /STDIN /IO_STDIN_READ", handlerIO_STDIN_READ)
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -82,29 +82,23 @@ func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 
 	//--------- RECIBE ---------
 
-	//Recibo la request
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
 	// Decodifica el request (codificado en formato json).
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
-
-	// Error de la decodificación.
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Imprime el request por consola (del lado del server)
-	fmt.Println("Unidades de Trabajo:", instruccionIO)
+	fmt.Println("Unidades de Trabajo:", instruccionIO.UnitWorkTime) //! Borrar despues.
 
 	//--------- EJECUTA ---------
 
-	//Ejecuta IO_GEN_SLEEP
 	sleepTime := configInterfaz.Unit_Work_Time * instruccionIO.UnitWorkTime
+
 	fmt.Println(instruccionIO.PidDesalojado, " Zzzzzz...")
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-
 	fmt.Println("Wakey wakey, ", instruccionIO.PidDesalojado, ", its time for school")
 
 	//--------- RESPUESTA ---------
@@ -120,11 +114,9 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	mx_interfaz.Lock()
 
 	//--------- RECIBE ---------
-
-	//Recibo la request
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	// Decodifica el request (codificado en formato json).
+	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		fmt.Println(err) //! Borrar despues.
@@ -134,14 +126,13 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	//Prepara el reader para leer el input de la terminal.
+	// Prepara el reader para leer el input de la terminal
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Por favor ingresa un texto:")
 
-	//Lee hasta que haya un salto de linea, y guarda el texto incluyendo '\n'
+	//Lee hasta que haya un salto de linea
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -149,7 +140,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	// Elimina el salto de línea al final de la cadena
 	input = input[:len(input)-1]
 
-	// Recorta la longitud del input en base al registroTamaño.
+	// Recorta la longitud del input en base al registroTamaño
 	inputTruncado := input[0:instruccionIO.RegistroTamaño]
 
 	//--------- RESPUESTA ---------
@@ -160,19 +151,17 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	body, err := json.Marshal(responseInputUsuario)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	//TODO: Cambiar endpoint de la request a memoria.
-	// Envía la request a memoria.
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/NOSEELENDPOINT", body)
+	// Envía la request a memoria
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/NOSEELENDPOINT", body) // TODO: Cambiar endpoint de la request a memoria
 	if respuesta == nil {
 		return
 	}
 
-	// Envía el status al kernel.
+	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
 	mx_interfaz.Unlock()
 
