@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/sisoputnfrba/tp-golang/memoria/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
@@ -49,22 +51,14 @@ func (tlb TLB) Hit(pagina uint32) (uint32, bool) {
 
 // ----------------------( MMU )----------------------\\
 
-// MMU
-// Estructura del MMU
-// ? El PID es el Key, y la dirección Lógica es el value
-type MMU map[uint32]int
+// TODO: Probar
+func DireccionLogicaAFisica(direccionLogica int) (int, int) {
 
-func MMUTraducir(dl int, pid uint32) {
+	numeroDePagina := int(math.Floor(float64(direccionLogica) / float64(funciones.ConfigJson.Page_Size)))
+	desplazamiento := direccionLogica - numeroDePagina*int(funciones.ConfigJson.Page_Size)
 
-	obtenerNumeroPagina(dl)
+	return numeroDePagina, desplazamiento
 
-}
-
-// TODO: SEGUIR DESARROLLANDO
-func obtenerNumeroPagina(dl int) string {
-	binario := strconv.FormatInt(int64(dl), 2)
-
-	return binario
 }
 
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
@@ -171,6 +165,9 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "JNZ":
 		Jnz(variable[1], variable[2], PC, registrosMap8)
+
+	case "RESIZE":
+		resize(variable[1])
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
@@ -299,6 +296,52 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	if *registro != 0 {
 		*PC = nuevoValor
 	}
+}
+
+// TODO: Probar
+func resize(tamañoEnBytes string) string {
+	// Convierte el PID y el PC a string
+	pid := strconv.FormatUint(uint64(PidEnEjecucion), 10)
+
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/memoria/resize", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud GET
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return ""
+	}
+
+	// Agrega el PID y el PC como params
+	q := req.URL.Query()
+	q.Add("pid", pid)
+	q.Add("size", tamañoEnBytes)
+	req.URL.RawQuery = q.Encode()
+
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		return ""
+	}
+
+	// Verifica el código de estado de la respuesta
+	if respuesta.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	// Lee el cuerpo de la respuesta
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return ""
+	}
+
+	// Retorna las instrucciones obtenidas como una cadena de texto
+	return string(bodyBytes)
+
 }
 
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.

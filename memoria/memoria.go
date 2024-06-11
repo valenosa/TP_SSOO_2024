@@ -41,6 +41,8 @@ func main() {
 	// ======== HandleFunctions ========
 	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
+	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
+	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
 
 	//inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -124,11 +126,31 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		// Borrar instrucciones
 		delete(memoriaInstrucciones, uint32(pid))
 		// Desocupar marcos
-		funciones.DesocuparMarcos(tablaDePaginas[uint32(pid)], bitMap)
+		funciones.LiberarMarcos(tablaDePaginas[uint32(pid)], bitMap)
 		// Borrar tabla de páginas
-		delete(tablaDePaginas, uint32(pid))
+		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
+
+		w.WriteHeader(http.StatusOK) //?
+		// w.Write([]byte)
+	}
+}
+
+// TODO: Probar
+func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
+
+	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
+		size, errSize := strconv.ParseUint(queryParams.Get("size"), 10, 32)
+
+		if errPid != nil || errSize != nil {
+			return
+		}
+
+		estado := funciones.ReasignarPaginas(uint32(pid), tablaDePaginas, bitMap, uint32(size))
 
 		w.WriteHeader(http.StatusOK)
-		// w.Write([]byte)
+		w.Write([]byte(estado)) //?Está bien mandar texto así? Es esto lo que hay que mandar?
 	}
 }
