@@ -19,7 +19,7 @@ import (
 var ConfigJson config.Kernel
 
 // ---------------------------- Recursos
-var MapRecursos = make(map[string]structs.Recurso)
+var MapRecursos = make(map[string]*structs.Recurso)
 
 // ----------------------------Listas de Estados
 var listaNEW = ListaSegura{}
@@ -316,7 +316,7 @@ func DesalojarProcesoIO(pid uint32) {
 func LeerRecursos(recursos []string, instancia_recursos []int) {
 	//Tomo de resources y resource_instances los recursos y sus instancias y los guardo en Recursos
 	for i, recurso := range recursos {
-		MapRecursos[recurso] = structs.Recurso{Instancias: instancia_recursos[i]}
+		MapRecursos[recurso] = &structs.Recurso{Instancias: instancia_recursos[i]}
 	}
 
 	fmt.Println("Recursos: ", MapRecursos)

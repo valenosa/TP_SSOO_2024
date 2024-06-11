@@ -64,6 +64,11 @@ type RespuestaDispatch struct {
 
 // ====================================| RECURSOS | ====================================\\
 
+type RequestRecurso struct {
+	PidSolicitante uint32
+	NombreRecurso  string
+}
+
 type Recurso struct {
 	Instancias int
 	ListaBlock []uint32

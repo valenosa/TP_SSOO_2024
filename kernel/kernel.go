@@ -43,6 +43,10 @@ func main() {
 	http.HandleFunc("POST /interfazConectada", handlerConexionInterfazIO)
 	http.HandleFunc("POST /instruccionIO", handlerEjecutarInstruccionEnIO)
 
+	//RECURSOS
+	http.HandleFunc("POST /wait", handlerWait)
+	http.HandleFunc("POST /signal", handlerSignal)
+
 	//Inicio el servidor de Kernel
 	config.IniciarServidor(funciones.ConfigJson.Port)
 
@@ -228,10 +232,9 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
 
 	//--------- DEVUELVE ---------
+
 	//Crea una variable tipo Response
 	respuesta, err := json.Marshal(respEstadoProceso)
-
-	// Error Handler de la codificación
 	if err != nil {
 		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -241,6 +244,57 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+}
+
+//----------------------( RECURSOS )----------------------\\
+
+func handlerWait(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
+	// Almaceno el recurso en una variable
+	var recursoSolicitado structs.RequestRecurso
+	err := json.NewDecoder(r.Body).Decode(&recursoSolicitado)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
+	respAsignaiconRecurso := "RECURSO ASIGNADO"
+
+	var recurso, find = funciones.MapRecursos[recursoSolicitado.NombreRecurso]
+	if !find {
+		respAsignaiconRecurso = "NO EXISTE EL RECURSO"
+	} else {
+
+		//Resto uno al la cantidad de instancias del recurso
+		recurso.Instancias--
+		if recurso.Instancias < 0 {
+
+			//Agrego PID a su lista de bloqueados
+			recurso.ListaBlock = append(recurso.ListaBlock, recursoSolicitado.PidSolicitante)
+			fmt.Println("Recursos: ", funciones.MapRecursos)
+
+			respAsignaiconRecurso = "RECURSO NO DISPONIBLE"
+		}
+
+	}
+
+	//--------- DEVUELVE ---------
+
+	respuesta, err := json.Marshal(respAsignaiconRecurso)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+func handlerSignal(w http.ResponseWriter, r *http.Request) {
 }
 
 //----------------------( I/O )----------------------\\
@@ -316,17 +370,13 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	query := interfazSolicitada.TipoInterfaz + " /" + requestInstruccionIO.Instruccion
 
 	respuesta := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
-	if respuesta == nil {
+	if respuesta.StatusCode != http.StatusOK {
+		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		funciones.InterfacesConectadas.Delete(requestInstruccionIO.NombreInterfaz)
 		fmt.Println("Interfaz desconectada.")
 		http.Error(w, "Interfaz desconectada.", http.StatusInternalServerError)
-		return
-	}
-
-	if respuesta.StatusCode != http.StatusOK {
-		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		return
 	}
 

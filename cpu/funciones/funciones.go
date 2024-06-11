@@ -131,6 +131,12 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "JNZ":
 		Jnz(variable[1], variable[2], PC, registrosMap8)
 
+	case "WAIT":
+		wait(variable[1], PCB, cicloFinalizado) //! Estoy cambiando estados desde adentro de la funcion, esta bien o solo debo hacerlo desde aca?
+
+	case "SIGNAL":
+		signal(variable[1])
+
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
@@ -258,6 +264,57 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	if *registro != 0 {
 		*PC = nuevoValor
 	}
+}
+
+func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
+
+	//Creo estructura de request
+	var requestRecurso = structs.RequestRecurso{
+		PidSolicitante: PCB.PID,
+		NombreRecurso:  nombreRecurso,
+	}
+
+	//Convierto request a JSON
+	body, err := json.Marshal(requestRecurso)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body) //? Es un POST???
+
+	// Decodifica en formato JSON la request.
+	var respWait string
+	err = json.NewDecoder(respuesta.Body).Decode(&respWait)
+	if err != nil {
+		return //? Que va aca?
+	}
+
+	println(respWait) //! Borrar despues
+
+	switch respWait {
+	case "RECURSO ASIGNADO":
+		//Continua con la ejecucion
+		return
+
+	case "RECURSO NO DISPONIBLE":
+		*cicloFinalizado = true
+		PCB.Estado = "BLOCK"
+		MotivoDeDesalojo = "WAIT"
+		//Bloquea el proceso
+		return
+
+	case "NO EXISTE EL RECURSO":
+		*cicloFinalizado = true
+		PCB.Estado = "EXIT"
+		MotivoDeDesalojo = "NO EXISTE EL RECURSO"
+		return
+	}
+
+}
+
+func signal(nombreRegistro string) {
+
 }
 
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
