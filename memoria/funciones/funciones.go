@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
@@ -54,6 +55,19 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
 	tablaDePaginas[pid] = structs.Tabla{}
+}
+
+// TODO: Probar
+func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas *map[uint32]structs.Tabla) string {
+	if len((*tablaDePaginas)[pid]) <= int(pagina) {
+		return ""
+	}
+
+	marco := (*tablaDePaginas)[pid][pagina]
+
+	marcoStr := strconv.Itoa(marco)
+
+	return marcoStr
 }
 
 // TODO: Probar

@@ -43,6 +43,7 @@ func main() {
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
+	http.HandleFunc("PUT /memoria/marco", handlerObtenerMarco(&tablasDePaginas))
 
 	//inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -62,7 +63,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP.
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -76,7 +77,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP.
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -111,7 +112,7 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 	}
 }
 
-// TODO: Crear request que venga a este handler, el endpoint, y probar
+// TODO: Crear request que venga a este handler, el endpoint, y probar // TODO: no olvidarse de desalojar los recursos
 func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
 
 	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
@@ -136,6 +137,43 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 }
 
 // TODO: Probar
+func handlerObtenerMarco(tablaDePaginas *map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Desglosa los Query Params
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
+		pagina, errPagina := strconv.ParseUint(queryParams.Get("pagina"), 10, 32)
+
+		// Maneja error en caso de que no se pueda parsear el query
+		if errPid != nil || errPagina != nil {
+			return
+		}
+
+		// Busca marco en la tabla de páginas, y en caso de no encontrarlo, devuelve un string vacío
+		marco := funciones.BuscarMarco(uint32(pid), uint32(pagina), tablaDePaginas)
+
+		// Codifica la respuesta en formato JSON
+		respuesta, err := json.Marshal(marco)
+		if err != nil {
+			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+			return
+		}
+
+		// Devuelve un status code dependiendo de si se encontró o no el marco
+		if marco == "" {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+
+		// Envía la respuesta al MMU
+		w.Write(respuesta)
+	}
+}
+
+// TODO: Probar
 func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
 
 	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
@@ -150,7 +188,14 @@ func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func
 
 		estado := funciones.ReasignarPaginas(uint32(pid), tablaDePaginas, bitMap, uint32(size))
 
+		respuesta, err := json.Marshal(estado)
+
+		if err != nil {
+			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(estado)) //?Está bien mandar texto así? Es esto lo que hay que mandar?
+		w.Write(respuesta)
 	}
 }

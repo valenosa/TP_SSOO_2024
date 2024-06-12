@@ -52,12 +52,115 @@ func (tlb TLB) Hit(pagina uint32) (uint32, bool) {
 // ----------------------( MMU )----------------------\\
 
 // TODO: Probar
-func DireccionLogicaAFisica(direccionLogica int) (int, int) {
+func TraduccionMMU(pid uint32, direccionLogica int, tlb TLB) (uint32, bool) {
+
+	// Obtiene la página y el desplazamiento de la dirección lógica
+	numeroDePagina, desplazamiento := ObtenerPaginayDesplazamiento(direccionLogica)
+
+	// Obtiene el marco de la página
+	marco, encontrado := ObtenerMarco(PidEnEjecucion, uint32(numeroDePagina), tlb)
+
+	// Si no se encontró el marco, se devuelve un error
+	if !encontrado {
+		//? Cómo manejar el caso de un "Page Fault" (si se debe)?
+		return 0, false
+	}
+
+	// Calcula la dirección física
+	direccionFisica := marco*uint32(funciones.ConfigJson.Page_Size) + uint32(desplazamiento)
+
+	return direccionFisica, true
+}
+
+// TODO: Probar
+func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
 
 	numeroDePagina := int(math.Floor(float64(direccionLogica) / float64(funciones.ConfigJson.Page_Size)))
 	desplazamiento := direccionLogica - numeroDePagina*int(funciones.ConfigJson.Page_Size)
 
 	return numeroDePagina, desplazamiento
+
+}
+
+// TODO: probar
+// obtiene el marco de la pagina
+func ObtenerMarco(pid uint32, pagina uint32, tlb TLB) (uint32, bool) {
+
+	// Busca en la TLB
+	marco, encontrado := buscarEnTLB(pagina, tlb)
+
+	// Si no está en la TLB, busca en la tabla de páginas
+	if !encontrado {
+		marco, encontrado = buscarEnMemoria(pid, pagina)
+
+		//TODO: agregarTLB(pagina, marco, pid, tlb)
+		//TODO: manejar caso en donde la TLB no pueda agregar marco (no existe marco en memoria)
+	}
+
+	//? Existe la posibilidad de que un marco no sea hallado
+	return marco, encontrado
+}
+
+func buscarEnTLB(pagina uint32, tlb TLB) (uint32, bool) {
+	marco, encontrado := tlb.Hit(pagina)
+	return marco, encontrado
+}
+
+func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
+
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/memoria/marco", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud PUT
+	req, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		return 0, false
+	}
+
+	// Agrega el PID y la PAGINA como params
+	q := req.URL.Query()
+	q.Add("pid", fmt.Sprint(pid))
+	q.Add("pagina", fmt.Sprint(pagina))
+	req.URL.RawQuery = q.Encode()
+
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		return 0, false
+	}
+
+	// Verifica el código de estado de la respuesta
+	if respuesta.StatusCode != http.StatusOK {
+		return 0, false
+	}
+
+	// Crea un string para almacenar el marco.
+	var marco string
+
+	// Decodifica en formato JSON la request.
+	err = json.NewDecoder(respuesta.Body).Decode(&marco)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		return 0, false
+	}
+
+	// Convierte el valor de la instrucción a un uint64 bits.
+	valorInt64, err := strconv.ParseUint(marco, 10, 32)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 0, false
+	}
+
+	// Disminuye el valor de la instrucción en uno para ajustarlo al índice del slice de instrucciones.
+	marcoEncontrado := uint32(valorInt64)
+
+	return uint32(marcoEncontrado), true
 
 }
 
@@ -290,11 +393,11 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 
 	// Disminuye el valor de la instrucción en uno para ajustarlo al índice del slice de instrucciones.
-	nuevoValor := uint32(valorInt64) - 1
+	marcoEncontrado := uint32(valorInt64) - 1
 
 	// Si el valor del registro es distinto de cero, actualiza el PC al nuevo valor.
 	if *registro != 0 {
-		*PC = nuevoValor
+		*PC = marcoEncontrado
 	}
 }
 
@@ -424,10 +527,6 @@ func IO_STDIN_READ(nombreInterfaz string, regDir string, regTamaño string, regi
 // }
 
 // func MOV_OUT(){
-
-// }
-
-// func RESIZE(){
 
 // }
 
