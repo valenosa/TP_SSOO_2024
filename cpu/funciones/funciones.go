@@ -393,11 +393,11 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 
 	// Disminuye el valor de la instrucción en uno para ajustarlo al índice del slice de instrucciones.
-	marcoEncontrado := uint32(valorInt64) - 1
+	nuevoValor := uint32(valorInt64) - 1
 
 	// Si el valor del registro es distinto de cero, actualiza el PC al nuevo valor.
 	if *registro != 0 {
-		*PC = marcoEncontrado
+		*PC = nuevoValor
 	}
 }
 
