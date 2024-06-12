@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/sisoputnfrba/tp-golang/memoria/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
@@ -25,6 +27,212 @@ var ConfigJson config.Cpu
 
 // Es global porque la uso para "depositar" el motivo de desalojo del proceso (que a excepción de EXIT, es traído por una interrupción)
 var MotivoDeDesalojo string
+
+// ----------------------( TLB )----------------------\\
+
+type pid = uint32
+type pagina = uint32
+type marco = uint32
+
+type TLB map[pid]map[pagina]marco
+
+// TLB
+// Estructura de la TLB.
+// ? El pid es el key, y el valor es otro map
+
+// Valida si el TLBA está lleno.
+func (tlb TLB) Full() bool {
+	return len(tlb) == ConfigJson.Number_Felling_tlb
+}
+
+// Hit or miss? I guess they never miss, huh?
+func (tlb TLB) Hit(pid uint32, pagina uint32) (uint32, bool) {
+	marco, encontrado := tlb[pid][pagina]
+	return marco, encontrado
+}
+
+type ElementoPrioridad struct {
+	Pid    uint32
+	Pagina uint32
+}
+
+// ----------------------( MMU )----------------------\\
+
+// TODO: Probar
+// Recibe una direccion lógica, devuelve una física y maneja el TLB
+func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
+
+	// Obtiene la página y el desplazamiento de la dirección lógica
+	numeroDePagina, desplazamiento := ObtenerPaginayDesplazamiento(direccionLogica)
+
+	// Obtiene el marco de la página
+	marco, encontrado := ObtenerMarco(PidEnEjecucion, uint32(numeroDePagina), tlb, prioridadesTLB)
+
+	// Si no se encontró el marco, se devuelve un error
+	if !encontrado {
+		//? Cómo manejar el caso de un "Page Fault" (si se debe)?
+		return 0, false
+	}
+
+	// Calcula la dirección física
+	direccionFisica := marco*uint32(funciones.ConfigJson.Page_Size) + uint32(desplazamiento)
+
+	return direccionFisica, true
+}
+
+// TODO: Probar
+func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
+
+	numeroDePagina := int(math.Floor(float64(direccionLogica) / float64(funciones.ConfigJson.Page_Size)))
+	desplazamiento := direccionLogica - numeroDePagina*int(funciones.ConfigJson.Page_Size)
+
+	return numeroDePagina, desplazamiento
+
+}
+
+// TODO: probar
+// obtiene el marco de la pagina
+func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
+
+	// Busca en la TLB
+	marco, encontrado := (*tlb).Hit(pagina, pid)
+
+	// Si no está en la TLB, busca en la tabla de páginas y de paso lo agrega
+	if !encontrado {
+		marco, encontrado = buscarEnMemoria(pid, pagina)
+
+		//TODO: manejar caso en donde la TLB no pueda agregar marco (no existe marco en memoria)
+		agregarEnTLB(pagina, marco, pid, tlb, prioridadesTLB)
+	}
+
+	//!Manejar tema TLBEANO
+
+	//? Existe la posibilidad de que un marco no sea hallado
+	return marco, encontrado
+}
+
+func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+	if tlb.Full() {
+
+		//TODO: Reemplazar marco
+		//TODO: Eliminar marco
+		planificarTLB(pid, pagina, marco, tlb, prioridadesTLB)
+	} else {
+		// agregar marco al TLB
+		(*tlb)[pid][pagina] = marco
+		// agregar a la lista de prioridades
+		(*tlb)[pid][pagina] = marco
+		(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
+	}
+}
+
+func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+	switch ConfigJson.Algorithm_tlb {
+
+	case "FIFO":
+
+		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
+
+	case "LRU": //?
+		algoritmoLru(pid, pagina, marco, tlb, prioridadesTLB)
+	}
+}
+
+func algoritmoFifo(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+	_, paginaEncontrada := (*tlb)[pid][pagina]
+
+	if !paginaEncontrada {
+		// Elimina el primer elemento de la lista de prioridades
+		delete((*tlb)[pid], (*prioridadesTLB)[0].Pagina)
+		(*prioridadesTLB) = (*prioridadesTLB)[1:]
+
+		// Agrega el marco a la TLB
+		(*tlb)[pid][pagina] = marco
+		(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
+
+	} else {
+
+		(*tlb)[pid][pagina] = marco
+	}
+}
+
+func algoritmoLru(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+	encontrado := false
+	for posicion, entrada := range *prioridadesTLB {
+		//si encuentro un elemento con el mismo pid y pagina
+		if entrada.Pid == pid && entrada.Pagina == pagina {
+
+			//Se elimina el elemento en la lista de prioridades
+			(*prioridadesTLB) = append((*prioridadesTLB)[:posicion], (*prioridadesTLB)[posicion+1:]...)
+
+			//Lo paso al final
+			(*prioridadesTLB) = append((*prioridadesTLB), entrada)
+
+			//Cambio el marco de la página en el TLB
+			(*tlb)[pid][pagina] = marco
+
+			encontrado = true
+			break
+		}
+	}
+	if !encontrado {
+		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
+	}
+}
+
+func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
+
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/memoria/marco", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud PUT
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		return 0, false
+	}
+
+	// Agrega el PID y la PAGINA como params
+	q := req.URL.Query()
+	q.Add("pid", fmt.Sprint(pid))
+	q.Add("pagina", fmt.Sprint(pagina))
+	req.URL.RawQuery = q.Encode()
+
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		return 0, false
+	}
+
+	// Verifica el código de estado de la respuesta
+	if respuesta.StatusCode != http.StatusOK {
+		return 0, false
+	}
+
+	// Lee el cuerpo de la respuesta
+	marco, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return 0, false
+	}
+
+	// Convierte el valor de la instrucción a un uint64 bits.
+	valorInt64, err := strconv.ParseUint(string(marco), 10, 32)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 0, false
+	}
+
+	// Disminuye el valor de la instrucción en uno para ajustarlo al índice del slice de instrucciones.
+	marcoEncontrado := uint32(valorInt64)
+
+	return uint32(marcoEncontrado), true
+
+}
 
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
 
@@ -131,11 +339,23 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "JNZ":
 		Jnz(variable[1], variable[2], PC, registrosMap8)
 
+	case "RESIZE":
+		estado := resize(variable[1])
+		//!Pasar a exit
+		if estado == "OUT OF MEMORY" {
+			*cicloFinalizado = true
+			PCB.Estado = "EXIT"
+			MotivoDeDesalojo = estado //TODO: Manejar en kernel
+			return
+		}
+
 	case "WAIT":
 		wait(variable[1], PCB, cicloFinalizado) //! Estoy cambiando estados desde adentro de la funcion, esta bien o solo debo hacerlo desde aca?
+    return //! Verificar si sin esto devuelve el PC incrementado en uno más de lo que debería 
 
 	case "SIGNAL":
 		signal(variable[1], PCB, cicloFinalizado)
+    return //! Verificar si sin esto devuelve el PC incrementado en uno más de lo que debería
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
@@ -151,7 +371,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		*cicloFinalizado = true
 		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "EXIT"
-
 		return
 
 	default:
@@ -286,6 +505,52 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 }
 
+// TODO: Probar
+func resize(tamañoEnBytes string) string {
+	// Convierte el PID y el PC a string
+	pid := strconv.FormatUint(uint64(PidEnEjecucion), 10)
+
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/memoria/resize", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud GET
+	req, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return ""
+	}
+
+	// Agrega el PID y el PC como params
+	q := req.URL.Query()
+	q.Add("pid", pid)
+	q.Add("size", tamañoEnBytes)
+	req.URL.RawQuery = q.Encode()
+
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		return ""
+	}
+
+	// Verifica el código de estado de la respuesta
+	if respuesta.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	// Lee el cuerpo de la respuesta
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return ""
+	}
+
+	// Retorna las instrucciones obtenidas como una cadena de texto
+	return string(bodyBytes)
+}
+
+
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	//--------- REQUEST ---------
@@ -363,8 +628,6 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 		}
 	}
 
-}
-
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
 func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
 
@@ -439,10 +702,6 @@ func IoStdinRead(nombreInterfaz string, regDir string, regTamaño string, regist
 // }
 
 // func MOV_OUT(){
-
-// }
-
-// func RESIZE(){
 
 // }
 

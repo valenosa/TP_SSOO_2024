@@ -106,3 +106,10 @@ type RequestInputSTDIN struct {
 	RegistroDireccion uint32
 	//? Tambien deberia estar el pid?
 }
+
+//=====================================| MEMORIA DE USUARIO |=====================================\\
+
+// Memoria
+
+// Tabla de páginas. Es un slice de marcos que contiene solamente las páginas validadas.
+type Tabla []int

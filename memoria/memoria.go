@@ -14,9 +14,6 @@ import (
 
 //================================| MAIN |================================\\
 
-// Tabla de páginas. Es un map que por cada página (key) tiene un marco (value). COntiene solamente las páginas validadas.
-type tabla map[uint32]uint32
-
 //================================| MAIN |================================\\
 
 func main() {
@@ -29,7 +26,7 @@ func main() {
 
 	espacioUsuario := make([]byte, funciones.ConfigJson.Memory_Size) // Contiene todo lo que se guarda para cada proceso (a excepcion)
 
-	tablasDePaginas := make(map[uint32]tabla) // Contiene la tabla de cada proceso (pid = key)
+	tablasDePaginas := make(map[uint32]structs.Tabla) // Contiene la tabla de cada proceso (pid = key)
 
 	bitMap := make([]bool, funciones.ConfigJson.Memory_Size/funciones.ConfigJson.Page_Size) // TRUE = ocupado, FALSE = libre
 
@@ -42,8 +39,11 @@ func main() {
 	config.Logger("Memoria.log")
 
 	// ======== HandleFunctions ========
-	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones))
+	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
+	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
+	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
+	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
 
 	//inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -52,7 +52,7 @@ func main() {
 //================================| HANDLERS |================================\\
 
 // Wrapper que crea un PCB con el pid recibido.
-func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(http.ResponseWriter, *http.Request) {
+func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
 
 	// Handler para iniciar un proceso.
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +63,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(htt
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP.
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -71,11 +71,13 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string) func(htt
 		// Se guardan las instrucciones en un map de memoria.
 		funciones.GuardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
 
+		funciones.AsignarTabla(request.PID, tablaDePaginas)
+
 		// Crea una variable tipo Response (para confeccionar una respuesta)
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP.
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -107,5 +109,86 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(instruccion))
+	}
+}
+
+// TODO: Crear request que venga a este handler, el endpoint, y probar // TODO: no olvidarse de desalojar los recursos
+func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
+
+	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
+
+		if errPid != nil {
+			return
+		}
+
+		// Borrar instrucciones
+		delete(memoriaInstrucciones, uint32(pid))
+		// Desocupar marcos
+		funciones.LiberarMarcos(tablaDePaginas[uint32(pid)], bitMap)
+		// Borrar tabla de páginas
+		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
+
+		w.WriteHeader(http.StatusOK) //?
+		// w.Write([]byte)
+	}
+}
+
+// TODO: Probar
+func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Desglosa los Query Params
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
+		pagina, errPagina := strconv.ParseUint(queryParams.Get("pagina"), 10, 32)
+
+		// Maneja error en caso de que no se pueda parsear el query
+		if errPid != nil || errPagina != nil {
+			return
+		}
+
+		// Busca marco en la tabla de páginas, y en caso de no encontrarlo, devuelve un string vacío
+		marco := funciones.BuscarMarco(uint32(pid), uint32(pagina), tablaDePaginas)
+
+		// Codifica la respuesta en formato JSON
+		respuesta, err := json.Marshal(marco)
+		if err != nil {
+			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+			return
+		}
+
+		// Devuelve un status code dependiendo de si se encontró o no el marco
+		if marco == "" {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+
+		// Envía la respuesta al MMU
+		w.Write(respuesta)
+	}
+}
+
+// TODO: Probar
+func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
+
+	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
+		size, errSize := strconv.ParseUint(queryParams.Get("size"), 10, 32)
+
+		if errPid != nil || errSize != nil {
+			return
+		}
+
+		estado := funciones.ReasignarPaginas(uint32(pid), tablaDePaginas, bitMap, uint32(size))
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(estado))
 	}
 }
