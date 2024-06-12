@@ -135,7 +135,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		wait(variable[1], PCB, cicloFinalizado) //! Estoy cambiando estados desde adentro de la funcion, esta bien o solo debo hacerlo desde aca?
 
 	case "SIGNAL":
-		signal(variable[1])
+		signal(variable[1], PCB, cicloFinalizado)
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
@@ -268,6 +268,8 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
+	//--------- REQUEST ---------
+
 	//Creo estructura de request
 	var requestRecurso = structs.RequestRecurso{
 		PidSolicitante: PCB.PID,
@@ -290,30 +292,56 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 		return //? Que va aca?
 	}
 
-	println(respWait) //! Borrar despues
+	//--------- EJECUTA ---------
 
 	switch respWait {
-	case "RECURSO ASIGNADO":
-		//Continua con la ejecucion
+	case "OK: Recurso asignado":
+		// Agrega el recurso a la lista de recursos retenidos por el proceso.
+		PCB.Recursos = append(PCB.Recursos, nombreRecurso) //* En base a esta lista se liberaran los recursos al finalizar el proceso
 		return
 
-	case "RECURSO NO DISPONIBLE":
+	case "BLOQUEAR: Recurso no disponible":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
 		MotivoDeDesalojo = "WAIT"
 		//Bloquea el proceso
 		return
 
-	case "NO EXISTE EL RECURSO":
+	case "ERROR: Recurso no existe":
 		*cicloFinalizado = true
 		PCB.Estado = "EXIT"
-		MotivoDeDesalojo = "NO EXISTE EL RECURSO"
+		MotivoDeDesalojo = "ERROR: Recurso no existe"
 		return
 	}
 
 }
 
-func signal(nombreRegistro string) {
+// TODO
+func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
+
+	//Creo estructura de request
+	var requestRecurso = structs.RequestRecurso{
+		PidSolicitante: PCB.PID,
+		NombreRecurso:  nombreRecurso,
+	}
+
+	//Convierto request a JSON
+	body, err := json.Marshal(requestRecurso)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body) //? Es un POST???
+
+	// Decodifica en formato JSON la request.
+	var respWait string
+	err = json.NewDecoder(respuesta.Body).Decode(&respWait)
+	if err != nil {
+		return //? Que va aca?
+	}
+
+	//--------- EJECUTA ---------
 
 }
 

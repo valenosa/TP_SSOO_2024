@@ -125,6 +125,8 @@ func Planificador() {
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
 
+		fmt.Println("Recursos Retenidos por", pcbActualizado.PID, ": ", pcbActualizado.Recursos) //! Borrar despues
+
 		//Aviso que esta libre el CPU
 		mx_CPUOcupado.Unlock()
 
@@ -318,8 +320,6 @@ func LeerRecursos(recursos []string, instancia_recursos []int) {
 	for i, recurso := range recursos {
 		MapRecursos[recurso] = &structs.Recurso{Instancias: instancia_recursos[i]}
 	}
-
-	fmt.Println("Recursos: ", MapRecursos)
 }
 
 // *=======================================| TADs SINCRONIZACION |=======================================\\

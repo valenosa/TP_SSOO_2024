@@ -262,11 +262,13 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	respAsignaiconRecurso := "RECURSO ASIGNADO"
+	respAsignaiconRecurso := "OK: Recurso asignado"
 
+	//Busco el recurso solicitado
 	var recurso, find = funciones.MapRecursos[recursoSolicitado.NombreRecurso]
 	if !find {
-		respAsignaiconRecurso = "NO EXISTE EL RECURSO"
+		//Si no existe el recurso
+		respAsignaiconRecurso = "ERROR: Recurso no existe"
 	} else {
 
 		//Resto uno al la cantidad de instancias del recurso
@@ -275,9 +277,8 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 
 			//Agrego PID a su lista de bloqueados
 			recurso.ListaBlock = append(recurso.ListaBlock, recursoSolicitado.PidSolicitante)
-			fmt.Println("Recursos: ", funciones.MapRecursos)
 
-			respAsignaiconRecurso = "RECURSO NO DISPONIBLE"
+			respAsignaiconRecurso = "BLOQUEAR: Recurso no disponible"
 		}
 
 	}
@@ -294,7 +295,21 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
+// TODO
 func handlerSignal(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
+	// Almaceno el recurso en una variable
+	var recursoSolicitado structs.RequestRecurso
+	err := json.NewDecoder(r.Body).Decode(&recursoSolicitado)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
 }
 
 //----------------------( I/O )----------------------\\
