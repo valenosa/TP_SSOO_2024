@@ -295,14 +295,13 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-// TODO
 func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	//--------- RECIBE ---------
 
 	// Almaceno el recurso en una variable
-	var recursoSolicitado structs.RequestRecurso
-	err := json.NewDecoder(r.Body).Decode(&recursoSolicitado)
+	var recursoLiberado string
+	err := json.NewDecoder(r.Body).Decode(&recursoLiberado)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -310,6 +309,28 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
+	var recurso, find = funciones.MapRecursos[recursoLiberado]
+	if !find {
+		//TODO Si no existe el recurso Mandar a EXIT
+		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
+		return
+	}
+
+	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
+	if len(recurso.ListaBlock) != 0 {
+		// Tomo el primer PID de la lista de BLOCK (del recurso)
+		pid := recurso.ListaBlock[0]
+		recurso.ListaBlock = recurso.ListaBlock[1:]
+
+		//Se pasa el proceso a de BOLCK -> READY
+		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
+		pcbDesbloqueado.Estado = "READY"
+		funciones.AdministrarQueues(pcbDesbloqueado)
+	} else {
+		recurso.Instancias++
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 //----------------------( I/O )----------------------\\

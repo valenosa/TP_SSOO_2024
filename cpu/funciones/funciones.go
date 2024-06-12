@@ -283,7 +283,7 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body) //? Es un POST???
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body)
 
 	// Decodifica en formato JSON la request.
 	var respWait string
@@ -316,32 +316,32 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 }
 
-// TODO
 func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
-	//Creo estructura de request
-	var requestRecurso = structs.RequestRecurso{
-		PidSolicitante: PCB.PID,
-		NombreRecurso:  nombreRecurso,
-	}
-
 	//Convierto request a JSON
-	body, err := json.Marshal(requestRecurso)
+	body, err := json.Marshal(nombreRecurso)
 	if err != nil {
 		return
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body) //? Es un POST???
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "signal", body)
+	if respuesta.StatusCode != http.StatusOK {
 
-	// Decodifica en formato JSON la request.
-	var respWait string
-	err = json.NewDecoder(respuesta.Body).Decode(&respWait)
-	if err != nil {
-		return //? Que va aca?
+		*cicloFinalizado = true
+		PCB.Estado = "EXIT"
+		MotivoDeDesalojo = "ERROR: Recurso no existe"
+
+		return
 	}
 
-	//--------- EJECUTA ---------
+	// Elimina el recurso liberado de la lista de recursos retenidos por el proceso
+	for i, recurso := range PCB.Recursos {
+		if recurso == nombreRecurso {
+			PCB.Recursos = append(PCB.Recursos[:i], PCB.Recursos[i+1:]...)
+			return
+		}
+	}
 
 }
 
