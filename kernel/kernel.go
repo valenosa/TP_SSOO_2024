@@ -20,6 +20,9 @@ func main() {
 	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
 	funciones.Bin_hayPCBenREADY = make(chan int, funciones.ConfigJson.Multiprogramming+1)
 
+	// Inicializar recursos
+	funciones.LeerRecursos(funciones.ConfigJson.Resources, funciones.ConfigJson.Resource_Instances)
+
 	// Configura el logger
 	config.Logger("Kernel.log")
 
@@ -39,6 +42,10 @@ func main() {
 	//ENTRADA SALIDA
 	http.HandleFunc("POST /interfazConectada", handlerConexionInterfazIO)
 	http.HandleFunc("POST /instruccionIO", handlerEjecutarInstruccionEnIO)
+
+	//RECURSOS
+	http.HandleFunc("POST /wait", handlerWait)
+	http.HandleFunc("POST /signal", handlerSignal)
 
 	//Inicio el servidor de Kernel
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -225,10 +232,9 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
 
 	//--------- DEVUELVE ---------
+
 	//Crea una variable tipo Response
 	respuesta, err := json.Marshal(respEstadoProceso)
-
-	// Error Handler de la codificación
 	if err != nil {
 		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -238,6 +244,93 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+}
+
+//----------------------( RECURSOS )----------------------\\
+
+func handlerWait(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
+	// Almaceno el recurso en una variable
+	var recursoSolicitado structs.RequestRecurso
+	err := json.NewDecoder(r.Body).Decode(&recursoSolicitado)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
+	respAsignaiconRecurso := "OK: Recurso asignado"
+
+	//Busco el recurso solicitado
+	var recurso, find = funciones.MapRecursos[recursoSolicitado.NombreRecurso]
+	if !find {
+		//Si no existe el recurso
+		respAsignaiconRecurso = "ERROR: Recurso no existe"
+	} else {
+
+		//Resto uno al la cantidad de instancias del recurso
+		recurso.Instancias--
+		if recurso.Instancias < 0 {
+
+			//Agrego PID a su lista de bloqueados
+			recurso.ListaBlock = append(recurso.ListaBlock, recursoSolicitado.PidSolicitante)
+
+			respAsignaiconRecurso = "BLOQUEAR: Recurso no disponible"
+		}
+
+	}
+
+	//--------- DEVUELVE ---------
+
+	respuesta, err := json.Marshal(respAsignaiconRecurso)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+func handlerSignal(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
+	// Almaceno el recurso en una variable
+	var recursoLiberado string
+	err := json.NewDecoder(r.Body).Decode(&recursoLiberado)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
+	var recurso, find = funciones.MapRecursos[recursoLiberado]
+	if !find {
+		//TODO Si no existe el recurso Mandar a EXIT
+		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
+		return
+	}
+
+	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
+	if len(recurso.ListaBlock) != 0 {
+		// Tomo el primer PID de la lista de BLOCK (del recurso)
+		pid := recurso.ListaBlock[0]
+		recurso.ListaBlock = recurso.ListaBlock[1:]
+
+		//Se pasa el proceso a de BOLCK -> READY
+		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
+		pcbDesbloqueado.Estado = "READY"
+		funciones.AdministrarQueues(pcbDesbloqueado)
+	} else {
+		recurso.Instancias++
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 //----------------------( I/O )----------------------\\
@@ -313,17 +406,13 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	query := interfazSolicitada.TipoInterfaz + " /" + requestInstruccionIO.Instruccion
 
 	respuesta := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
-	if respuesta == nil {
+	if respuesta.StatusCode != http.StatusOK {
+		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		funciones.InterfacesConectadas.Delete(requestInstruccionIO.NombreInterfaz)
 		fmt.Println("Interfaz desconectada.")
 		http.Error(w, "Interfaz desconectada.", http.StatusInternalServerError)
-		return
-	}
-
-	if respuesta.StatusCode != http.StatusOK {
-		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		return
 	}
 

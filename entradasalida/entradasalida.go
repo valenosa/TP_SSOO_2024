@@ -143,7 +143,8 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	// Recorta la longitud del input en base al registroTamaño
 	inputTruncado := input[0:instruccionIO.RegistroTamaño]
 
-	//--------- RESPUESTA ---------
+	//--------- REQUEST A MEMORIA ---------
+
 	responseInputUsuario := structs.RequestInputSTDIN{
 		TextoUsuario:      inputTruncado,
 		RegistroDireccion: instruccionIO.RegistroDireccion,
@@ -160,6 +161,8 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	if respuesta == nil {
 		return
 	}
+
+	//--------- RESPUESTA ---------
 
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)

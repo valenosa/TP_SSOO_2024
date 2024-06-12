@@ -3,7 +3,7 @@ package structs
 // =====================================| PROCESO |========================================================\\
 
 //	Kernel -> Cliente
-//
+
 // Estructura que contiene el path del archivo que se utilizará como base para ejecutar un nuevo proceso y su PID asociado.
 type BodyIniciarProceso struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
@@ -24,9 +24,10 @@ type ResponseEstadoProceso struct {
 // CPU, Kernel.
 // Estructura base de un proceso.
 type PCB struct {
-	PID     uint32
-	Quantum uint16
-	Estado  string
+	PID      uint32
+	Quantum  uint16
+	Estado   string
+	Recursos []string
 	RegistrosUsoGeneral
 }
 
@@ -60,6 +61,18 @@ type ResponseListarProceso struct {
 type RespuestaDispatch struct {
 	MotivoDeDesalojo string
 	PCB              PCB
+}
+
+// ====================================| RECURSOS | ====================================\\
+
+type RequestRecurso struct {
+	PidSolicitante uint32
+	NombreRecurso  string
+}
+
+type Recurso struct {
+	Instancias int
+	ListaBlock []uint32
 }
 
 //=====================================| I/O |=====================================\\

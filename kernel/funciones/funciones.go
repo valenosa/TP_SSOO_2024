@@ -18,6 +18,9 @@ import (
 // ----------------------( VARIABLES )---------------------------\\
 var ConfigJson config.Kernel
 
+// ---------------------------- Recursos
+var MapRecursos = make(map[string]*structs.Recurso)
+
 // ----------------------------Listas de Estados
 var listaNEW = ListaSegura{}
 var listaREADY = ListaSegura{}
@@ -96,30 +99,6 @@ func ListarProceso(configJson config.Kernel) {
 	fmt.Println(string(bodyBytes))
 }
 
-//*======================================| ENTRADA SALIDA (I/O) |=======================================\\
-
-// Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
-func ValidarInstruccionIO(tipo string, instruccion string) bool {
-	switch tipo {
-	case "GENERICA":
-		return instruccion == "IO_GEN_SLEEP"
-
-	case "STDIN":
-		return instruccion == "IO_STDIN_READ"
-
-	case "STDOUT":
-		return instruccion == "IO_STDOUT_WRITE"
-	}
-	return false
-}
-
-// Toma un pid del map general de BLOCK y manda un proceso a EXIT.
-func DesalojarProcesoIO(pid uint32) {
-	pcbDesalojado := MapBLOCK.Delete(pid)
-	pcbDesalojado.Estado = "EXIT"
-	AdministrarQueues(pcbDesalojado)
-}
-
 //*=======================================| PLANIFICADOR |=======================================\\
 
 // TODO: Verificar el tema del semaforo de hay pcb en ready (31/05/24)
@@ -145,6 +124,8 @@ func Planificador() {
 
 		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
+
+		fmt.Println("Recursos Retenidos por", pcbActualizado.PID, ": ", pcbActualizado.Recursos) //! Borrar despues
 
 		//Aviso que esta libre el CPU
 		mx_CPUOcupado.Unlock()
@@ -306,6 +287,39 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 	}
 
 	fmt.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
+}
+
+//*======================================| ENTRADA SALIDA (I/O) |=======================================\\
+
+// Verificar que esa interfazConectada puede ejecutar la instruccion que le pide el CPU
+func ValidarInstruccionIO(tipo string, instruccion string) bool {
+	switch tipo {
+	case "GENERICA":
+		return instruccion == "IO_GEN_SLEEP"
+
+	case "STDIN":
+		return instruccion == "IO_STDIN_READ"
+
+	case "STDOUT":
+		return instruccion == "IO_STDOUT_WRITE"
+	}
+	return false
+}
+
+// Toma un pid del map general de BLOCK y manda un proceso a EXIT.
+func DesalojarProcesoIO(pid uint32) {
+	pcbDesalojado := MapBLOCK.Delete(pid)
+	pcbDesalojado.Estado = "EXIT"
+	AdministrarQueues(pcbDesalojado)
+}
+
+// *=======================================| RECURSOS |=======================================\\
+
+func LeerRecursos(recursos []string, instancia_recursos []int) {
+	//Tomo de resources y resource_instances los recursos y sus instancias y los guardo en Recursos
+	for i, recurso := range recursos {
+		MapRecursos[recurso] = &structs.Recurso{Instancias: instancia_recursos[i]}
+	}
 }
 
 // *=======================================| TADs SINCRONIZACION |=======================================\\
