@@ -97,11 +97,18 @@ func Fetch(PID uint32, PC uint32) string {
 func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
 
 	// Mapa de registros para acceder a los registros de la CPU por nombre
-	var registrosMap = map[string]*uint8{
+	var registrosMap8 = map[string]*uint8{
 		"AX": &RegistrosCPU.AX,
 		"BX": &RegistrosCPU.BX,
 		"CX": &RegistrosCPU.CX,
 		"DX": &RegistrosCPU.DX,
+	}
+
+	var registrosMap32 = map[string]*uint32{
+		"EAX": &RegistrosCPU.EAX,
+		"EBX": &RegistrosCPU.EBX,
+		"ECX": &RegistrosCPU.ECX,
+		"EDX": &RegistrosCPU.EDX,
 	}
 
 	// Parsea las instrucciones de la cadena de instrucción
@@ -113,21 +120,32 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	// Switch para determinar la operación a realizar según la instrucción
 	switch variable[0] {
 	case "SET":
-		Set(variable[1], variable[2], registrosMap, PC)
+		Set(variable[1], variable[2], registrosMap8, registrosMap32, PC)
 
 	case "SUM":
-		Sum(variable[1], variable[2], registrosMap)
+		Sum(variable[1], variable[2], registrosMap8)
 
 	case "SUB":
-		Sub(variable[1], variable[2], registrosMap)
+		Sub(variable[1], variable[2], registrosMap8)
 
 	case "JNZ":
-		Jnz(variable[1], variable[2], PC, registrosMap)
+		Jnz(variable[1], variable[2], PC, registrosMap8)
+
+	case "WAIT":
+		wait(variable[1], PCB, cicloFinalizado) //! Estoy cambiando estados desde adentro de la funcion, esta bien o solo debo hacerlo desde aca?
+
+	case "SIGNAL":
+		signal(variable[1], PCB, cicloFinalizado)
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		IoGenSleep(variable[1], variable[2], registrosMap, PCB.PID)
+		go IoGenSleep(variable[1], variable[2], registrosMap8, PCB.PID)
+
+	case "IO_STDIN_READ":
+		*cicloFinalizado = true
+		PCB.Estado = "BLOCK"
+		go IoStdinRead(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID)
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -147,14 +165,13 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 //----------------------( FUNCIONES DE INSTRUCCIONES )----------------------\\
 
 // Asigna al registro el valor pasado como parámetro.
-func Set(reg string, dato string, registroMap map[string]*uint8, PC *uint32) {
+func Set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PC *uint32) {
 
 	// Verifica si el registro a asignar es el PC
 	if reg == "PC" {
 
 		// Convierte el valor a un entero sin signo de 32 bits
 		valorInt64, err := strconv.ParseUint(dato, 10, 32)
-
 		if err != nil {
 			fmt.Println("Dato no valido")
 		}
@@ -164,22 +181,43 @@ func Set(reg string, dato string, registroMap map[string]*uint8, PC *uint32) {
 		return
 	}
 
-	// Obtiene el puntero al registro del mapa de registros
-	registro, encontrado := registroMap[reg]
-	if !encontrado {
-		fmt.Println("Registro invalido")
-		return
+	if reg == "AX" || reg == "AB" || reg == "CX" || reg == "DX" {
+
+		// Obtiene el puntero al registro del mapa de registros
+		registro, encontrado := registroMap8[reg]
+		if !encontrado {
+			fmt.Println("Registro invalido")
+			return
+		}
+
+		// Convierte el valor de string a entero
+		valor, err := strconv.Atoi(dato)
+
+		if err != nil {
+			fmt.Println("Dato no valido")
+		}
+
+		// Asigna el nuevo valor al registro
+		*registro = uint8(valor)
+	} else {
+
+		// Obtiene el puntero al registro del mapa de registros
+		registro, encontrado := registroMap32[reg]
+		if !encontrado {
+			fmt.Println("Registro invalido")
+			return
+		}
+
+		// Convierte el valor de string a entero
+		valor, err := strconv.Atoi(dato)
+
+		if err != nil {
+			fmt.Println("Dato no valido")
+		}
+
+		// Asigna el nuevo valor al registro
+		*registro = uint32(valor)
 	}
-
-	// Convierte el valor de string a entero
-	valor, err := strconv.Atoi(dato)
-
-	if err != nil {
-		fmt.Println("Dato no valido")
-	}
-
-	// Asigna el nuevo valor al registro
-	*registro = uint8(valor)
 }
 
 // Suma al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
@@ -248,7 +286,86 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 }
 
-// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar. No se hace nada con la respuesta.
+func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
+
+	//--------- REQUEST ---------
+
+	//Creo estructura de request
+	var requestRecurso = structs.RequestRecurso{
+		PidSolicitante: PCB.PID,
+		NombreRecurso:  nombreRecurso,
+	}
+
+	//Convierto request a JSON
+	body, err := json.Marshal(requestRecurso)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body)
+
+	// Decodifica en formato JSON la request.
+	var respWait string
+	err = json.NewDecoder(respuesta.Body).Decode(&respWait)
+	if err != nil {
+		return //? Que va aca?
+	}
+
+	//--------- EJECUTA ---------
+
+	switch respWait {
+	case "OK: Recurso asignado":
+		// Agrega el recurso a la lista de recursos retenidos por el proceso.
+		PCB.Recursos = append(PCB.Recursos, nombreRecurso) //* En base a esta lista se liberaran los recursos al finalizar el proceso
+		return
+
+	case "BLOQUEAR: Recurso no disponible":
+		*cicloFinalizado = true
+		PCB.Estado = "BLOCK"
+		MotivoDeDesalojo = "WAIT"
+		//Bloquea el proceso
+		return
+
+	case "ERROR: Recurso no existe":
+		*cicloFinalizado = true
+		PCB.Estado = "EXIT"
+		MotivoDeDesalojo = "ERROR: Recurso no existe"
+		return
+	}
+
+}
+
+func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
+
+	//Convierto request a JSON
+	body, err := json.Marshal(nombreRecurso)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "signal", body)
+	if respuesta.StatusCode != http.StatusOK {
+
+		*cicloFinalizado = true
+		PCB.Estado = "EXIT"
+		MotivoDeDesalojo = "ERROR: Recurso no existe"
+
+		return
+	}
+
+	// Elimina el recurso liberado de la lista de recursos retenidos por el proceso
+	for i, recurso := range PCB.Recursos {
+		if recurso == nombreRecurso {
+			PCB.Recursos = append(PCB.Recursos[:i], PCB.Recursos[i+1:]...)
+			return
+		}
+	}
+
+}
+
+// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
 func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
 
 	// Convierte el tiempo de trabajo de la unidad de cadena a entero.
@@ -272,8 +389,63 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccion", body)
-	if respuesta == nil {
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+
+}
+
+// Ejemplo de uso: IoStdinRead Int2 EAX AX
+// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
+func IoStdinRead(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32) {
+
+	// Verifica si existe el registro especificado en la instrucción.
+	registroDireccion, encontrado := registroMap32[regDir]
+	if !encontrado {
+		fmt.Println("Registro invalido")
 		return
 	}
+
+	// Verifica si existe el registro especificado en la instrucción.
+	registroTamaño, encontrado := registroMap8[regTamaño]
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	// Creo estructura de request
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:     PID,
+		NombreInterfaz:    nombreInterfaz,
+		Instruccion:       "IO_STDIN_READ",
+		RegistroDireccion: *registroDireccion,
+		RegistroTamaño:    *registroTamaño,
+	}
+
+	// Convierto request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
+
+// func IO_STDOUT_READ(){
+
+// }
+
+// func MOV_IN(){
+
+// }
+
+// func MOV_OUT(){
+
+// }
+
+// func RESIZE(){
+
+// }
+
+// func COPY_STRING(){
+
+// }

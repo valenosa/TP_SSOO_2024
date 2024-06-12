@@ -20,6 +20,9 @@ func main() {
 	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
 	funciones.Bin_hayPCBenREADY = make(chan int, funciones.ConfigJson.Multiprogramming+1)
 
+	// Inicializar recursos
+	funciones.LeerRecursos(funciones.ConfigJson.Resources, funciones.ConfigJson.Resource_Instances)
+
 	// Configura el logger
 	config.Logger("Kernel.log")
 
@@ -38,7 +41,11 @@ func main() {
 
 	//ENTRADA SALIDA
 	http.HandleFunc("POST /interfazConectada", handlerConexionInterfazIO)
-	http.HandleFunc("POST /instruccion", handlerEjecutarInstruccionEnIO)
+	http.HandleFunc("POST /instruccionIO", handlerEjecutarInstruccionEnIO)
+
+	//RECURSOS
+	http.HandleFunc("POST /wait", handlerWait)
+	http.HandleFunc("POST /signal", handlerSignal)
 
 	//Inicio el servidor de Kernel
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -117,7 +124,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println(err) ////! Borrar despues.
+		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -225,10 +232,9 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
 
 	//--------- DEVUELVE ---------
+
 	//Crea una variable tipo Response
 	respuesta, err := json.Marshal(respEstadoProceso)
-
-	// Error Handler de la codificación
 	if err != nil {
 		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -238,6 +244,93 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 	w.Write(respuesta)
+}
+
+//----------------------( RECURSOS )----------------------\\
+
+func handlerWait(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
+	// Almaceno el recurso en una variable
+	var recursoSolicitado structs.RequestRecurso
+	err := json.NewDecoder(r.Body).Decode(&recursoSolicitado)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
+	respAsignaiconRecurso := "OK: Recurso asignado"
+
+	//Busco el recurso solicitado
+	var recurso, find = funciones.MapRecursos[recursoSolicitado.NombreRecurso]
+	if !find {
+		//Si no existe el recurso
+		respAsignaiconRecurso = "ERROR: Recurso no existe"
+	} else {
+
+		//Resto uno al la cantidad de instancias del recurso
+		recurso.Instancias--
+		if recurso.Instancias < 0 {
+
+			//Agrego PID a su lista de bloqueados
+			recurso.ListaBlock = append(recurso.ListaBlock, recursoSolicitado.PidSolicitante)
+
+			respAsignaiconRecurso = "BLOQUEAR: Recurso no disponible"
+		}
+
+	}
+
+	//--------- DEVUELVE ---------
+
+	respuesta, err := json.Marshal(respAsignaiconRecurso)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(respuesta)
+}
+
+func handlerSignal(w http.ResponseWriter, r *http.Request) {
+
+	//--------- RECIBE ---------
+
+	// Almaceno el recurso en una variable
+	var recursoLiberado string
+	err := json.NewDecoder(r.Body).Decode(&recursoLiberado)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//--------- EJECUTA ---------
+
+	var recurso, find = funciones.MapRecursos[recursoLiberado]
+	if !find {
+		//TODO Si no existe el recurso Mandar a EXIT
+		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
+		return
+	}
+
+	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
+	if len(recurso.ListaBlock) != 0 {
+		// Tomo el primer PID de la lista de BLOCK (del recurso)
+		pid := recurso.ListaBlock[0]
+		recurso.ListaBlock = recurso.ListaBlock[1:]
+
+		//Se pasa el proceso a de BOLCK -> READY
+		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
+		pcbDesbloqueado.Estado = "READY"
+		funciones.AdministrarQueues(pcbDesbloqueado)
+	} else {
+		recurso.Instancias++
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 //----------------------( I/O )----------------------\\
@@ -251,39 +344,22 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 	var interfazConectada structs.RequestConectarInterfazIO
 	err := json.NewDecoder(r.Body).Decode(&interfazConectada)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Imprime la solicitud
-	fmt.Println("Request path:", interfazConectada) //! Borrar despues
+	fmt.Println("Interfaz Conectada:", interfazConectada) //! Borrar despues
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
-
-	//go planificarInterfaz()
 }
 
-var Bin_hayInterfaz = make(chan int, 1)
-
-func planificarInterfaz() {
-
-	for {
-		//Espero a que la interfaz tenga elementos en su cola de BLOCK
-		<-Bin_hayInterfaz
-
-	}
-
-}
-
-// TODO: Implementar para los demás tipos de interfaces (cambiar tipos de datos en request y body)
 func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
-	// Se crea una variable para almacenar la instrucción recibida en la solicitud
-	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
+	//--------- RECIBE ---------
 
 	// Se decodifica el cuerpo de la solicitud en formato JSON
+	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 	marshalError := json.NewDecoder(r.Body).Decode(&requestInstruccionIO)
 	if marshalError != nil {
 		fmt.Println(marshalError) //! Borrar despues.
@@ -292,10 +368,14 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Imprime la solicitud
-	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //!Borrar despues
+	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //! Borrar despues
+
+	//--------- EJECUTA ---------
+
+	//--- VALIDA
 
 	// Verifica que la Interfaz este Conectada
-	interfazConectada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
+	interfazSolicitada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
 	if !encontrado {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		fmt.Println("Interfaz no conectada.")
@@ -304,24 +384,17 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Verifica que la instruccion sea compatible con el tipo de interfazConectada
-	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazConectada.TipoInterfaz, requestInstruccionIO.Instruccion)
+	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazSolicitada.TipoInterfaz, requestInstruccionIO.Instruccion)
 	if !laInstruccionEsValida {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		fmt.Println("Interfaz incompatible.")
-		http.Error(w, "Interfaz incompatible.", http.StatusBadRequest)
+		fmt.Println("Instruccion incompatible.")
+		http.Error(w, "Instruccion incompatible.", http.StatusBadRequest)
 		return
 	}
 
-	// Agrega el Proceso a la cola de bloqueados de la interfazConectada
-	interfazConectada.QueueBlock = append(interfazConectada.QueueBlock, requestInstruccionIO.PidDesalojado)
-	//Actualiza la lista de interfaces conectadas
-	funciones.InterfacesConectadas.Set(requestInstruccionIO.NombreInterfaz, interfazConectada)
+	//--- ENVIA A EJECUTAR A IO
 
-	//Bin_hayInterfaz <- 0
-
-	//TODO: ----------------------------------------(ESTO LO HACE EL PLANIFICADOR DE LA INTERFAZ)
-
-	// Manda a ejecutar a la interfaz
+	// Codifica instruccion a ejecutar en JSON
 	body, marshalError := json.Marshal(requestInstruccionIO)
 	if marshalError != nil {
 		fmt.Println(marshalError) //! Borrar despues.
@@ -330,22 +403,23 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
-	respuesta := config.Request(interfazConectada.PuertoInterfaz, "localhost", "POST", requestInstruccionIO.Instruccion, body)
+	query := interfazSolicitada.TipoInterfaz + " /" + requestInstruccionIO.Instruccion
 
-	// Verifica que no hubo error en la request
-	if respuesta == nil {
-		fmt.Println(respuesta) //! Borrar despues.
-		http.Error(w, "Respuesta vacia.", http.StatusInternalServerError)
-		return
-	}
-
-	// Si la interfazConectada pudo ejecutar la instrucción, pasa el Proceso a READY.
-	if respuesta.StatusCode == http.StatusOK {
-		// Pasa el proceso a READY y lo quita de la lista de bloqueados.
+	respuesta := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
+	if respuesta.StatusCode != http.StatusOK {
+		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
+		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
-		pcbDesalojado.Estado = "READY"
-		funciones.AdministrarQueues(pcbDesalojado)
+		funciones.InterfacesConectadas.Delete(requestInstruccionIO.NombreInterfaz)
+		fmt.Println("Interfaz desconectada.")
+		http.Error(w, "Interfaz desconectada.", http.StatusInternalServerError)
 		return
 	}
+
+	//--- VUELVE DE IO
+
+	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
+	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado.Estado = "READY"
+	funciones.AdministrarQueues(pcbDesalojado)
 }

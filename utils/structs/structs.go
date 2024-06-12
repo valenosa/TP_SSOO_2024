@@ -3,7 +3,7 @@ package structs
 // =====================================| PROCESO |========================================================\\
 
 //	Kernel -> Cliente
-//
+
 // Estructura que contiene el path del archivo que se utilizará como base para ejecutar un nuevo proceso y su PID asociado.
 type BodyIniciarProceso struct {
 	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
@@ -24,9 +24,10 @@ type ResponseEstadoProceso struct {
 // CPU, Kernel.
 // Estructura base de un proceso.
 type PCB struct {
-	PID     uint32
-	Quantum uint16
-	Estado  string
+	PID      uint32
+	Quantum  uint16
+	Estado   string
+	Recursos []string
 	RegistrosUsoGeneral
 }
 
@@ -38,10 +39,10 @@ type RegistrosUsoGeneral struct {
 	BX  uint8
 	CX  uint8
 	DX  uint8
-	EAX uint16
-	EBX uint16
-	ECX uint16
-	EDX uint16
+	EAX uint32
+	EBX uint32
+	ECX uint32
+	EDX uint32
 	SI  uint32
 	DI  uint32
 }
@@ -62,13 +63,24 @@ type RespuestaDispatch struct {
 	PCB              PCB
 }
 
+// ====================================| RECURSOS | ====================================\\
+
+type RequestRecurso struct {
+	PidSolicitante uint32
+	NombreRecurso  string
+}
+
+type Recurso struct {
+	Instancias int
+	ListaBlock []uint32
+}
+
 //=====================================| I/O |=====================================\\
 
 // Estructura basica de InterfazIO que se guardara Kernel
 type Interfaz struct {
 	TipoInterfaz   string
 	PuertoInterfaz int
-	QueueBlock     []uint32 //? Necesita mutex?
 }
 
 // Estructura de comunicacion al conectar una interfaz (Contiene su nombre/identificador y lo necesario para validar en Kernel)
@@ -77,10 +89,20 @@ type RequestConectarInterfazIO struct {
 	Interfaz       Interfaz
 }
 
+// TODO: Implementar para DialFS
 // Estructura de comunicacion entre CPU y Kernel para ejecutar una instruccion de I/O
 type RequestEjecutarInstruccionIO struct {
-	PidDesalojado  uint32
-	NombreInterfaz string
-	Instruccion    string
-	UnitWorkTime   int
+	PidDesalojado     uint32
+	NombreInterfaz    string
+	Instruccion       string
+	UnitWorkTime      int
+	RegistroDireccion uint32
+	RegistroTamaño    uint8
+}
+
+// Estructura que comunica Kernel con CPU y CPU con memoria para la instruccion STDIN.
+type RequestInputSTDIN struct {
+	TextoUsuario      string
+	RegistroDireccion uint32
+	//? Tambien deberia estar el pid?
 }
