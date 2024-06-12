@@ -21,7 +21,7 @@ func main() {
 
 	// ======== Make ========
 
-	TLB := make(funciones.TLB) // TLB (Translation Lookaside Buffer).
+	TLB := make(funciones.TLB, funciones.ConfigJson.Number_Felling_tlb) // TLB (Translation Lookaside Buffer).
 	_ = TLB
 
 	// ======== HandleFunctions ========

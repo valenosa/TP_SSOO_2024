@@ -57,30 +57,27 @@ func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
 	tablaDePaginas[pid] = structs.Tabla{}
 }
 
-// TODO: Probar
-func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas *map[uint32]structs.Tabla) string {
-	if len((*tablaDePaginas)[pid]) <= int(pagina) {
+func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Tabla) string {
+	if len(tablaDePaginas[pid]) <= int(pagina) {
 		return ""
 	}
 
-	marco := (*tablaDePaginas)[pid][pagina]
+	marco := tablaDePaginas[pid][pagina]
 
 	marcoStr := strconv.Itoa(marco)
 
 	return marcoStr
 }
 
-// TODO: Probar
 func LiberarMarcos(marcosALiberar []int, bitMap []bool) {
 	for _, marco := range marcosALiberar {
 		bitMap[marco] = false
 	}
 }
 
-// TODO: Probar
 func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool, size uint32) string {
 
-	lenOriginal := len((*tablaDePaginas)[pid])
+	lenOriginal := len((*tablaDePaginas)[pid]) //!
 
 	cantidadDePaginas := int(math.Ceil(float64(size) / float64(ConfigJson.Page_Size)))
 

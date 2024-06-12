@@ -43,7 +43,7 @@ func main() {
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
-	http.HandleFunc("PUT /memoria/marco", handlerObtenerMarco(&tablasDePaginas))
+	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
 
 	//inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -137,7 +137,7 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 }
 
 // TODO: Probar
-func handlerObtenerMarco(tablaDePaginas *map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
+func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -188,14 +188,7 @@ func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func
 
 		estado := funciones.ReasignarPaginas(uint32(pid), tablaDePaginas, bitMap, uint32(size))
 
-		respuesta, err := json.Marshal(estado)
-
-		if err != nil {
-			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-			return
-		}
-
 		w.WriteHeader(http.StatusOK)
-		w.Write(respuesta)
+		w.Write([]byte(estado))
 	}
 }

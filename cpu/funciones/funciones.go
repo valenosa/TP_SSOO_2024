@@ -32,10 +32,11 @@ var MotivoDeDesalojo string
 
 // TLB
 // Estructura de la TLB.
-// ? La página es el key, y el valor es un struct con el marco y el pid.
-type TLB map[uint32]struct {
-	Marco uint32
-	Pid   uint32
+// ? El pid es el key, y el valor es otro map
+type TLB []struct {
+	Pid    uint32
+	Pagina uint32
+	Marco  uint32
 }
 
 // Valida si el TLBA está lleno.
@@ -44,9 +45,16 @@ func (tlb TLB) Full() bool {
 }
 
 // Hit or miss? I guess they never miss, huh?
-func (tlb TLB) Hit(pagina uint32) (uint32, bool) {
-	strct, encontrado := tlb[pagina]
-	return strct.Marco, encontrado
+func (tlb TLB) Hit(pid uint32, pagina uint32) (uint32, bool) {
+
+	// Itera sobre la TLB
+	for _, entrada := range tlb {
+		if entrada.Pid == pid && entrada.Pagina == pagina {
+			return entrada.Marco, true
+		}
+	}
+
+	return 0, false
 }
 
 // ----------------------( MMU )----------------------\\
@@ -58,7 +66,7 @@ func TraduccionMMU(pid uint32, direccionLogica int, tlb TLB) (uint32, bool) {
 	numeroDePagina, desplazamiento := ObtenerPaginayDesplazamiento(direccionLogica)
 
 	// Obtiene el marco de la página
-	marco, encontrado := ObtenerMarco(PidEnEjecucion, uint32(numeroDePagina), tlb)
+	marco, encontrado := ObtenerMarco(PidEnEjecucion, uint32(numeroDePagina), &tlb)
 
 	// Si no se encontró el marco, se devuelve un error
 	if !encontrado {
@@ -84,26 +92,55 @@ func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
 
 // TODO: probar
 // obtiene el marco de la pagina
-func ObtenerMarco(pid uint32, pagina uint32, tlb TLB) (uint32, bool) {
+func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB) (uint32, bool) {
 
 	// Busca en la TLB
-	marco, encontrado := buscarEnTLB(pagina, tlb)
+	marco, encontrado := buscarEnTLB(pagina, pid, *tlb)
 
-	// Si no está en la TLB, busca en la tabla de páginas
+	// Si no está en la TLB, busca en la tabla de páginas y de paso lo agrega
 	if !encontrado {
 		marco, encontrado = buscarEnMemoria(pid, pagina)
 
 		//TODO: agregarTLB(pagina, marco, pid, tlb)
 		//TODO: manejar caso en donde la TLB no pueda agregar marco (no existe marco en memoria)
+		agregarEnTLB(pagina, marco, pid, tlb)
 	}
+
+	//!Manejar tema TLBEANO
 
 	//? Existe la posibilidad de que un marco no sea hallado
 	return marco, encontrado
 }
 
-func buscarEnTLB(pagina uint32, tlb TLB) (uint32, bool) {
-	marco, encontrado := tlb.Hit(pagina)
+func buscarEnTLB(pid uint32, pagina uint32, tlb TLB) (uint32, bool) {
+	marco, encontrado := tlb.Hit(pid, pagina)
 	return marco, encontrado
+}
+
+func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB) {
+	if tlb.Full() {
+
+		//TODO: Reemplazar marco
+		//TODO: Eliminar marco
+		planificarTLB(pid, pagina, marco, tlb)
+	} else {
+		//agregar marco al TLB
+		*tlb = append(*tlb, struct {
+			Pid    uint32
+			Pagina uint32
+			Marco  uint32
+		}{Pid: pid, Pagina: pagina, Marco: marco})
+	}
+}
+
+func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB) {
+	switch ConfigJson.Algorithm_tlb {
+	//TODO: Implementar algoritmos de reemplazo
+	case "FIFO":
+
+	case "LRU":
+
+	}
 }
 
 func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
@@ -113,7 +150,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	url := fmt.Sprintf("http://%s:%d/memoria/marco", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
 
 	// Crea una nueva solicitud PUT
-	req, err := http.NewRequest("PUT", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Println(err) //! Borrar despues.
 		return 0, false
@@ -140,18 +177,14 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 		return 0, false
 	}
 
-	// Crea un string para almacenar el marco.
-	var marco string
-
-	// Decodifica en formato JSON la request.
-	err = json.NewDecoder(respuesta.Body).Decode(&marco)
+	// Lee el cuerpo de la respuesta
+	marco, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
 		return 0, false
 	}
 
 	// Convierte el valor de la instrucción a un uint64 bits.
-	valorInt64, err := strconv.ParseUint(marco, 10, 32)
+	valorInt64, err := strconv.ParseUint(string(marco), 10, 32)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return 0, false
@@ -270,7 +303,14 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		Jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "RESIZE":
-		resize(variable[1])
+		estado := resize(variable[1])
+		//!Pasar a exit
+		if estado == "OUT OF MEMORY" {
+			*cicloFinalizado = true
+			PCB.Estado = "EXIT"
+			MotivoDeDesalojo = estado //TODO: Manejar en kernel
+			return
+		}
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
@@ -411,7 +451,7 @@ func resize(tamañoEnBytes string) string {
 	url := fmt.Sprintf("http://%s:%d/memoria/resize", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
 
 	// Crea una nueva solicitud GET
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("PUT", url, nil)
 	if err != nil {
 		return ""
 	}
