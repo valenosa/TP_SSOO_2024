@@ -351,11 +351,11 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "WAIT":
 		wait(variable[1], PCB, cicloFinalizado) //! Estoy cambiando estados desde adentro de la funcion, esta bien o solo debo hacerlo desde aca?
-    return //! Verificar si sin esto devuelve el PC incrementado en uno más de lo que debería 
+		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "SIGNAL":
 		signal(variable[1], PCB, cicloFinalizado)
-    return //! Verificar si sin esto devuelve el PC incrementado en uno más de lo que debería
+		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
@@ -550,7 +550,6 @@ func resize(tamañoEnBytes string) string {
 	return string(bodyBytes)
 }
 
-
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	//--------- REQUEST ---------
@@ -627,6 +626,7 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 			return
 		}
 	}
+}
 
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
 func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
