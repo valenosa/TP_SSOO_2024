@@ -237,7 +237,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
 
 // Ejecuta un ciclo de instruccion.
-func EjecutarCiclosDeInstruccion(PCB *structs.PCB) {
+func EjecutarCiclosDeInstruccion(PCB *structs.PCB, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	var cicloFinalizado bool = false
 
 	// Itera el ciclo de instrucción si hay instrucciones a ejecutar y no hay interrupciones.
@@ -246,7 +246,7 @@ func EjecutarCiclosDeInstruccion(PCB *structs.PCB) {
 		instruccion := Fetch(PCB.PID, RegistrosCPU.PC)
 
 		// Decodifica y ejecuta la instrucción.
-		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado)
+		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado, TLB, prioridadesTLB)
 	}
 	HayInterrupcion = false // Resetea la interrupción
 
@@ -302,7 +302,7 @@ func Fetch(PID uint32, PC uint32) string {
 }
 
 // Ejecuta las instrucciones traidas de memoria.
-func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
+func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
 
 	// Mapa de registros para acceder a los registros de la CPU por nombre
 	var registrosMap8 = map[string]*uint8{
@@ -365,7 +365,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		go IoStdinRead(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID)
+		go IoStdinRead(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB)
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -656,9 +656,15 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 }
 
-// Ejemplo de uso: IoStdinRead Int2 EAX AX
-// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
-func IoStdinRead(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32) {
+func IoStdinRead(
+	nombreInterfaz string,
+	regDir string,
+	regTamaño string,
+	registroMap8 map[string]*uint8,
+	registroMap32 map[string]*uint32,
+	PID uint32,
+	tlb *TLB,
+	prioridadesTLB *[]ElementoPrioridad) {
 
 	// Verifica si existe el registro especificado en la instrucción.
 	registroDireccion, encontrado := registroMap32[regDir]
@@ -674,7 +680,17 @@ func IoStdinRead(nombreInterfaz string, regDir string, regTamaño string, regist
 		return
 	}
 
-	// Creo estructura de request
+	//Traduce dirección lógica a física
+	registroDireccionFisica, encontrado := TraduccionMMU(PID, int(*registroDireccion), tlb, prioridadesTLB)
+	if !encontrado {
+		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		return
+	}
+
+	//Le asigna el valor de la dirección física al registroDireccion.
+	*registroDireccion = registroDireccionFisica
+
+	//Crea una variable que contiene el cuerpo de la request.
 	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
 		PidDesalojado:     PID,
 		NombreInterfaz:    nombreInterfaz,
@@ -683,7 +699,7 @@ func IoStdinRead(nombreInterfaz string, regDir string, regTamaño string, regist
 		RegistroTamaño:    *registroTamaño,
 	}
 
-	// Convierto request a JSON
+	// Convierte request a JSON
 	body, err := json.Marshal(requestEjecutarInstuccion)
 	if err != nil {
 		return

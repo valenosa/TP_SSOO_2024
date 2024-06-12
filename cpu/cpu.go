@@ -28,7 +28,7 @@ func main() {
 
 	// ======== HandleFunctions ========
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
-	http.HandleFunc("POST /exec", handlerEjecutarProceso)
+	http.HandleFunc("POST /exec", handlerEjecutarProceso(&TLB, &prioridadTLB))
 	http.HandleFunc("POST /interrupciones", handlerInterrupcion)
 
 	// Extrae info de config.json
@@ -42,43 +42,47 @@ func main() {
 
 // Maneja la ejecución de un proceso a través de un PCB
 // Devuelve a dispatch el contexto de ejecución y el motivo del desalojo.
-func handlerEjecutarProceso(w http.ResponseWriter, r *http.Request) {
-	// Crea una variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
-	var pcbRecibido structs.PCB
+func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.ElementoPrioridad) func(http.ResponseWriter, *http.Request) {
 
-	// Decodifica el request (codificado en formato JSON)
-	err := json.NewDecoder(r.Body).Decode(&pcbRecibido)
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	// Error Handler de la decodificación
-	if err != nil {
-		fmt.Println(err) //! Borrar despues.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		// Crea una variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
+		var pcbRecibido structs.PCB
+
+		// Decodifica el request (codificado en formato JSON)
+		err := json.NewDecoder(r.Body).Decode(&pcbRecibido)
+
+		// Error Handler de la decodificación
+		if err != nil {
+			fmt.Println(err) //! Borrar despues.
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
+
+		funciones.PidEnEjecucion = pcbRecibido.PID
+
+		// Ejecuta el ciclo de instrucción.
+		funciones.RegistrosCPU = pcbRecibido.RegistrosUsoGeneral
+		funciones.EjecutarCiclosDeInstruccion(&pcbRecibido, TLB, prioridadesTLB)
+
+		// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
+		respuesta, err := json.Marshal(structs.RespuestaDispatch{
+			MotivoDeDesalojo: funciones.MotivoDeDesalojo,
+			PCB:              pcbRecibido,
+		})
+
+		// Error Handler de la codificación
+		if err != nil {
+			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+			return
+		}
+
+		// Envía respuesta (con estatus como header) al cliente
+		w.WriteHeader(http.StatusOK)
+		w.Write(respuesta)
 	}
-
-	fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
-
-	funciones.PidEnEjecucion = pcbRecibido.PID
-
-	// Ejecuta el ciclo de instrucción.
-	funciones.RegistrosCPU = pcbRecibido.RegistrosUsoGeneral
-	funciones.EjecutarCiclosDeInstruccion(&pcbRecibido)
-
-	// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
-	respuesta, err := json.Marshal(structs.RespuestaDispatch{
-		MotivoDeDesalojo: funciones.MotivoDeDesalojo,
-		PCB:              pcbRecibido,
-	})
-
-	// Error Handler de la codificación
-	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// Envía respuesta (con estatus como header) al cliente
-	w.WriteHeader(http.StatusOK)
-	w.Write(respuesta)
 }
 
 // Checkea que Kernel no haya enviado interrupciones

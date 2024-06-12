@@ -157,7 +157,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía la request a memoria
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/NOSEELENDPOINT", body) // TODO: Cambiar endpoint de la request a memoria
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/stdin", body) // TODO: Cambiar endpoint de la request a memoria
 	if respuesta == nil {
 		return
 	}

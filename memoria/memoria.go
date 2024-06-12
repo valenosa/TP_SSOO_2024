@@ -44,8 +44,9 @@ func main() {
 	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
 	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
+	//TODO: Crear handleFunc para guardar el valor en la dirección recibida por la I/O STDIN.
 
-	//inicio el servidor de Memoria
+	// Inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
 }
 
