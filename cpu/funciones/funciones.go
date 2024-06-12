@@ -30,14 +30,15 @@ var MotivoDeDesalojo string
 
 // ----------------------( TLB )----------------------\\
 
+type pid = uint32
+type pagina = uint32
+type marco = uint32
+
+type TLB map[pid]map[pagina]marco
+
 // TLB
 // Estructura de la TLB.
 // ? El pid es el key, y el valor es otro map
-type TLB []struct {
-	Pid    uint32
-	Pagina uint32
-	Marco  uint32
-}
 
 // Valida si el TLBA está lleno.
 func (tlb TLB) Full() bool {
@@ -46,27 +47,26 @@ func (tlb TLB) Full() bool {
 
 // Hit or miss? I guess they never miss, huh?
 func (tlb TLB) Hit(pid uint32, pagina uint32) (uint32, bool) {
+	marco, encontrado := tlb[pid][pagina]
+	return marco, encontrado
+}
 
-	// Itera sobre la TLB
-	for _, entrada := range tlb {
-		if entrada.Pid == pid && entrada.Pagina == pagina {
-			return entrada.Marco, true
-		}
-	}
-
-	return 0, false
+type ElementoPrioridad struct {
+	Pid    uint32
+	Pagina uint32
 }
 
 // ----------------------( MMU )----------------------\\
 
 // TODO: Probar
-func TraduccionMMU(pid uint32, direccionLogica int, tlb TLB) (uint32, bool) {
+// Recibe una direccion lógica, devuelve una física y maneja el TLB
+func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
 
 	// Obtiene la página y el desplazamiento de la dirección lógica
 	numeroDePagina, desplazamiento := ObtenerPaginayDesplazamiento(direccionLogica)
 
 	// Obtiene el marco de la página
-	marco, encontrado := ObtenerMarco(PidEnEjecucion, uint32(numeroDePagina), &tlb)
+	marco, encontrado := ObtenerMarco(PidEnEjecucion, uint32(numeroDePagina), tlb, prioridadesTLB)
 
 	// Si no se encontró el marco, se devuelve un error
 	if !encontrado {
@@ -92,18 +92,17 @@ func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
 
 // TODO: probar
 // obtiene el marco de la pagina
-func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB) (uint32, bool) {
+func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
 
 	// Busca en la TLB
-	marco, encontrado := buscarEnTLB(pagina, pid, *tlb)
+	marco, encontrado := (*tlb).Hit(pagina, pid)
 
 	// Si no está en la TLB, busca en la tabla de páginas y de paso lo agrega
 	if !encontrado {
 		marco, encontrado = buscarEnMemoria(pid, pagina)
 
-		//TODO: agregarTLB(pagina, marco, pid, tlb)
 		//TODO: manejar caso en donde la TLB no pueda agregar marco (no existe marco en memoria)
-		agregarEnTLB(pagina, marco, pid, tlb)
+		agregarEnTLB(pagina, marco, pid, tlb, prioridadesTLB)
 	}
 
 	//!Manejar tema TLBEANO
@@ -112,34 +111,72 @@ func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB) (uint32, bool) {
 	return marco, encontrado
 }
 
-func buscarEnTLB(pid uint32, pagina uint32, tlb TLB) (uint32, bool) {
-	marco, encontrado := tlb.Hit(pid, pagina)
-	return marco, encontrado
-}
-
-func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB) {
+func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	if tlb.Full() {
 
 		//TODO: Reemplazar marco
 		//TODO: Eliminar marco
-		planificarTLB(pid, pagina, marco, tlb)
+		planificarTLB(pid, pagina, marco, tlb, prioridadesTLB)
 	} else {
-		//agregar marco al TLB
-		*tlb = append(*tlb, struct {
-			Pid    uint32
-			Pagina uint32
-			Marco  uint32
-		}{Pid: pid, Pagina: pagina, Marco: marco})
+		// agregar marco al TLB
+		(*tlb)[pid][pagina] = marco
+		// agregar a la lista de prioridades
+		(*tlb)[pid][pagina] = marco
+		(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
 	}
 }
 
-func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB) {
+func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	switch ConfigJson.Algorithm_tlb {
-	//TODO: Implementar algoritmos de reemplazo
+
 	case "FIFO":
 
-	case "LRU":
+		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
 
+	case "LRU": //?
+		algoritmoLru(pid, pagina, marco, tlb, prioridadesTLB)
+	}
+}
+
+func algoritmoFifo(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+	_, paginaEncontrada := (*tlb)[pid][pagina]
+
+	if !paginaEncontrada {
+		// Elimina el primer elemento de la lista de prioridades
+		delete((*tlb)[pid], (*prioridadesTLB)[0].Pagina)
+		(*prioridadesTLB) = (*prioridadesTLB)[1:]
+
+		// Agrega el marco a la TLB
+		(*tlb)[pid][pagina] = marco
+		(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
+
+	} else {
+
+		(*tlb)[pid][pagina] = marco
+	}
+}
+
+func algoritmoLru(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+	encontrado := false
+	for posicion, entrada := range *prioridadesTLB {
+		//si encuentro un elemento con el mismo pid y pagina
+		if entrada.Pid == pid && entrada.Pagina == pagina {
+
+			//Se elimina el elemento en la lista de prioridades
+			(*prioridadesTLB) = append((*prioridadesTLB)[:posicion], (*prioridadesTLB)[posicion+1:]...)
+
+			//Lo paso al final
+			(*prioridadesTLB) = append((*prioridadesTLB), entrada)
+
+			//Cambio el marco de la página en el TLB
+			(*tlb)[pid][pagina] = marco
+
+			encontrado = true
+			break
+		}
+	}
+	if !encontrado {
+		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
 	}
 }
 

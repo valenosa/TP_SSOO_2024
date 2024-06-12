@@ -21,8 +21,10 @@ func main() {
 
 	// ======== Make ========
 
-	TLB := make(funciones.TLB, funciones.ConfigJson.Number_Felling_tlb) // TLB (Translation Lookaside Buffer).
+	TLB := make(funciones.TLB)                                                                   // TLB (Translation Lookaside Buffer).
+	prioridadTLB := make([]funciones.ElementoPrioridad, funciones.ConfigJson.Number_Felling_tlb) // Prioridad de la TLB (para el algoritmo de reemplazo de páginas
 	_ = TLB
+	_ = prioridadTLB
 
 	// ======== HandleFunctions ========
 	// Se establece el handler que se utilizará para las diversas situaciones recibidas por el server
