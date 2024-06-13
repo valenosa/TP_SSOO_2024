@@ -44,7 +44,8 @@ func main() {
 	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
 	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
-	//TODO: Crear handleFunc para guardar el valor en la dirección recibida por la I/O STDIN.
+	http.HandleFunc("PUT /movin", handlerMovIn(espacioUsuario))
+
 
 	// Inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -149,6 +150,7 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 
 		// Maneja error en caso de que no se pueda parsear el query
 		if errPid != nil || errPagina != nil {
+			http.Error(w, "Error al parsear las query params", http.StatusInternalServerError)
 			return
 		}
 
@@ -171,6 +173,30 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 
 		// Envía la respuesta al MMU
 		w.Write(respuesta)
+	}
+}
+
+// TODO: Probar
+func handlerMovIn(espacioUsuario []byte) func(http.ResponseWriter, *http.Request) {
+
+	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		//Obtengo los query params
+		queryParams := r.URL.Query()
+		direccionFisica, errDF := strconv.ParseUint(queryParams.Get("dir"), 10, 32)
+		tamanioRegistro, errReg := strconv.ParseUint(queryParams.Get("size"), 10, 32)
+
+		// Maneja error en caso de que no se pueda parsear el query
+		if errDF != nil || errReg != nil {
+			http.Error(w, "Error al parsear las query params", http.StatusInternalServerError)
+			return
+		}
+
+		registroLeido := funciones.LeerEnMemoria(direccionFisica, tamanioRegistro, espacioUsuario)
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(registroLeido))
 	}
 }
 
