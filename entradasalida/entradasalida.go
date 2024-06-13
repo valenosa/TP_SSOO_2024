@@ -217,7 +217,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	inputTruncado = inputTruncado[0:instruccionIO.RegistroTamaño]
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
-	fmt.Print(inputTruncado) //* No borrar, es parte de STDOUT.
+	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.
 
 	//--------- RESPUESTA ---------
 	// Envía el status al Kernel
