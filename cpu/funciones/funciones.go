@@ -247,7 +247,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
 
 // Ejecuta un ciclo de instruccion.
-func EjecutarCiclosDeInstruccion(PCB *structs.PCB) {
+func EjecutarCiclosDeInstruccion(PCB *structs.PCB, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	var cicloFinalizado bool = false
 
 	// Itera el ciclo de instrucción si hay instrucciones a ejecutar y no hay interrupciones.
@@ -256,7 +256,7 @@ func EjecutarCiclosDeInstruccion(PCB *structs.PCB) {
 		instruccion := Fetch(PCB.PID, RegistrosCPU.PC)
 
 		// Decodifica y ejecuta la instrucción.
-		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado)
+		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado, TLB, prioridadesTLB)
 	}
 	HayInterrupcion = false // Resetea la interrupción
 
@@ -312,7 +312,7 @@ func Fetch(PID uint32, PC uint32) string {
 }
 
 // Ejecuta las instrucciones traidas de memoria.
-func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool) {
+func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
 
 	// Mapa de registros para acceder a los registros de la CPU por nombre
 	var registrosMap8 = map[string]*uint8{
@@ -383,7 +383,13 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		go ioStdinRead(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID)
+		go IoSTDINread(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB)
+
+	case "IO_STDOUT_WRITE":
+		*cicloFinalizado = true
+		PCB.Estado = "BLOCK"
+		go ioSTDINwrite(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB) //TODO: IN -> OUT
+
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -645,7 +651,7 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 		return
 	}
 
-	// Envía la solicitud de ejecucion a Kernel
+	// Envía la solicitud de ejecución a Kernel
 	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body)
 
 	// Decodifica en formato JSON la request.
@@ -734,9 +740,73 @@ func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 }
 
-// Ejemplo de uso: ioStdinRead Int2 EAX AX
-// Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
-func ioStdinRead(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32) {
+func IoSTDINread(
+	nombreInterfaz string,
+	regDir string,
+	regTamaño string,
+	registroMap8 map[string]*uint8,
+	registroMap32 map[string]*uint32,
+	PID uint32,
+	tlb *TLB,
+	prioridadesTLB *[]ElementoPrioridad) {
+
+	// Verifica si existe el registro especificado en la instrucción.
+  registroDireccion, encontrado := registroMap32[regDir] //TODO: Adaptar para los dos tipos de registro
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	// Verifica si existe el registro especificado en la instrucción.
+	registroTamaño, encontrado := registroMap8[regTamaño] //TODO: Adaptar para los dos tipos de registro
+	if !encontrado {
+		fmt.Println("Registro invalido")
+		return
+	}
+
+	//Traduce dirección lógica a física
+	registroDireccionFisica, encontrado := TraduccionMMU(PID, int(*registroDireccion), tlb, prioridadesTLB)
+	if !encontrado {
+		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		return
+	}
+
+	//Le asigna el valor de la dirección física al registroDireccion.
+	*registroDireccion = registroDireccionFisica
+
+	//Crea una variable que contiene el cuerpo de la request.
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:     PID,
+		NombreInterfaz:    nombreInterfaz,
+		Instruccion:       "IO_STDIN_READ",
+		RegistroDireccion: *registroDireccion,
+		RegistroTamaño:    *registroTamaño,
+	}
+
+	// Convierte request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+}
+
+/*
+IO_STDOUT_WRITE (Interfaz, Registro Dirección, Registro Tamaño):
+Esta instrucción solicita al Kernel que mediante la interfaz seleccionada,
+se lea desde la posición de memoria indicada por la Dirección Lógica almacenada en el Registro Dirección,
+un tamaño indicado por el Registro Tamaño y se imprima por pantalla.
+*/
+func ioSTDINwrite(nombreInterfaz string,
+	regDir string,
+	regTamaño string,
+	registroMap8 map[string]*uint8,
+	registroMap32 map[string]*uint32,
+	PID uint32,
+	tlb *TLB,
+	prioridadesTLB *[]ElementoPrioridad) {
 
 	// Verifica si existe el registro especificado en la instrucción.
 	registroDireccion, encontrado := registroMap32[regDir]
@@ -752,28 +822,34 @@ func ioStdinRead(nombreInterfaz string, regDir string, regTamaño string, regist
 		return
 	}
 
-	// Creo estructura de request
+	//Traduce dirección lógica a física
+	registroDireccionFisica, encontrado := TraduccionMMU(PID, int(*registroDireccion), tlb, prioridadesTLB)
+	if !encontrado {
+		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		return
+	}
+
+	//Le asigna el valor de la dirección física al registroDireccion.
+	*registroDireccion = registroDireccionFisica
+
+	//Crea una variable que contiene el cuerpo de la request.
 	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
 		PidDesalojado:     PID,
 		NombreInterfaz:    nombreInterfaz,
-		Instruccion:       "IO_STDIN_READ",
+		Instruccion:       "IO_STDOUT_WRITE",
 		RegistroDireccion: *registroDireccion,
 		RegistroTamaño:    *registroTamaño,
 	}
 
-	// Convierto request a JSON
+	// Convierte request a JSON
 	body, err := json.Marshal(requestEjecutarInstuccion)
 	if err != nil {
 		return
 	}
 
-	// Envía la solicitud de ejecucion a Kernel
+	// Envía la solicitud de ejecución a Kernel
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
-
-// func IO_STDOUT_READ(){
-
-// }
 
 // func MOV_IN(){
 

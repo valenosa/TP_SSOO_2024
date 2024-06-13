@@ -66,7 +66,8 @@ func conectarInterfazIO(nombre string) {
 func iniciarServidorInterfaz() error {
 
 	http.HandleFunc("POST /GENERICA /IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
-	http.HandleFunc("POST /STDIN /IO_STDIN_READ", handlerIO_STDIN_READ)
+	http.HandleFunc("POST /STDIN/IO_STDIN_READ", handlerIO_STDIN_READ)
+	http.HandleFunc("POST /STDIN/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -157,7 +158,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía la request a memoria
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/NOSEELENDPOINT", body) // TODO: Cambiar endpoint de la request a memoria
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/stdin", body) // TODO: Cambiar endpoint de la request a memoria
 	if respuesta == nil {
 		return
 	}
@@ -168,4 +169,58 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	mx_interfaz.Unlock()
 
+}
+
+/*
+IO_STDOUT_WRITE (Interfaz, Registro Dirección, Registro Tamaño):
+Esta instrucción solicita al Kernel que mediante la interfaz seleccionada,
+se lea desde la posición de memoria indicada por la Dirección Lógica almacenada en el Registro Dirección,
+un tamaño indicado por el Registro Tamaño y se imprima por pantalla.
+*/
+func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
+	mx_interfaz.Lock()
+
+	//--------- RECIBE ---------
+	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	// Decodifica el request (codificado en formato json)
+	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+	if err != nil {
+		fmt.Println(err) //! Borrar despues.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//--------- REQUEST A MEMORIA ---------
+
+	body, err := json.Marshal(instruccionIO.RegistroDireccion)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Envía la request a memoria
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/stdout", body) // TODO: Cambiar endpoint de la request a memoria
+	if respuesta == nil {
+		return
+	}
+
+	//--------- EJECUTA ---------
+	var inputTruncado string
+	err = json.NewDecoder(respuesta.Body).Decode(&inputTruncado)
+	if err != nil {
+		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Recorta la longitud del input en base al registroTamaño
+	inputTruncado = inputTruncado[0:instruccionIO.RegistroTamaño]
+
+	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
+	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.
+
+	//--------- RESPUESTA ---------
+	// Envía el status al Kernel
+	w.WriteHeader(http.StatusOK)
+	mx_interfaz.Unlock()
 }

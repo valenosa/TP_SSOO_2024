@@ -46,7 +46,8 @@ func main() {
 	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
 	http.HandleFunc("PUT /movin", handlerMovIn(espacioUsuario))
 
-	//inicio el servidor de Memoria
+
+	// Inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
 }
 
