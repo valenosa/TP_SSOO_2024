@@ -127,3 +127,31 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 
 	return "OK" //?
 }
+
+// TODO: Probar
+func LeerEnMemoria(direccionFisica uint64, tamanioRegistro uint64, espacioUsuario []byte) string {
+
+	// Checkea si recibe orden de lectura en 4 bytes o en 1.
+	if tamanioRegistro > 1 {
+
+		// Lee los 4 bytes contiguos desde la dirección física.
+		datos := (espacioUsuario)[direccionFisica : direccionFisica+4]
+
+		// Convierte los bytes a una cadena.
+		datosStr := string(datos)
+
+		// Devuelve el dato como una cadena.
+		return datosStr
+
+	} else {
+
+		// Luego, lee el dato desde la dirección física.
+		dato := (espacioUsuario)[direccionFisica]
+
+		datosStr := string(dato)
+
+		// Devuelve el dato como una cadena.
+		return datosStr
+	}
+
+}

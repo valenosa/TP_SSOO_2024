@@ -34,15 +34,25 @@ type pid = uint32
 type pagina = uint32
 type marco = uint32
 
-type TLB map[pid]map[pagina]marco
-
 // TLB
 // Estructura de la TLB.
 // ? El pid es el key, y el valor es otro map
+type TLB map[pid]map[pagina]marco
+
+func (tlb TLB) longitudTLB() int {
+
+	sumatoria := 0
+
+	for _, entradas := range tlb {
+		sumatoria = sumatoria + len(entradas)
+	}
+
+	return sumatoria
+}
 
 // Valida si el TLBA está lleno.
 func (tlb TLB) Full() bool {
-	return len(tlb) == ConfigJson.Number_Felling_tlb
+	return tlb.longitudTLB() >= ConfigJson.Number_Felling_tlb
 }
 
 // Hit or miss? I guess they never miss, huh?
@@ -143,7 +153,7 @@ func algoritmoFifo(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridade
 
 	if !paginaEncontrada {
 		// Elimina el primer elemento de la lista de prioridades
-		delete((*tlb)[pid], (*prioridadesTLB)[0].Pagina)
+		delete((*tlb)[(*prioridadesTLB)[0].Pid], (*prioridadesTLB)[0].Pagina)
 		(*prioridadesTLB) = (*prioridadesTLB)[1:]
 
 		// Agrega el marco a la TLB
@@ -328,16 +338,24 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	// Switch para determinar la operación a realizar según la instrucción
 	switch variable[0] {
 	case "SET":
-		Set(variable[1], variable[2], registrosMap8, registrosMap32, PC)
+		set(variable[1], variable[2], registrosMap8, registrosMap32, PC)
 
 	case "SUM":
-		Sum(variable[1], variable[2], registrosMap8)
+		sum(variable[1], variable[2], registrosMap8)
 
 	case "SUB":
-		Sub(variable[1], variable[2], registrosMap8)
+		sub(variable[1], variable[2], registrosMap8)
 
 	case "JNZ":
-		Jnz(variable[1], variable[2], PC, registrosMap8)
+		jnz(variable[1], variable[2], PC, registrosMap8)
+
+	case "MOV_IN":
+		movIN(variable[1], variable[2], registrosMap8, registrosMap32)
+		//TODO: logueano
+
+	case "MOV_OUT":
+		movOUT(variable[1], variable[2], registrosMap8, registrosMap32)
+		//TODO: logueano
 
 	case "RESIZE":
 		estado := resize(variable[1])
@@ -360,12 +378,12 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		go IoGenSleep(variable[1], variable[2], registrosMap8, PCB.PID)
+		go ioGenSleep(variable[1], variable[2], registrosMap8, PCB.PID)
 
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
-		go IoStdinRead(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID)
+		go ioStdinRead(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID)
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -383,8 +401,9 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 //----------------------( FUNCIONES DE INSTRUCCIONES )----------------------\\
 
+// TODO: Manejar registros grandes
 // Asigna al registro el valor pasado como parámetro.
-func Set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PC *uint32) {
+func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PC *uint32) {
 
 	// Verifica si el registro a asignar es el PC
 	if reg == "PC" {
@@ -440,7 +459,7 @@ func Set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 }
 
 // Suma al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
-func Sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
+func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
 
 	// Verifica si existen los registros especificados en la instrucción.
 	registro1, encontrado := registroMap[reg1]
@@ -460,7 +479,7 @@ func Sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
 }
 
 // Resta al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
-func Sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
+func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
 
 	// Verifica si existen los registros especificados en la instrucción.
 	registro1, encontrado := registroMap[reg1]
@@ -480,7 +499,7 @@ func Sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
 }
 
 // Si el valor del registro es distinto de cero, actualiza el PC al numero de instruccion pasada por parametro.
-func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
+func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 
 	// Verifica si existe el registro especificado en la instrucción.
 	registro, encontrado := registroMap[reg]
@@ -505,7 +524,6 @@ func Jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	}
 }
 
-// TODO: Probar
 func resize(tamañoEnBytes string) string {
 	// Convierte el PID y el PC a string
 	pid := strconv.FormatUint(uint64(PidEnEjecucion), 10)
@@ -526,9 +544,6 @@ func resize(tamañoEnBytes string) string {
 	q.Add("size", tamañoEnBytes)
 	req.URL.RawQuery = q.Encode()
 
-	// Establece el tipo de contenido de la solicitud
-	req.Header.Set("Content-Type", "text/plain")
-
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
 	if err != nil {
@@ -548,6 +563,70 @@ func resize(tamañoEnBytes string) string {
 
 	// Retorna las instrucciones obtenidas como una cadena de texto
 	return string(bodyBytes)
+}
+
+// mandame
+// 1 caractrer w/r
+// Direccion Fisica
+// Info a Leer/escribir
+func movIN(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
+
+	var direccionFisica uint32
+	var encontrado bool
+	var longitud string
+
+	if registroDireccion == "AX" || registroDireccion == "AB" || registroDireccion == "CX" || registroDireccion == "DX" {
+		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, *(registrosMap32[registroDireccion]), &TLB, &prioridadesTLB) //TODO: Pasarle la tlb y la lista de prioridades a la funcion cuando mergeemos con lo de DB
+	} else {
+		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, *(registrosMap32[registroDireccion]), &TLB, &prioridadesTLB)
+	}
+
+	if !encontrado {
+		fmt.Println("Error: Page Fault")
+		return //?Es correcto esto?
+
+	}
+
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/movin", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud GET
+	req, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return ""
+	}
+
+	//Parsea la direccion física de uint32 a string.
+	direccionFisicaStr := strconv.FormatUint(uint64(direccionFisica), 10)
+
+	// Agrega el PID y el PC como params
+	q := req.URL.Query()
+	q.Add("dir", direccionFisicaStr)
+	q.Add("size", longitud)
+	req.URL.RawQuery = q.Encode()
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		return ""
+	}
+
+	// Verifica el código de estado de la respuesta
+	if respuesta.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	// Lee el cuerpo de la respuesta
+	data, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return ""
+	}
+
+}
+
+func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
+
 }
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
@@ -597,7 +676,6 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 		MotivoDeDesalojo = "ERROR: Recurso no existe"
 		return
 	}
-
 }
 
 func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
@@ -629,7 +707,7 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 }
 
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
-func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
+func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
 
 	// Convierte el tiempo de trabajo de la unidad de cadena a entero.
 	unitWorkTime, err := strconv.Atoi(unitWorkTimeString)
@@ -656,9 +734,9 @@ func IoGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 }
 
-// Ejemplo de uso: IoStdinRead Int2 EAX AX
+// Ejemplo de uso: ioStdinRead Int2 EAX AX
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
-func IoStdinRead(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32) {
+func ioStdinRead(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32) {
 
 	// Verifica si existe el registro especificado en la instrucción.
 	registroDireccion, encontrado := registroMap32[regDir]
