@@ -350,11 +350,11 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "MOV_IN":
-		movIN(variable[1], variable[2], registrosMap8, registrosMap32)
+		//movIN(variable[1], variable[2], registrosMap8, registrosMap32)
 		//TODO: logueano
 
 	case "MOV_OUT":
-		movOUT(variable[1], variable[2], registrosMap8, registrosMap32)
+		//movOUT(variable[1], variable[2], registrosMap8, registrosMap32)
 		//TODO: logueano
 
 	case "RESIZE":
@@ -389,7 +389,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
 		go ioSTDINwrite(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB) //TODO: IN -> OUT
-
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -575,7 +574,7 @@ func resize(tamañoEnBytes string) string {
 // 1 caractrer w/r
 // Direccion Fisica
 // Info a Leer/escribir
-func movIN(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
+/*func movIN(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
 
 	var direccionFisica uint32
 	var encontrado bool
@@ -634,6 +633,7 @@ func movIN(registroDireccion string, registroDato string, registrosMap8 map[stri
 func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
 
 }
+*/
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
@@ -751,7 +751,7 @@ func IoSTDINread(
 	prioridadesTLB *[]ElementoPrioridad) {
 
 	// Verifica si existe el registro especificado en la instrucción.
-  registroDireccion, encontrado := registroMap32[regDir] //TODO: Adaptar para los dos tipos de registro
+	registroDireccion, encontrado := registroMap32[regDir] //TODO: Adaptar para los dos tipos de registro
 	if !encontrado {
 		fmt.Println("Registro invalido")
 		return
