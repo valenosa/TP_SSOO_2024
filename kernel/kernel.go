@@ -189,12 +189,12 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("ListarProceso-------------------------")
 
 	//----------- EJECUTA -----------
+	//Recorre la lista de NEW
+	var listaDeProcesos []structs.ResponseListarProceso
 
-	//Harcodea una lista de procesos, más adelante deberá ser dinámico
-	var listaDeProcesos []structs.ResponseListarProceso = []structs.ResponseListarProceso{
-		{PID: 0, Estado: "READY"},
-		{PID: 1, Estado: "BLOCK"},
-	}
+	//listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
+	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
+	//listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 
 	//----------- DEVUELVE -----------
 
