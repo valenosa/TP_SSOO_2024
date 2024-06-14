@@ -35,17 +35,14 @@ func ExtractInstructions(path string) []byte {
 	return file
 }
 
-// insertData inserta las instrucciones en la memoria de instrucciones asociadas al PID especificado,
+// insertData inserta las instrucciones en la memoria de instrucciones asociadas al PID especificado
 // e imprime las instrucciones guardadas en memoria junto con su PID correspondiente.
 func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byte) {
-
-	// Separa las instrucciones por medio de tokens.
+	// Separar las instrucciones por medio de tokens
 	instrucciones := strings.Split(string(data), "\n")
-
-	// Inserta las instrucciones en la memoria de instrucciones.
+	// Insertar las instrucciones en la memoria de instrucciones
 	memoriaInstrucciones[pid] = instrucciones
-
-	// Imprime las instrucciones guardadas en memoria.
+	// Imprimir las instrucciones guardadas en memoria
 	fmt.Println("Instrucciones guardadas en memoria: ")
 	for pid, instrucciones := range memoriaInstrucciones {
 		fmt.Printf("PID: %d\n", pid)
@@ -57,10 +54,7 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 }
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
-
-	//Genera una tabla de páginas en base a un pid.
 	tablaDePaginas[pid] = structs.Tabla{}
-
 }
 
 func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Tabla) string {
@@ -73,6 +67,37 @@ func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Ta
 	marcoStr := strconv.Itoa(marco)
 
 	return marcoStr
+}
+
+// TODO: Probar
+func obtenerPagina(pid uint32, direccionFisica uint32, tablaDePaginas map[uint32]structs.Tabla) int {
+
+	marco := math.Floor(float64(direccionFisica) / float64(ConfigJson.Page_Size))
+
+	for i := range tablaDePaginas[pid] {
+
+		marcoActual := tablaDePaginas[pid][i]
+
+		if uint32(marcoActual) == uint32(marco) {
+
+			return i
+
+		}
+	}
+
+	return -1
+}
+
+// TODO: Probar
+func tableHasNext(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Tabla) bool {
+	return len(tablaDePaginas[pid])-1 > int(pagina)
+}
+
+// TODO: Probar
+// Verifica si la pagina aun tiene espacio en memoria
+func endOfPage(direccionFisica uint32) bool {
+	//Si la direccion es multiplo del tamaño de pagina, es el fin de la pagina
+	return direccionFisica%uint32(ConfigJson.Page_Size) == 0
 }
 
 func LiberarMarcos(marcosALiberar []int, bitMap []bool) {
@@ -134,31 +159,65 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 	return "OK" //?
 }
 
-// TODO: Probar
-// ! CAMBIAR, PASARLE TAMBIEN UNA TABLA DE PAGINA
-func LeerEnMemoria(direccionFisica uint64, tamanioRegistro uint64, espacioUsuario []byte) []byte {
+func LeerEnMemoria(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, byteArraySize int, espacioUsuario *[]byte, bitMap *[]bool) string {
 
-	// Luego, lee el dato desde la dirección física.
-	dato := (espacioUsuario)[direccionFisica : direccionFisica+tamanioRegistro]
+	var dato []byte
 
-	// Devuelve el dato como una cadena.
-	return dato
+	// Itera sobre los bytes del dato recibido.
+	for ; byteArraySize > 0; byteArraySize-- {
 
+		// Lee el byte en la dirección física.
+		dato = append(dato, (*espacioUsuario)[direccionFisica])
+
+		// Incrementa la dirección
+		direccionFisica++
+
+		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
+		if endOfPage(direccionFisica) {
+			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
+			if !cambioDePagina(&direccionFisica, pid, *tablaDePaginas, pagina) {
+				return "OUT OF MEMORY"
+			}
+		}
+	}
+
+	return "OK" //?
 }
 
 // TODO: Probar
-// ! CAMBIAR, PASARLE TAMBIEN UNA TABLA DE PAGINA
-func EscribirEnMemoria(direccionFisica uint64, dato []byte, espacioUsuario *[]byte, bitMap *[]bool) {
-	// Verifica si la dirección física está dentro de los límites del espacio de usuario
-	if direccionFisica+uint64(len(dato)) > uint64(len(*espacioUsuario)) {
-		return
+// Escribe en memoria el dato recibido en la dirección física especificada.
+func EscribirEnMemoria(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, dato string, espacioUsuario *[]byte) string {
+
+	datoBytes := []byte(dato) //? string o byte
+
+	// Itera sobre los bytes del dato recibido.
+	for i := range datoBytes {
+
+		// Escribe el byte en la dirección física.
+		(*espacioUsuario)[direccionFisica] = datoBytes[i]
+
+		// Incrementa la dirección
+		direccionFisica++
+
+		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
+		if endOfPage(direccionFisica) {
+			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
+			if !cambioDePagina(&direccionFisica, pid, *tablaDePaginas, pagina) {
+				return "OUT OF MEMORY"
+			}
+		}
 	}
-	// Escribe los datos en el espacio de usuario
-	copy((*espacioUsuario)[direccionFisica:], dato)
 
-	// Calcula el índice del marco afectado
-	marco := direccionFisica / uint64(ConfigJson.Page_Size)
+	return "OK" //?
+}
 
-	// Marca el marco como lleno en el bitMap
-	(*bitMap)[marco] = true
+// TODO: Probar
+func cambioDePagina(direccionFisica *uint32, pid uint32, tablasDePaginas map[uint32]structs.Tabla, pagina uint32) bool {
+
+	if tableHasNext(pid, pagina, tablasDePaginas) {
+		// Cambio la direccion fisica a la primera del siguitabla
+		*direccionFisica = uint32(((tablasDePaginas)[pid][pagina+1]) * int(ConfigJson.Page_Size))
+		return true
+	}
+	return false
 }
