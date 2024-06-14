@@ -1,6 +1,7 @@
 package funciones
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -350,11 +351,11 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "MOV_IN":
-		movIN(variable[1], variable[2], registrosMap8, registrosMap32)
+		movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 		//TODO: logueano
 
 	case "MOV_OUT":
-		movOUT(variable[1], variable[2], registrosMap8, registrosMap32)
+		movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 		//TODO: logueano
 
 	case "RESIZE":
@@ -389,7 +390,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		*cicloFinalizado = true
 		PCB.Estado = "BLOCK"
 		go ioSTDINwrite(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB) //TODO: IN -> OUT
-
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -571,20 +571,17 @@ func resize(tamañoEnBytes string) string {
 	return string(bodyBytes)
 }
 
-// mandame
-// 1 caractrer w/r
-// Direccion Fisica
-// Info a Leer/escribir
-func movIN(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
+func movIN(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
 
 	var direccionFisica uint32
 	var encontrado bool
 	var longitud string
 
+	// D. Logica a Fisica
 	if registroDireccion == "AX" || registroDireccion == "AB" || registroDireccion == "CX" || registroDireccion == "DX" {
-		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, *(registrosMap32[registroDireccion]), &TLB, &prioridadesTLB) //TODO: Pasarle la tlb y la lista de prioridades a la funcion cuando mergeemos con lo de DB
+		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, int(*(registrosMap8[registroDireccion])), TLB, prioridadesTLB)
 	} else {
-		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, *(registrosMap32[registroDireccion]), &TLB, &prioridadesTLB)
+		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
 	}
 
 	if !encontrado {
@@ -593,14 +590,21 @@ func movIN(registroDireccion string, registroDato string, registrosMap8 map[stri
 
 	}
 
+	// Obtiene longitud del registro de dato
+	if registroDato == "AX" || registroDato == "AB" || registroDato == "CX" || registroDato == "DX" {
+		longitud = "1"
+	} else {
+		longitud = "4"
+	}
+
 	// Crea un cliente HTTP
 	cliente := &http.Client{}
-	url := fmt.Sprintf("http://%s:%d/movin", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+	url := fmt.Sprintf("http://%s:%d/memoria/movin", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
 
 	// Crea una nueva solicitud GET
-	req, err := http.NewRequest("PUT", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return ""
+		return
 	}
 
 	//Parsea la direccion física de uint32 a string.
@@ -615,24 +619,71 @@ func movIN(registroDireccion string, registroDato string, registrosMap8 map[stri
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
 	if err != nil {
-		return ""
+		return
 	}
 
 	// Verifica el código de estado de la respuesta
 	if respuesta.StatusCode != http.StatusOK {
-		return ""
+		return
 	}
 
 	// Lee el cuerpo de la respuesta
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		return ""
+		return
 	}
 
+	escribirEnRegistro(registroDato, data, registrosMap8, registrosMap32)
 }
 
-func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
+func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
+	if len(data) == 1 {
+		*registrosMap8[registroDato] = uint8(data[0])
+	} else {
+		*registrosMap32[registroDato] = binary.BigEndian.Uint32(data) //? []byte a uint32
+	}
+}
 
+// TODO: Terminar
+func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
+
+	extraerDatos := func(registroDato string) []byte {
+		if registroDato == "AX" || registroDato == "AB" || registroDato == "CX" || registroDato == "DX" {
+			return []byte{byte(*registrosMap8[registroDato])}
+		} else {
+			data := make([]byte, 4)
+			binary.BigEndian.PutUint32(data, *registrosMap32[registroDato]) //? uint32 a []byte
+			return data
+		}
+	}
+
+	obtenerDireccionFisica := func(registroDireccion string) (uint32, bool) {
+		if registroDireccion == "AX" || registroDireccion == "AB" || registroDireccion == "CX" || registroDireccion == "DX" {
+			return TraduccionMMU(PidEnEjecucion, int(*(registrosMap8[registroDireccion])), TLB, prioridadesTLB)
+		}
+		return TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
+	}
+
+	direccionFisica, encontrado := obtenerDireccionFisica(registroDireccion)
+
+	if !encontrado {
+		fmt.Println("Error: Page Fault")
+		return //?Es correcto esto?
+
+	}
+
+	valor := extraerDatos(registroDato)
+
+	body, err := json.Marshal(structs.RequestMovOUT{Dir: direccionFisica, Data: valor})
+
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	respuesta := config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "POST", "memoria/movout", body)
+	if respuesta.StatusCode != http.StatusOK {
+	}
 }
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
@@ -751,7 +802,7 @@ func IoSTDINread(
 	prioridadesTLB *[]ElementoPrioridad) {
 
 	// Verifica si existe el registro especificado en la instrucción.
-  registroDireccion, encontrado := registroMap32[regDir] //TODO: Adaptar para los dos tipos de registro
+	registroDireccion, encontrado := registroMap32[regDir] //TODO: Adaptar para los dos tipos de registro
 	if !encontrado {
 		fmt.Println("Registro invalido")
 		return
@@ -850,10 +901,6 @@ func ioSTDINwrite(nombreInterfaz string,
 	// Envía la solicitud de ejecución a Kernel
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
-
-// func MOV_IN(){
-
-// }
 
 // func MOV_OUT(){
 

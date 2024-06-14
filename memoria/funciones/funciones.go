@@ -35,14 +35,17 @@ func ExtractInstructions(path string) []byte {
 	return file
 }
 
-// insertData inserta las instrucciones en la memoria de instrucciones asociadas al PID especificado
+// insertData inserta las instrucciones en la memoria de instrucciones asociadas al PID especificado,
 // e imprime las instrucciones guardadas en memoria junto con su PID correspondiente.
 func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byte) {
-	// Separar las instrucciones por medio de tokens
+
+	// Separa las instrucciones por medio de tokens.
 	instrucciones := strings.Split(string(data), "\n")
-	// Insertar las instrucciones en la memoria de instrucciones
+
+	// Inserta las instrucciones en la memoria de instrucciones.
 	memoriaInstrucciones[pid] = instrucciones
-	// Imprimir las instrucciones guardadas en memoria
+
+	// Imprime las instrucciones guardadas en memoria.
 	fmt.Println("Instrucciones guardadas en memoria: ")
 	for pid, instrucciones := range memoriaInstrucciones {
 		fmt.Printf("PID: %d\n", pid)
@@ -54,7 +57,10 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 }
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
+
+	//Genera una tabla de páginas en base a un pid.
 	tablaDePaginas[pid] = structs.Tabla{}
+
 }
 
 func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Tabla) string {
@@ -129,29 +135,30 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 }
 
 // TODO: Probar
-func LeerEnMemoria(direccionFisica uint64, tamanioRegistro uint64, espacioUsuario []byte) string {
+// ! CAMBIAR, PASARLE TAMBIEN UNA TABLA DE PAGINA
+func LeerEnMemoria(direccionFisica uint64, tamanioRegistro uint64, espacioUsuario []byte) []byte {
 
-	// Checkea si recibe orden de lectura en 4 bytes o en 1.
-	if tamanioRegistro > 1 {
+	// Luego, lee el dato desde la dirección física.
+	dato := (espacioUsuario)[direccionFisica : direccionFisica+tamanioRegistro]
 
-		// Lee los 4 bytes contiguos desde la dirección física.
-		datos := (espacioUsuario)[direccionFisica : direccionFisica+4]
+	// Devuelve el dato como una cadena.
+	return dato
 
-		// Convierte los bytes a una cadena.
-		datosStr := string(datos)
+}
 
-		// Devuelve el dato como una cadena.
-		return datosStr
-
-	} else {
-
-		// Luego, lee el dato desde la dirección física.
-		dato := (espacioUsuario)[direccionFisica]
-
-		datosStr := string(dato)
-
-		// Devuelve el dato como una cadena.
-		return datosStr
+// TODO: Probar
+// ! CAMBIAR, PASARLE TAMBIEN UNA TABLA DE PAGINA
+func EscribirEnMemoria(direccionFisica uint64, dato []byte, espacioUsuario *[]byte, bitMap *[]bool) {
+	// Verifica si la dirección física está dentro de los límites del espacio de usuario
+	if direccionFisica+uint64(len(dato)) > uint64(len(*espacioUsuario)) {
+		return
 	}
+	// Escribe los datos en el espacio de usuario
+	copy((*espacioUsuario)[direccionFisica:], dato)
 
+	// Calcula el índice del marco afectado
+	marco := direccionFisica / uint64(ConfigJson.Page_Size)
+
+	// Marca el marco como lleno en el bitMap
+	(*bitMap)[marco] = true
 }
