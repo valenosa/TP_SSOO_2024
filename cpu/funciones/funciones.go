@@ -571,7 +571,8 @@ func resize(tamañoEnBytes string) string {
 	return string(bodyBytes)
 }
 
-func movIN(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
+// TODO: Probar
+func movIN(registroDato string, registroDireccion string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
 
 	var direccionFisica uint32
 	var encontrado bool
@@ -586,7 +587,7 @@ func movIN(registroDireccion string, registroDato string, registrosMap8 map[stri
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
-		return //?Es correcto esto?
+		return "PAGE FAULT" //?Es correcto esto?
 
 	}
 
@@ -603,39 +604,53 @@ func movIN(registroDireccion string, registroDato string, registrosMap8 map[stri
 
 	// Crea una nueva solicitud GET
 	req, err := http.NewRequest("GET", url, nil)
+
 	if err != nil {
-		return
+		return ""
 	}
 
 	//Parsea la direccion física de uint32 a string.
 	direccionFisicaStr := strconv.FormatUint(uint64(direccionFisica), 10)
+	pidEnEjecucionStr := strconv.FormatUint(uint64(PidEnEjecucion), 10)
 
 	// Agrega el PID y el PC como params
 	q := req.URL.Query()
+	q.Add("pid", pidEnEjecucionStr)
 	q.Add("dir", direccionFisicaStr)
 	q.Add("size", longitud)
 	req.URL.RawQuery = q.Encode()
 
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
+
 	if err != nil {
-		return
+		return ""
 	}
 
 	// Verifica el código de estado de la respuesta
 	if respuesta.StatusCode != http.StatusOK {
-		return
+		return ""
+	}
+
+	if respuesta.StatusCode != http.StatusNotFound {
+		return "OUT OF MEMORY"
 	}
 
 	// Lee el cuerpo de la respuesta
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		return
+		return ""
 	}
 
 	escribirEnRegistro(registroDato, data, registrosMap8, registrosMap32)
+
+	return "OK"
 }
 
+// TODO: Probar
 func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
 	if len(data) == 1 {
 		*registrosMap8[registroDato] = uint8(data[0])
@@ -644,8 +659,8 @@ func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[stri
 	}
 }
 
-// TODO: Terminar
-func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
+// TODO: Probar
+func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
 
 	extraerDatos := func(registroDato string) []byte {
 		if registroDato == "AX" || registroDato == "AB" || registroDato == "CX" || registroDato == "DX" {
@@ -668,22 +683,35 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
-		return //?Es correcto esto?
+		return "PAGE FAULT" //?Es correcto esto?
 
 	}
 
 	valor := extraerDatos(registroDato)
 
-	body, err := json.Marshal(structs.RequestMovOUT{Dir: direccionFisica, Data: valor})
+	body, err := json.Marshal(structs.RequestMovOUT{Pid: PidEnEjecucion, Dir: direccionFisica, Data: valor})
 
 	if err != nil {
-		return
+		return ""
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
 	respuesta := config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "POST", "memoria/movout", body)
+
 	if respuesta.StatusCode != http.StatusOK {
+		return ""
 	}
+
+	if respuesta.StatusCode != http.StatusNotFound {
+		return "OUT OF MEMORY"
+	}
+
+	// bodyBytes, err := io.ReadAll(respuesta.Body) //?
+	// if err != nil {
+	// 	return ""
+	// }
+
+	return "OK"
 }
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
@@ -901,10 +929,6 @@ func ioSTDINwrite(nombreInterfaz string,
 	// Envía la solicitud de ejecución a Kernel
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
-
-// func MOV_OUT(){
-
-// }
 
 // func COPY_STRING(){
 

@@ -70,7 +70,7 @@ func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Ta
 }
 
 // TODO: Probar
-func obtenerPagina(pid uint32, direccionFisica uint32, tablaDePaginas map[uint32]structs.Tabla) int {
+func ObtenerPagina(pid uint32, direccionFisica uint32, tablaDePaginas map[uint32]structs.Tabla) int {
 
 	marco := math.Floor(float64(direccionFisica) / float64(ConfigJson.Page_Size))
 
@@ -159,7 +159,8 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 	return "OK" //?
 }
 
-func LeerEnMemoria(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, byteArraySize int, espacioUsuario *[]byte, bitMap *[]bool) string {
+// TODO: Probar
+func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, byteArraySize int, espacioUsuario *[]byte) ([]byte, string) {
 
 	var dato []byte
 
@@ -175,20 +176,18 @@ func LeerEnMemoria(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, pagina 
 		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
 		if endOfPage(direccionFisica) {
 			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
-			if !cambioDePagina(&direccionFisica, pid, *tablaDePaginas, pagina) {
-				return "OUT OF MEMORY"
+			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, pagina) {
+				return dato, "OUT OF MEMORY"
 			}
 		}
 	}
 
-	return "OK" //?
+	return dato, "OK" //?
 }
 
 // TODO: Probar
 // Escribe en memoria el dato recibido en la dirección física especificada.
-func EscribirEnMemoria(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, dato string, espacioUsuario *[]byte) string {
-
-	datoBytes := []byte(dato) //? string o byte
+func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, datoBytes []byte, espacioUsuario *[]byte) string {
 
 	// Itera sobre los bytes del dato recibido.
 	for i := range datoBytes {
@@ -202,7 +201,7 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, pag
 		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
 		if endOfPage(direccionFisica) {
 			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
-			if !cambioDePagina(&direccionFisica, pid, *tablaDePaginas, pagina) {
+			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, pagina) {
 				return "OUT OF MEMORY"
 			}
 		}

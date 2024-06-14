@@ -115,6 +115,7 @@ type RequestInputSTDIN struct {
 type Tabla []int
 
 type RequestMovOUT struct {
+	Pid  uint32
 	Dir  uint32
 	Data []byte
 }
