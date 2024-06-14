@@ -22,9 +22,9 @@ var ConfigJson config.Kernel
 var MapRecursos = make(map[string]*structs.Recurso)
 
 // ----------------------------Listas de Estados
-var listaNEW = ListaSegura{}
-var listaREADY = ListaSegura{}
-var listaEXIT = ListaSegura{}
+var ListaNEW = ListaSegura{}
+var ListaREADY = ListaSegura{}
+var ListaEXIT = ListaSegura{}
 var MapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
 var ProcesoExec structs.PCB
 
@@ -115,7 +115,7 @@ func Planificador() {
 		<-Bin_hayPCBenREADY
 
 		// Proceso READY -> EXEC
-		var siguientePCB = listaREADY.Dequeue()
+		var siguientePCB = ListaREADY.Dequeue()
 		siguientePCB.Estado = "EXEC"
 
 		ProcesoExec = siguientePCB
@@ -165,18 +165,18 @@ func AdministrarQueues(pcb structs.PCB) {
 	case "NEW":
 
 		//PCB --> cola de NEW
-		listaNEW.Append(pcb)
+		ListaNEW.Append(pcb)
 
 	case "READY":
 
 		//PCB --> cola de READY
-		listaREADY.Append(pcb)
+		ListaREADY.Append(pcb)
 
 		//Avisa al planificador que hay un PCB en READY (se usa dentro del select para que no se bloquee si ya metieron algo "buffer infinito")
 		Bin_hayPCBenREADY <- 0
 
 		//^ log obligatorio (3/6)
-		logueano.PidsReady(listaREADY.list) //!No se si tengo que sync esto
+		logueano.PidsReady(ListaREADY.List) //!No se si tengo que sync esto
 
 	case "BLOCK":
 
@@ -188,7 +188,7 @@ func AdministrarQueues(pcb structs.PCB) {
 	case "EXIT":
 
 		//PCB --> cola de EXIT
-		listaEXIT.Append(pcb)
+		ListaEXIT.Append(pcb)
 		<-Cont_producirPCB
 
 	}
@@ -326,24 +326,35 @@ func LeerRecursos(recursos []string, instancia_recursos []int) {
 
 // ----------------------( LISTA )----------------------\\
 type ListaSegura struct {
-	mx   sync.Mutex
-	list []structs.PCB
+	Mx   sync.Mutex
+	List []structs.PCB
 }
 
 func (sList *ListaSegura) Append(value structs.PCB) {
-	sList.mx.Lock()
-	sList.list = append(sList.list, value)
-	sList.mx.Unlock()
+	sList.Mx.Lock()
+	sList.List = append(sList.List, value)
+	sList.Mx.Unlock()
 }
 
 // TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
 func (sList *ListaSegura) Dequeue() structs.PCB {
-	sList.mx.Lock()
-	var pcb = sList.list[0]
-	sList.list = sList.list[1:]
-	sList.mx.Unlock()
+	sList.Mx.Lock()
+	var pcb = sList.List[0]
+	sList.List = sList.List[1:]
+	sList.Mx.Unlock()
 
 	return pcb
+}
+
+func AppendListaProceso(listadoProcesos []structs.ResponseListarProceso, listaEspecifica *ListaSegura) []structs.ResponseListarProceso {
+	listaEspecifica.Mx.Lock()
+	for i := range listaEspecifica.List {
+		elemento := structs.ResponseListarProceso{PID: listaEspecifica.List[i].PID, Estado: listaEspecifica.List[i].Estado}
+		listadoProcesos = append(listadoProcesos, elemento)
+	}
+	listaEspecifica.Mx.Unlock()
+
+	return listadoProcesos
 }
 
 // ----------------------( MAP PCB )----------------------\\
