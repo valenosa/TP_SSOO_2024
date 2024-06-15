@@ -3,9 +3,9 @@ package funciones
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,13 +22,16 @@ var ConfigJson config.Kernel
 var MapRecursos = make(map[string]*structs.Recurso)
 
 // ----------------------------Listas de Estados
-var ListaNEW = ListaSegura{}
+var ListaNEW = ListaSegura{} //TODO: Se necesita para listar procesos y estado de procesos
 var ListaREADY = ListaSegura{}
 var ListaEXIT = ListaSegura{}
 var MapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
 var ProcesoExec structs.PCB
 
-//var procesoExec structs.PCB //* Verificar que sea necesario
+//var procesoExec structs.PCB //TODO: Se necesita para listar procesos y estado de procesos
+
+// ---------------------------- VRR
+var ListaREADY_PRIORITARIO = ListaSegura{}
 
 // ---------------------------- Semaforos PLANIFICADORES
 
@@ -49,56 +52,6 @@ var CounterPID uint32 = 0
 
 //var hayInterfaz = make(chan int)
 
-// Envía una solicitud a memoria para obtener el estado de un proceso específico mediante su PID.
-func EstadoProceso(configJson config.Kernel) {
-
-	// PID del proceso a consultar (hardcodeado).
-	pid := 0
-
-	// Enviar solicitud a memoria para obtener el estado del proceso.
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", fmt.Sprintf("process/%d", pid))
-	if respuesta == nil {
-		return
-	}
-
-	// Declarar una variable para almacenar la respuesta del servidor.
-	var response structs.ResponseListarProceso
-
-	// Decodifica la respuesta del servidor.
-	err := json.NewDecoder(respuesta.Body).Decode(&response)
-
-	// Maneja el error para la decodificación.
-	if err != nil {
-		fmt.Printf("Error decodificando\n")
-		fmt.Println(err)
-		return
-	}
-
-	// Imprimir información sobre el proceso (en este caso, solo el PID).
-	fmt.Println(response)
-}
-
-// TODO desarrollar la lectura de procesos creados (27/05/24)
-// Envía una solicitud al módulo de memoria para obtener y mostrar la lista de todos los procesos
-func ListarProceso(configJson config.Kernel) {
-
-	// Enviar solicitud al servidor de memoria
-	respuesta := config.Request(configJson.Port_Memory, configJson.Ip_Memory, "GET", "process")
-	if respuesta == nil {
-		return
-	}
-
-	// TODO: Checkear que io.ReadAll no esté deprecada.(27/05/24)
-	// Leer el cuerpo de la respuesta.
-	bodyBytes, err := io.ReadAll(respuesta.Body)
-	if err != nil {
-		return
-	}
-
-	// Imprimir la lista de procesos.
-	fmt.Println(string(bodyBytes))
-}
-
 //*=======================================| PLANIFICADOR |=======================================\\
 
 // TODO: Verificar el tema del semaforo de hay pcb en ready (31/05/24)
@@ -111,26 +64,47 @@ func Planificador() {
 		//Espero a que el CPU este libre
 		mx_CPUOcupado.Lock()
 
-		// Espero que exista PCB en READY
+		// Espero que exista PCB en READY (Tanto en READY como en READY_PRIORITARIO)
 		<-Bin_hayPCBenREADY
 
+		var siguientePCB structs.PCB
+		var tiempoInicioQuantum time.Time
+
+		if ConfigJson.Planning_Algorithm == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 { //! A lo mejor tiene que ser con semaforos pero es para testear la idea
+
+			siguientePCB = ListaREADY_PRIORITARIO.Dequeue()
+			go roundRobin(siguientePCB.PID, int(siguientePCB.Quantum))
+
+		} else {
+			siguientePCB = ListaREADY.Dequeue()
+
+			//Si el algoritmo de planificación es Round Robin, "contabiliza" el quantum
+			if strings.ToUpper(ConfigJson.Planning_Algorithm) != "FIFO" {
+				go roundRobin(siguientePCB.PID, ConfigJson.Quantum)
+			}
+
+			//Guardo tiempo de inicio para Virtual RR
+			tiempoInicioQuantum = time.Now()
+		}
+
 		// Proceso READY -> EXEC
-		var siguientePCB = ListaREADY.Dequeue()
 		siguientePCB.Estado = "EXEC"
-
 		ProcesoExec = siguientePCB
-
 		logueano.CambioDeEstado("READY", siguientePCB)
 
-		// Se envía el proceso al CPU para su ejecución y se recibe la respuesta
+		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
 
-		fmt.Println("Recursos Retenidos por", pcbActualizado.PID, ": ", pcbActualizado.Recursos) //! Borrar despues
+		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
+		if ConfigJson.Planning_Algorithm == "VRR" && motivoDesalojo == "IO" {
+			tiempoCorteQuantum := time.Now()
+			pcbActualizado.Quantum = uint16(tiempoCorteQuantum.Sub(tiempoInicioQuantum))
+		}
 
 		//Aviso que esta libre el CPU
 		mx_CPUOcupado.Unlock()
 
-		administrarInterrupciones(&pcbActualizado, motivoDesalojo)
+		administrarMotivoDesalojo(&pcbActualizado, motivoDesalojo)
 
 		// Se administra el PCB devuelto por el CPU
 		AdministrarQueues(pcbActualizado)
@@ -138,13 +112,21 @@ func Planificador() {
 	}
 }
 
-func administrarInterrupciones(pcb *structs.PCB, motivoDesalojo string) {
+// TODO: TODOS LOS CAMBIOS DE ESTADO QUE SE HACEN EN CPU SE TIENEN QUE HACER ACA EN BASE A EL MOTIVO DE DESALOJO (14/6/24)
+func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
+
+	// Imprime el motivo de desalojo.
+	fmt.Println("===================================== Proceso", pcb.PID, "desalojado por:", motivoDesalojo)
+
 	switch motivoDesalojo {
 	case "Fin de QUANTUM":
 		pcb.Estado = "READY"
 
 	case "Finalizar PROCESO":
 		pcb.Estado = "EXIT"
+
+	case "IO":
+		pcb.Estado = "BLOCK"
 	}
 
 }
@@ -178,6 +160,11 @@ func AdministrarQueues(pcb structs.PCB) {
 		//^ log obligatorio (3/6)
 		logueano.PidsReady(ListaREADY.List) //!No se si tengo que sync esto
 
+	case "READY_PRIORITARIO":
+		ListaREADY_PRIORITARIO.Append(pcb)
+		fmt.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
+		Bin_hayPCBenREADY <- 0
+
 	case "BLOCK":
 
 		//PCB --> mapa de BLOCK
@@ -192,16 +179,17 @@ func AdministrarQueues(pcb structs.PCB) {
 		<-Cont_producirPCB
 
 	}
+
+	//TODO: loguear cambios de estado directo desde aca, esto para no llamar a la funcion por todos lados :)
 }
 
 //----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\
 
-// TODO: Reescribir par funcionamiento con semáforos (sincronización)  (18/5/24)
-// Envía un PCB al CPU para su ejecución, Tras volver lo manda a la cola correspondiente
+// Envía un PCB (indicado por el planificador) al CPU para su ejecución, Tras volver lo devuelve al planificador
 func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	//Envia PCB al CPU.
-	fmt.Println("Se envió el proceso", pcb.PID, "al CPU")
+	fmt.Println("===================================== Proceso", pcb.PID, " enviado al CPU.")
 
 	//-------------------Request al CPU------------------------
 
@@ -212,14 +200,6 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 	if err != nil {
 		fmt.Printf("error codificando body: %s", err.Error())
 		return structs.PCB{}, "ERROR"
-	}
-
-	/*
-		*Si el algoritmo de planificación es Round Robin, "contabiliza" el quantum
-		?Es correcto?
-	*/
-	if configJson.Planning_Algorithm == "RR" {
-		go roundRobin(pcb.PID, configJson.Quantum)
 	}
 
 	// Envía una solicitud al servidor CPU.
@@ -242,14 +222,10 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	//-------------------Fin Request al CPU------------------------
 
-	// Imprime el motivo de desalojo.
-	fmt.Println("Proceso", respuestaDispatch.PCB.PID, "desalojado por:", respuestaDispatch.MotivoDeDesalojo)
-
 	// Retorna el PCB y el motivo de desalojo.
 	return respuestaDispatch.PCB, respuestaDispatch.MotivoDeDesalojo
 }
 
-// TODO: La función no está en uso. (27/05/24)
 // Desaloja el Proceso enviando una interrupción al CPU
 func Interrupt(PID uint32, tipoDeInterrupcion string) {
 	cliente := &http.Client{}
