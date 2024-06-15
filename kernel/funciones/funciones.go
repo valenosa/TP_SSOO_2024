@@ -22,13 +22,11 @@ var ConfigJson config.Kernel
 var MapRecursos = make(map[string]*structs.Recurso)
 
 // ----------------------------Listas de Estados
-var ListaNEW = ListaSegura{} //TODO: Se necesita para listar procesos y estado de procesos
+var ListaNEW = ListaSegura{} //? Es simplemente para mostrarlo en listarProcesos
 var ListaREADY = ListaSegura{}
-var ListaEXIT = ListaSegura{}
+var ListaEXIT = ListaSegura{} //? Es simplemente para mostrarlo en listarProcesos
 var MapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
-var ProcesoExec structs.PCB
-
-//var procesoExec structs.PCB //TODO: Se necesita para listar procesos y estado de procesos
+var ProcesoExec structs.PCB //? Es simplemente para mostrarlo en listarProcesos
 
 // ---------------------------- VRR
 var ListaREADY_PRIORITARIO = ListaSegura{}
@@ -49,8 +47,6 @@ var mx_CPUOcupado sync.Mutex
 var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz)}
 var Mx_ConterPID sync.Mutex
 var CounterPID uint32 = 0
-
-//var hayInterfaz = make(chan int)
 
 //*=======================================| PLANIFICADOR |=======================================\\
 
@@ -177,11 +173,44 @@ func AdministrarQueues(pcb structs.PCB) {
 
 		//PCB --> cola de EXIT
 		ListaEXIT.Append(pcb)
+		LiberarProceso(pcb)
 		<-Cont_producirPCB
-
 	}
 
 	//TODO: loguear cambios de estado directo desde aca, esto para no llamar a la funcion por todos lados :)
+}
+
+func LiberarProceso(pcb structs.PCB) {
+
+	//-------------- Libera las estructuras de Memoria --------------
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/process", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud PUT
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Agrega el PID y la PAGINA como params
+	q := req.URL.Query()
+	q.Add("pid", fmt.Sprint(pcb.PID))
+	req.URL.RawQuery = q.Encode()
+
+	// Realiza la solicitud al servidor de memoria
+	_, err = cliente.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	//-------------- Liberar Recursos ------------------------------
+
+	for _, recurso := range pcb.Recursos {
+		MapRecursos[recurso].Instancias++
+	}
 }
 
 //----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\

@@ -161,7 +161,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respIniciarProceso)
 }
 
-// TODO: Probar
+// TODO: BUSCAR EL PCB Y MANDARLO A LAFUNCION LIBERER PROCESO
 func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("DetenerEstadoProceso-------------------------")
@@ -178,7 +178,9 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	//* Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
+	//TODO: Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
+	var pcb structs.PCB
+	funciones.LiberarProceso(pcb)
 
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
