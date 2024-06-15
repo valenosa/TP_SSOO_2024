@@ -182,13 +182,6 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 
 		//--------- RESPUESTA ---------
 
-		// Codifica la respuesta en formato JSON
-		respuesta, err := json.Marshal(marco)
-		if err != nil {
-			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-			return
-		}
-
 		// Devuelve un status code dependiendo de si se encontró o no el marco
 		if marco == "" {
 			w.WriteHeader(http.StatusNotFound)
@@ -197,7 +190,7 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 		}
 
 		// Envía la respuesta al MMU
-		w.Write(respuesta)
+		w.Write([]byte(marco))
 	}
 }
 
@@ -259,17 +252,21 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 
 		pagina := funciones.ObtenerPagina(request.Pid, request.Dir, tablaDePaginas)
 
-		estado := funciones.EscribirEnMemoria(request.Pid, tablaDePaginas, uint32(pagina), request.Dir, request.Data, espacioUsuario)
+		if pagina == -1 {
+			fmt.Println("No se encontró la página")
+		}
 
+		estado := funciones.EscribirEnMemoria(request.Pid, tablaDePaginas, uint32(pagina), request.Dir, request.Data, espacioUsuario)
 		// Devuelve un status code dependiendo de si se encontró o no el marco
-		if estado != "OK" {
-			w.WriteHeader(http.StatusNotFound)
-		} else {
+		if estado == "OK" {
 			w.WriteHeader(http.StatusOK)
+		}
+		if estado == "OUT OF MEMORY" {
+			w.WriteHeader(http.StatusNotFound)
 		}
 
 		//--------- RESPUESTA ---------
-		w.Write(nil) //NO LE CABE UNA
+		w.Write([]byte(estado))
 	}
 }
 
