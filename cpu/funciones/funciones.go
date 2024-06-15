@@ -386,7 +386,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		}
 
 	case "WAIT":
-		wait(variable[1], PCB, cicloFinalizado) //! Estoy cambiando estados desde adentro de la funcion, esta bien o solo debo hacerlo desde aca?
+		wait(variable[1], PCB, cicloFinalizado)
 		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "SIGNAL":
@@ -395,18 +395,18 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
-		PCB.Estado = "BLOCK"
+		MotivoDeDesalojo = "IO"
 		go ioGenSleep(variable[1], variable[2], registrosMap8, PCB.PID)
 
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
-		PCB.Estado = "BLOCK"
+		MotivoDeDesalojo = "IO"
 		go IoSTDINread(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB)
 
 	case "IO_STDOUT_WRITE":
 		*cicloFinalizado = true
-		PCB.Estado = "BLOCK"
-		go ioSTDINwrite(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB) //TODO: IN -> OUT
+		MotivoDeDesalojo = "IO"
+		go ioSTDOUTwrite(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB) //TODO: IN -> OUT
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -730,6 +730,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	return "OK"
 }
 
+
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	//--------- REQUEST ---------
@@ -894,7 +895,7 @@ Esta instrucción solicita al Kernel que mediante la interfaz seleccionada,
 se lea desde la posición de memoria indicada por la Dirección Lógica almacenada en el Registro Dirección,
 un tamaño indicado por el Registro Tamaño y se imprima por pantalla.
 */
-func ioSTDINwrite(nombreInterfaz string,
+func ioSTDOUTwrite(nombreInterfaz string,
 	regDir string,
 	regTamaño string,
 	registroMap8 map[string]*uint8,

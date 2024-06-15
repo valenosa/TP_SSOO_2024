@@ -189,12 +189,12 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("ListarProceso-------------------------")
 
 	//----------- EJECUTA -----------
+	//Recorre la lista de NEW
+	var listaDeProcesos []structs.ResponseListarProceso
 
-	//Harcodea una lista de procesos, más adelante deberá ser dinámico
-	var listaDeProcesos []structs.ResponseListarProceso = []structs.ResponseListarProceso{
-		{PID: 0, Estado: "READY"},
-		{PID: 1, Estado: "BLOCK"},
-	}
+	//listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
+	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
+	//listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 
 	//----------- DEVUELVE -----------
 
@@ -421,5 +421,11 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
 	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 	pcbDesalojado.Estado = "READY"
+
+	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR
+	if funciones.ConfigJson.Planning_Algorithm == "VRR" {
+		pcbDesalojado.Estado = "READY_PRIORITARIO"
+	}
+
 	funciones.AdministrarQueues(pcbDesalojado)
 }
