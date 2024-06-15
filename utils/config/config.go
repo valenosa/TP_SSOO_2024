@@ -118,7 +118,7 @@ func printConfig(configJson Kernel) {
 //*======================================| FUNC GLOBALES |=======================================\\
 
 // retorna true si la request fue exitosa, false en caso contrario
-func Request(port int, ip string, metodo string, query string, bodies ...[]byte) *http.Response {
+func Request(port int, ip string, metodo string, query string, bodies ...[]byte) (*http.Response, error) {
 
 	// Se declara un nuevo cliente
 	cliente := &http.Client{}
@@ -134,7 +134,7 @@ func Request(port int, ip string, metodo string, query string, bodies ...[]byte)
 	// Error Handler de la construcción de la request
 	if err != nil {
 		fmt.Printf("error creando request a ip: %s puerto: %d\n", ip, port)
-		return nil
+		return nil, err
 	}
 
 	// Se establecen los headers
@@ -146,18 +146,18 @@ func Request(port int, ip string, metodo string, query string, bodies ...[]byte)
 	// Error handler de la request
 	if err != nil {
 		fmt.Printf("error enviando request a ip: %s puerto: %d\n", ip, port)
-		return nil
+		return nil, err
 	}
 
 	// Verificar el código de estado de la respuesta del servidor a nuestra request (de no ser OK)
 	if respuesta.StatusCode != http.StatusOK {
 		fmt.Printf("Status Error: %d\n", respuesta.StatusCode)
-		return nil
+		return nil, err
 	}
 
 	//Todo salió bien
 	//fmt.Printf("%s %s exitoso \n", metodo, query)
-	return respuesta
+	return respuesta, err
 }
 
 func ifBody(bodies ...[]byte) io.Reader {

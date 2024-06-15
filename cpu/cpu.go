@@ -54,7 +54,7 @@ func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.Elem
 
 		// Error Handler de la decodificación
 		if err != nil {
-			fmt.Println(err) //! Borrar despues.
+			fmt.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

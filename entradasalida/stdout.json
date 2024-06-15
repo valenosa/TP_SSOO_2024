@@ -1,6 +1,6 @@
 {
     "port": 8006,
-    "type": "GENERICA",
+    "type": "STDOUT",
     "unit_work_time": 1000,
     "ip_kernel": "127.0.0.1",
     "port_kernel": 8001,

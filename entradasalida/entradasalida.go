@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -57,17 +59,18 @@ func conectarInterfazIO(nombre string) {
 	}
 
 	// Envia la request de conexion a Kernel
-	respuesta := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
-	if respuesta == nil {
+	_, err := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 }
 
 func iniciarServidorInterfaz() error {
 
-	http.HandleFunc("POST /GENERICA /IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
+	http.HandleFunc("POST /GENERICA/IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
 	http.HandleFunc("POST /STDIN/IO_STDIN_READ", handlerIO_STDIN_READ)
-	http.HandleFunc("POST /STDIN/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
+	http.HandleFunc("POST /STDOUT/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -120,7 +123,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -133,6 +136,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	//Lee hasta que haya un salto de linea
 	input, err := reader.ReadString('\n')
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -142,24 +146,28 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	input = input[:len(input)-1]
 
 	// Recorta la longitud del input en base al registroTamaño
-	inputTruncado := input[0:instruccionIO.RegistroTamaño]
+	if len(input) > int(instruccionIO.Tamaño) {
+		input = input[:instruccionIO.Tamaño]
+	}
 
 	//--------- REQUEST A MEMORIA ---------
 
-	responseInputUsuario := structs.RequestInputSTDIN{
-		TextoUsuario:      inputTruncado,
-		RegistroDireccion: instruccionIO.RegistroDireccion,
+	bodyWriteMemoria := structs.RequestMovOUT{
+		Pid:  instruccionIO.PidDesalojado,
+		Dir:  instruccionIO.Direccion,
+		Data: []byte(input),
 	}
 
-	body, err := json.Marshal(responseInputUsuario)
+	body, err := json.Marshal(bodyWriteMemoria)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Envía la request a memoria
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/stdin", body) // TODO: Cambiar endpoint de la request a memoria
-	if respuesta == nil {
+	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body) // TODO: Cambiar endpoint de la request a memoria
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
@@ -167,54 +175,67 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(":)"))
+
 	mx_interfaz.Unlock()
 
 }
 
-/*
-IO_STDOUT_WRITE (Interfaz, Registro Dirección, Registro Tamaño):
-Esta instrucción solicita al Kernel que mediante la interfaz seleccionada,
-se lea desde la posición de memoria indicada por la Dirección Lógica almacenada en el Registro Dirección,
-un tamaño indicado por el Registro Tamaño y se imprima por pantalla.
-*/
 func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	mx_interfaz.Lock()
 
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
-
-	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	//--------- REQUEST A MEMORIA ---------
 
-	body, err := json.Marshal(instruccionIO.RegistroDireccion)
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/memoria/movin", configInterfaz.Ip_Memory, configInterfaz.Port_Memory)
+
+	// Crea una nueva solicitud GET
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Envía la request a memoria
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/stdout", body) // TODO: Cambiar endpoint de la request a memoria
-	if respuesta == nil {
+	//Parsea la direccion física de uint32 a string.
+	direccionFisicaStr := strconv.FormatUint(uint64(instruccionIO.Direccion), 10)
+	pidEnEjecucionStr := strconv.FormatUint(uint64(instruccionIO.PidDesalojado), 10)
+	longitud := strconv.FormatUint(uint64(instruccionIO.Tamaño), 10)
+
+	// Agrega el PID y el PC como params
+	q := req.URL.Query()
+	q.Add("pid", pidEnEjecucionStr)
+	q.Add("dir", direccionFisicaStr)
+	q.Add("size", longitud)
+	req.URL.RawQuery = q.Encode()
+
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
 	//--------- EJECUTA ---------
-	var inputTruncado string
-	err = json.NewDecoder(respuesta.Body).Decode(&inputTruncado)
+
+	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
+		fmt.Println(err)
 		return
 	}
 
-	// Recorta la longitud del input en base al registroTamaño
-	inputTruncado = inputTruncado[0:instruccionIO.RegistroTamaño]
+	var inputTruncado = string(data)
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
 	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.
@@ -222,5 +243,8 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	//--------- RESPUESTA ---------
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(":("))
+
 	mx_interfaz.Unlock()
+
 }
