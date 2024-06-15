@@ -46,6 +46,7 @@ func main() {
 	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
 	http.HandleFunc("GET /memoria/movin", handlerMovIn(&espacioUsuario, tablasDePaginas))
 	http.HandleFunc("POST /memoria/movout", handlerMovOut(&espacioUsuario, tablasDePaginas))
+	http.HandleFunc("GET /memoria/copystr", handlerCopyString(&espacioUsuario, tablasDePaginas))
 
 	// Inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -157,7 +158,6 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 	}
 }
 
-// TODO: Probar
 func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -194,7 +194,6 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 	}
 }
 
-// TODO: Probar
 func handlerMovIn(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +230,6 @@ func handlerMovIn(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tabl
 	}
 }
 
-// TODO: Probar
 func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) { //? Es necesario este parámetro?
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -270,7 +268,6 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 	}
 }
 
-// TODO: Probar
 func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
 
 	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
@@ -295,3 +292,57 @@ func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func
 		w.Write([]byte(estado))
 	}
 }
+
+func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
+		fmt.Println("Recibí un request copystr")
+		//Obtengo los query params
+		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
+		direccionEscritura, errDE := strconv.ParseUint(queryParams.Get("write"), 10, 32)
+		direccionLectura, errDL := strconv.ParseUint(queryParams.Get("read"), 10, 32)
+		byteArraySize, errByte := strconv.Atoi(queryParams.Get("size"))
+
+		// Maneja error en caso de que no se pueda parsear el query
+		if errDE != nil || errDL != nil || errByte != nil || errPid != nil {
+			http.Error(w, "Error al parsear las query params", http.StatusInternalServerError)
+			return
+		}
+
+		//--------- EJECUTA ---------
+
+		paginaEscritura := funciones.ObtenerPagina(uint32(pid), uint32(direccionEscritura), tablaDePaginas)
+
+		paginaLectura := funciones.ObtenerPagina(uint32(pid), uint32(direccionLectura), tablaDePaginas)
+
+		if paginaEscritura == -1 || paginaLectura == -1 {
+			fmt.Println("No se encontró la página") //? No debería pasar nunca pero x las dudas
+		}
+
+		//--------- LECTURA ---------
+
+		data, estadoLectura := funciones.LeerEnMemoria(uint32(pid), tablaDePaginas, uint32(paginaLectura), uint32(direccionLectura), byteArraySize, espacioUsuario)
+
+		//--------- ESCRITURA ---------
+
+		estadoEscritura := funciones.EscribirEnMemoria(uint32(pid), tablaDePaginas, uint32(paginaEscritura), uint32(direccionEscritura), data, espacioUsuario)
+
+		//--------- RESPUESTA ---------
+
+		// Devuelve un status code dependiendo de si se encontró o no el marco
+		if estadoLectura == "OK" && estadoEscritura == "OK" {
+			w.WriteHeader(http.StatusOK)
+		} else if estadoLectura == "OUT OF MEMORY" || estadoEscritura == "OUT OF MEMORY" {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+		w.Write(data)
+	}
+}
+
+//VALEN SOCOTROCO

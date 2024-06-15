@@ -341,6 +341,8 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		"EBX": &RegistrosCPU.EBX,
 		"ECX": &RegistrosCPU.ECX,
 		"EDX": &RegistrosCPU.EDX,
+		"SI":  &RegistrosCPU.SI,
+		"DI":  &RegistrosCPU.DI,
 	}
 
 	// Parsea las instrucciones de la cadena de instrucción
@@ -369,6 +371,10 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "MOV_OUT":
 		movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
+		//TODO: logueano
+
+	case "COPY_STRING":
+		copyString(variable[1], TLB, prioridadesTLB)
 		//TODO: logueano
 
 	case "RESIZE":
@@ -592,11 +598,8 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	var longitud string
 
 	// D. Logica a Fisica
-	if registroDireccion == "AX" || registroDireccion == "BX" || registroDireccion == "CX" || registroDireccion == "DX" {
-		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, int(*(registrosMap8[registroDireccion])), TLB, prioridadesTLB)
-	} else {
-		direccionFisica, encontrado = TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
-	}
+
+	direccionFisica, encontrado = obtenerDireccionFisica(registroDireccion, registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
@@ -879,6 +882,74 @@ func ioSTD(
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
 
-// func COPY_STRING(){
+func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
 
-// }
+	direccionEscritura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.DI), TLB, prioridadesTLB)
+
+	if !encontrado {
+		fmt.Println("Error: Page Fault")
+		return "PAGE FAULT" //?Es correcto esto?
+
+	}
+
+	direccionLectura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.SI), TLB, prioridadesTLB)
+
+	if !encontrado {
+		fmt.Println("Error: Page Fault")
+		return "PAGE FAULT" //?Es correcto esto?
+
+	}
+
+	// Crea un cliente HTTP
+	cliente := &http.Client{}
+	url := fmt.Sprintf("http://%s:%d/memoria/copystr", ConfigJson.Ip_Memory, ConfigJson.Port_Memory)
+
+	// Crea una nueva solicitud GET
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return ""
+	}
+
+	//Parsea la direccion física de uint32 a string.
+	pidEnEjecucionStr := strconv.FormatUint(uint64(PidEnEjecucion), 10)
+	direccionEscrituraStr := strconv.FormatUint(uint64(direccionEscritura), 10)
+	direccionLecturaStr := strconv.FormatUint(uint64(direccionLectura), 10)
+
+	// Agrega el PID y las direcciones físicas
+	q := req.URL.Query()
+	q.Add("pid", pidEnEjecucionStr)
+	q.Add("write", direccionEscrituraStr)
+	q.Add("read", direccionLecturaStr)
+	q.Add("size", tamaño)
+	req.URL.RawQuery = q.Encode()
+
+	// Establece el tipo de contenido de la solicitud
+	req.Header.Set("Content-Type", "text/plain")
+
+	// Realiza la solicitud al servidor de memoria
+	respuesta, err := cliente.Do(req)
+
+	if err != nil {
+		return ""
+	}
+
+	if respuesta.StatusCode == http.StatusNotFound {
+		return "OUT OF MEMORY"
+	}
+
+	if respuesta.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	// Lee el cuerpo de la respuesta
+	data, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return ""
+	}
+
+	fmt.Println(string(data)) //*log
+
+	return "OK"
+
+}
