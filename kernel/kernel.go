@@ -90,7 +90,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -115,8 +115,9 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Envía el path a memoria para que cree el proceso
-	respuesta := config.Request(funciones.ConfigJson.Port_Memory, funciones.ConfigJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
-	if respuesta == nil {
+	respuesta, err := config.Request(funciones.ConfigJson.Port_Memory, funciones.ConfigJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
@@ -124,7 +125,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -151,7 +152,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -168,7 +169,7 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 32)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -201,7 +202,7 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -219,7 +220,7 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	pid, err := strconv.Atoi(r.PathValue("pid"))
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -236,7 +237,7 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//Crea una variable tipo Response
 	respuesta, err := json.Marshal(respEstadoProceso)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -405,13 +406,13 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
 	query := interfazSolicitada.TipoInterfaz + "/" + requestInstruccionIO.Instruccion
 
-	respuesta := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
-
-	if respuesta == nil {
-		fmt.Println("jijo")
+	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	if respuesta.StatusCode != http.StatusOK { //?
+	if respuesta.StatusCode != http.StatusOK {
 		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)

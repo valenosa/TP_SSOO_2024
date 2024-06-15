@@ -213,7 +213,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	// Crea una nueva solicitud PUT
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		return 0, false
 	}
 
@@ -229,12 +229,8 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
 	if err != nil {
-		fmt.Println(err) //! Borrar despues.
+		fmt.Println(err)
 		return 0, false
-	}
-
-	if respuesta == nil {
-		fmt.Println("ERROR: respuesta es nil")
 	}
 
 	// Verifica el código de estado de la respuesta
@@ -243,7 +239,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	}
 
 	// Lee el cuerpo de la respuesta
-	marcoBytes, err := io.ReadAll(respuesta.Body) //!
+	marcoBytes, err := io.ReadAll(respuesta.Body)
 	if err != nil {
 		return 0, false
 	}
@@ -671,16 +667,16 @@ func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[stri
 	if len(data) == 1 {
 		*registrosMap8[registroDato] = uint8(data[0])
 	} else {
-		*registrosMap32[registroDato] = binary.BigEndian.Uint32(data) //? []byte a uint32
+		*registrosMap32[registroDato] = binary.BigEndian.Uint32(data)
 	}
 }
 
 func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) []byte {
 	if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
-		return []byte{*registrosMap8[registroDato]} //?[]byte{byte(*registrosMap8[registroDato])}
+		return []byte{*registrosMap8[registroDato]}
 	} else {
 		data := make([]byte, 4)
-		binary.BigEndian.PutUint32(data, *registrosMap32[registroDato]) //? uint32 a []byte
+		binary.BigEndian.PutUint32(data, *registrosMap32[registroDato])
 		return data
 	}
 }
@@ -712,10 +708,10 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "POST", "memoria/movout", body)
-
-	if respuesta == nil {
-		fmt.Println("ERROR: respuesta es nil")
+	respuesta, err := config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "POST", "memoria/movout", body)
+	if err != nil {
+		fmt.Println(err)
+		return ""
 	}
 
 	if respuesta.StatusCode == http.StatusNotFound {
@@ -747,7 +743,11 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	}
 
 	// Envía la solicitud de ejecución a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body)
+	respuesta, err := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// Decodifica en formato JSON la request.
 	var respWait string
@@ -788,13 +788,17 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "signal", body)
+	respuesta, err := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "signal", body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	if respuesta.StatusCode != http.StatusOK {
 
 		*cicloFinalizado = true
 		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "ERROR: Recurso no existe"
-
 		return
 	}
 

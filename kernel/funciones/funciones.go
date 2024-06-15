@@ -204,8 +204,9 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 	}
 
 	// Envía una solicitud al servidor CPU.
-	respuesta := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
-	if respuesta == nil {
+	respuesta, err := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
+	if err != nil {
+		fmt.Println(err)
 		return structs.PCB{}, "ERROR"
 	}
 
