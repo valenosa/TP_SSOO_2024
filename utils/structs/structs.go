@@ -102,7 +102,8 @@ type RequestEjecutarInstruccionIO struct {
 
 // Estructura que comunica Kernel con CPU y CPU con memoria para la instruccion STDIN.
 type RequestInputSTDIN struct {
-	TextoUsuario      string
+	Pid               uint32
+	TextoUsuario      []byte
 	RegistroDireccion uint32
 	//? Tambien deberia estar el pid?
 }

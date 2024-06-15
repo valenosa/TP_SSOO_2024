@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sync"
@@ -146,22 +147,33 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	//--------- REQUEST A MEMORIA ---------
 
-	responseInputUsuario := structs.RequestInputSTDIN{
-		TextoUsuario:      inputTruncado,
+	bodyWriteMemoria := structs.RequestInputSTDIN{
+		Pid:               instruccionIO.PidDesalojado,
+		TextoUsuario:      []byte(inputTruncado),
 		RegistroDireccion: instruccionIO.RegistroDireccion,
 	}
 
-	body, err := json.Marshal(responseInputUsuario)
+	body, err := json.Marshal(bodyWriteMemoria)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Envía la request a memoria
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/stdin", body) // TODO: Cambiar endpoint de la request a memoria
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/movout", body) // TODO: Cambiar endpoint de la request a memoria
 	if respuesta == nil {
 		return
 	}
+
+	marcoBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		return
+	}
+
+	// Convierte el valor de la instrucción a un uint64 bits.
+	testInput := string(marcoBytes)
+
+	fmt.Println("Mi input es: ", testInput)
 
 	//--------- RESPUESTA ---------
 
@@ -171,12 +183,6 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 }
 
-/*
-IO_STDOUT_WRITE (Interfaz, Registro Dirección, Registro Tamaño):
-Esta instrucción solicita al Kernel que mediante la interfaz seleccionada,
-se lea desde la posición de memoria indicada por la Dirección Lógica almacenada en el Registro Dirección,
-un tamaño indicado por el Registro Tamaño y se imprima por pantalla.
-*/
 func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	mx_interfaz.Lock()
 
