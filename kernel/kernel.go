@@ -193,9 +193,11 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	//Recorre la lista de NEW
 	var listaDeProcesos []structs.ResponseListarProceso
 
-	//listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
+	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
-	//listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
+	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
+	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
+	listaDeProcesos = append(listaDeProcesos, procesoExec)
 
 	//----------- DEVUELVE -----------
 
