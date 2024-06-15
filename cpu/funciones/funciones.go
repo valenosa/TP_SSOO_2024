@@ -590,7 +590,6 @@ func resize(tamañoEnBytes string) string {
 	return string(bodyBytes)
 }
 
-// TODO: Probar
 func movIN(registroDato string, registroDireccion string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
 
 	var direccionFisica uint32
@@ -665,7 +664,6 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	return "OK"
 }
 
-// TODO: Probar
 func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
 	if len(data) == 1 {
 		*registrosMap8[registroDato] = uint8(data[0])
@@ -691,7 +689,6 @@ func obtenerDireccionFisica(registroDireccion string, registrosMap8 map[string]*
 	return TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
 }
 
-// TODO: Probar
 func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
 
 	direccionFisica, encontrado := obtenerDireccionFisica(registroDireccion, registrosMap8, registrosMap32, TLB, prioridadesTLB)
@@ -842,14 +839,7 @@ func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, PID uint32) {
 
 }
 
-func ioSTD(
-	nombreInterfaz string,
-	regDir string,
-	regTamaño string,
-	registroMap8 map[string]*uint8,
-	registroMap32 map[string]*uint32,
-	PID uint32,
-	tlb *TLB,
+func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32, tlb *TLB,
 	prioridadesTLB *[]ElementoPrioridad, instruccionIO string) {
 
 	//Extrae el tamaño de la instrucción
@@ -906,7 +896,6 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 
 	// Crea una nueva solicitud GET
 	req, err := http.NewRequest("GET", url, nil)
-
 	if err != nil {
 		return ""
 	}
