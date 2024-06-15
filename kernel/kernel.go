@@ -421,5 +421,11 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
 	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 	pcbDesalojado.Estado = "READY"
+
+	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR
+	if funciones.ConfigJson.Planning_Algorithm == "VRR" {
+		pcbDesalojado.Estado = "READY_PRIORITARIO"
+	}
+
 	funciones.AdministrarQueues(pcbDesalojado)
 }
