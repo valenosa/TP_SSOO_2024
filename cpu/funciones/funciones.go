@@ -109,7 +109,6 @@ func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) { //*OK
 	desplazamiento := direccionLogica - numeroDePagina*int(ConfigJson.Page_Size)
 
 	return numeroDePagina, desplazamiento
-
 }
 
 // TODO: probar
@@ -370,16 +369,27 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		//TODO: logueano
 
 	case "MOV_OUT":
-		movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
+		estado := movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 		//TODO: logueano
+		if estado == "OUT OF MEMORY" {
+			*cicloFinalizado = true
+			PCB.Estado = "EXIT"
+			MotivoDeDesalojo = estado //TODO: Manejar en kernel
+			return
+		}
 
 	case "COPY_STRING":
-		copyString(variable[1], TLB, prioridadesTLB)
+		estado := copyString(variable[1], TLB, prioridadesTLB)
 		//TODO: logueano
+		if estado == "OUT OF MEMORY" {
+			*cicloFinalizado = true
+			PCB.Estado = "EXIT"
+			MotivoDeDesalojo = estado //TODO: Manejar en kernel
+			return
+		}
 
 	case "RESIZE":
 		estado := resize(variable[1])
-		//!Pasar a exit
 		if estado == "OUT OF MEMORY" {
 			*cicloFinalizado = true
 			PCB.Estado = "EXIT"
