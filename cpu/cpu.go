@@ -44,6 +44,8 @@ func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.Elem
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		//--------- REQUEST ---------
+
 		// Crea una variable tipo BodyIniciar (para interpretar lo que se recibe de la pcbRecibido)
 		var pcbRecibido structs.PCB
 
@@ -57,6 +59,8 @@ func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.Elem
 			return
 		}
 
+		//--------- EJECUTAR ---------
+
 		fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
 
 		funciones.PidEnEjecucion = pcbRecibido.PID
@@ -64,6 +68,8 @@ func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.Elem
 		// Ejecuta el ciclo de instrucción.
 		funciones.RegistrosCPU = pcbRecibido.RegistrosUsoGeneral
 		funciones.EjecutarCiclosDeInstruccion(&pcbRecibido, TLB, prioridadesTLB)
+
+		//--------- RESPUESTA ---------
 
 		// Devuelve a dispatch el contexto de ejecucion y el motivo del desalojo
 		respuesta, err := json.Marshal(structs.RespuestaDispatch{
@@ -85,6 +91,9 @@ func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.Elem
 
 // Checkea que Kernel no haya enviado interrupciones
 func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
+
+	//--------- REQUEST ---------
+
 	queryParams := r.URL.Query()
 
 	funciones.MotivoDeDesalojo = queryParams.Get("interrupt_type")

@@ -5,5 +5,6 @@
     "number_felling_tlb": 32,
     "algorithm_tlb": "FIFO",
     "ip_kernel": "127.0.0.1", 
-    "port_kernel": 8001
+    "port_kernel": 8001,
+    "page_size": 16
 }

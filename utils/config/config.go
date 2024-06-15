@@ -20,6 +20,7 @@ type Cpu struct {
 	Algorithm_tlb      string `json:"algorithm_tlb"`
 	Ip_Kernel          string `json:"ip_kernel"`
 	Port_Kernel        int    `json:"port_kernel"`
+	Page_Size          int    `json:"page_size"`
 }
 
 type IO struct {

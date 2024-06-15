@@ -47,7 +47,7 @@ type RegistrosUsoGeneral struct {
 	DI  uint32
 }
 
-//=====================================|  |=====================================\\
+//=====================================| KERNEL |=====================================\\
 
 // Kernel, Memoria
 // Estructura de respuesta al iniciar un proceso
@@ -113,3 +113,9 @@ type RequestInputSTDIN struct {
 
 // Tabla de páginas. Es un slice de marcos que contiene solamente las páginas validadas.
 type Tabla []int
+
+type RequestMovOUT struct {
+	Pid  uint32
+	Dir  uint32
+	Data []byte
+}

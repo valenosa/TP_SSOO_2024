@@ -44,8 +44,8 @@ func main() {
 	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
 	http.HandleFunc("GET /memoria/marco", handlerObtenerMarco(tablasDePaginas))
-	http.HandleFunc("PUT /movin", handlerMovIn(espacioUsuario))
-
+	http.HandleFunc("GET /memoria/movin", handlerMovIn(&espacioUsuario, tablasDePaginas))
+	http.HandleFunc("POST /memoria/movout", handlerMovOut(&espacioUsuario, tablasDePaginas))
 
 	// Inicio el servidor de Memoria
 	config.IniciarServidor(funciones.ConfigJson.Port)
@@ -59,6 +59,8 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 	// Handler para iniciar un proceso.
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		//--------- REQUEST ---------
+
 		//variable que recibirá la request.
 		var request structs.BodyIniciarProceso
 
@@ -70,10 +72,14 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 			return
 		}
 
+		//--------- EJECUTA ---------
+
 		// Se guardan las instrucciones en un map de memoria.
 		funciones.GuardarInstrucciones(request.PID, request.Path, memoriaInstrucciones)
 
 		funciones.AsignarTabla(request.PID, tablaDePaginas)
+
+		//--------- RESPUESTA ---------
 
 		// Crea una variable tipo Response (para confeccionar una respuesta)
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
@@ -95,6 +101,9 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 	// Handler para enviar una instruccion
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
+
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
 		pc, errPC := strconv.ParseUint(queryParams.Get("PC"), 10, 32)
@@ -103,11 +112,15 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 			return
 		}
 
+		//--------- EJECUTA ---------
+
 		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
 		fmt.Println(instruccion) //! Borrar despues
 
 		// Esperar un tiempo determinado a tiempo de retardo
 		time.Sleep(time.Duration(funciones.ConfigJson.Delay_Response) * time.Millisecond)
+
+		//--------- RESPUESTA ---------
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(instruccion))
@@ -119,12 +132,17 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 
 	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
+
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
 
 		if errPid != nil {
 			return
 		}
+
+		//--------- EJECUTA ---------
 
 		// Borrar instrucciones
 		delete(memoriaInstrucciones, uint32(pid))
@@ -133,8 +151,9 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		// Borrar tabla de páginas
 		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
 
-		w.WriteHeader(http.StatusOK) //?
-		// w.Write([]byte)
+		//--------- RESPUESTA ---------
+
+		w.WriteHeader(http.StatusOK) //? Es necesario?
 	}
 }
 
@@ -142,6 +161,8 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
 
 		// Desglosa los Query Params
 		queryParams := r.URL.Query()
@@ -154,15 +175,12 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 			return
 		}
 
+		//--------- EJECUTA ---------
+
 		// Busca marco en la tabla de páginas, y en caso de no encontrarlo, devuelve un string vacío
 		marco := funciones.BuscarMarco(uint32(pid), uint32(pagina), tablaDePaginas)
 
-		// Codifica la respuesta en formato JSON
-		respuesta, err := json.Marshal(marco)
-		if err != nil {
-			http.Error(w, "Error al codificar los datos como JSON", http.StatusInternalServerError)
-			return
-		}
+		//--------- RESPUESTA ---------
 
 		// Devuelve un status code dependiendo de si se encontró o no el marco
 		if marco == "" {
@@ -172,31 +190,83 @@ func handlerObtenerMarco(tablaDePaginas map[uint32]structs.Tabla) func(http.Resp
 		}
 
 		// Envía la respuesta al MMU
-		w.Write(respuesta)
+		w.Write([]byte(marco))
 	}
 }
 
 // TODO: Probar
-func handlerMovIn(espacioUsuario []byte) func(http.ResponseWriter, *http.Request) {
+func handlerMovIn(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
 
-	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
 
 		//Obtengo los query params
 		queryParams := r.URL.Query()
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
 		direccionFisica, errDF := strconv.ParseUint(queryParams.Get("dir"), 10, 32)
-		tamanioRegistro, errReg := strconv.ParseUint(queryParams.Get("size"), 10, 32)
+		byteArraySize, errReg := strconv.Atoi(queryParams.Get("size"))
 
 		// Maneja error en caso de que no se pueda parsear el query
-		if errDF != nil || errReg != nil {
+		if errDF != nil || errReg != nil || errPid != nil {
 			http.Error(w, "Error al parsear las query params", http.StatusInternalServerError)
 			return
 		}
 
-		registroLeido := funciones.LeerEnMemoria(direccionFisica, tamanioRegistro, espacioUsuario)
+		//--------- EJECUTA ---------
 
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(registroLeido))
+		pagina := funciones.ObtenerPagina(uint32(pid), uint32(direccionFisica), tablaDePaginas)
+
+		data, estado := funciones.LeerEnMemoria(uint32(pid), tablaDePaginas, uint32(pagina), uint32(direccionFisica), byteArraySize, espacioUsuario)
+
+		//--------- RESPUESTA ---------
+
+		if estado != "OK" {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+
+		w.Write(data)
+	}
+}
+
+// TODO: Probar
+func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) { //? Es necesario este parámetro?
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
+
+		// Variable que recibirá la request.
+		var request structs.RequestMovOUT
+
+		// Decodifica en formato JSON la request.
+		err := json.NewDecoder(r.Body).Decode(&request)
+		if err != nil {
+			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//--------- EJECUTA ---------
+
+		pagina := funciones.ObtenerPagina(request.Pid, request.Dir, tablaDePaginas)
+
+		if pagina == -1 {
+			fmt.Println("No se encontró la página")
+		}
+
+		estado := funciones.EscribirEnMemoria(request.Pid, tablaDePaginas, uint32(pagina), request.Dir, request.Data, espacioUsuario)
+		// Devuelve un status code dependiendo de si se encontró o no el marco
+		if estado == "OK" {
+			w.WriteHeader(http.StatusOK)
+		}
+		if estado == "OUT OF MEMORY" {
+			w.WriteHeader(http.StatusNotFound)
+		}
+
+		//--------- RESPUESTA ---------
+		w.Write([]byte(estado))
 	}
 }
 
@@ -205,6 +275,9 @@ func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func
 
 	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		//--------- REQUEST ---------
+
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
 		size, errSize := strconv.ParseUint(queryParams.Get("size"), 10, 32)
@@ -212,8 +285,11 @@ func handlerResize(tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool) func
 		if errPid != nil || errSize != nil {
 			return
 		}
+		//--------- EJECUTA ---------
 
 		estado := funciones.ReasignarPaginas(uint32(pid), tablaDePaginas, bitMap, uint32(size))
+
+		//--------- RESPUESTA ---------
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(estado))
