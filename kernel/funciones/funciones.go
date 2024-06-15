@@ -67,10 +67,11 @@ func Planificador() {
 		// Espero que exista PCB en READY (Tanto en READY como en READY_PRIORITARIO)
 		<-Bin_hayPCBenREADY
 
-		var siguientePCB structs.PCB
-		var tiempoInicioQuantum time.Time
+		var siguientePCB structs.PCB      // PCB a enviar al CPU
+		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
 
-		if ConfigJson.Planning_Algorithm == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 { //! A lo mejor tiene que ser con semaforos pero es para testear la idea
+		//! A lo mejor tiene que ser con semaforos pero es para testear la idea
+		if strings.ToUpper(ConfigJson.Planning_Algorithm) == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 {
 
 			siguientePCB = ListaREADY_PRIORITARIO.Dequeue()
 			go roundRobin(siguientePCB.PID, int(siguientePCB.Quantum))
