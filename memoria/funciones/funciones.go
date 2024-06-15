@@ -69,7 +69,6 @@ func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Ta
 	return marcoStr
 }
 
-// TODO: Probar
 func ObtenerPagina(pid uint32, direccionFisica uint32, tablaDePaginas map[uint32]structs.Tabla) int {
 
 	marco := math.Floor(float64(direccionFisica) / float64(ConfigJson.Page_Size))
@@ -88,12 +87,10 @@ func ObtenerPagina(pid uint32, direccionFisica uint32, tablaDePaginas map[uint32
 	return -1
 }
 
-// TODO: Probar
 func tableHasNext(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Tabla) bool {
 	return len(tablaDePaginas[pid])-1 > int(pagina)
 }
 
-// TODO: Probar
 // Verifica si la pagina aun tiene espacio en memoria
 func endOfPage(direccionFisica uint32) bool {
 	//Si la direccion es multiplo del tamaño de pagina, es el fin de la pagina
@@ -159,7 +156,6 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 	return "OK" //?
 }
 
-// TODO: Probar
 func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, byteArraySize int, espacioUsuario *[]byte) ([]byte, string) {
 
 	var dato []byte
@@ -185,7 +181,6 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 	return dato, "OK" //?
 }
 
-// TODO: Probar
 // Escribe en memoria el dato recibido en la dirección física especificada.
 func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, datoBytes []byte, espacioUsuario *[]byte) string {
 
@@ -210,7 +205,6 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 	return "OK" //?
 }
 
-// TODO: Probar
 func cambioDePagina(direccionFisica *uint32, pid uint32, tablasDePaginas map[uint32]structs.Tabla, pagina uint32) bool {
 
 	if tableHasNext(pid, pagina, tablasDePaginas) {

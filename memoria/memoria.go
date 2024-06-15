@@ -137,8 +137,7 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		//--------- REQUEST ---------
 
 		queryParams := r.URL.Query()
-		pid, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
-
+		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
 		if errPid != nil {
 			return
 		}
@@ -154,7 +153,7 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 
 		//--------- RESPUESTA ---------
 
-		w.WriteHeader(http.StatusOK) //? Es necesario?
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
