@@ -66,7 +66,7 @@ func conectarInterfazIO(nombre string) {
 
 func iniciarServidorInterfaz() error {
 
-	http.HandleFunc("POST /GENERICA /IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
+	http.HandleFunc("POST /GENERICA/IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
 	http.HandleFunc("POST /STDIN/IO_STDIN_READ", handlerIO_STDIN_READ)
 	http.HandleFunc("POST /STDIN/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
 
@@ -134,6 +134,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	//Lee hasta que haya un salto de linea
 	input, err := reader.ReadString('\n')
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -143,14 +144,14 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	input = input[:len(input)-1]
 
 	// Recorta la longitud del input en base al registroTamaño
-	inputTruncado := input[0:instruccionIO.RegistroTamaño]
+	inputTruncado := input[0:instruccionIO.Tamaño]
 
 	//--------- REQUEST A MEMORIA ---------
 
-	bodyWriteMemoria := structs.RequestInputSTDIN{
-		Pid:               instruccionIO.PidDesalojado,
-		TextoUsuario:      []byte(inputTruncado),
-		RegistroDireccion: instruccionIO.RegistroDireccion,
+	bodyWriteMemoria := structs.RequestMovOUT{
+		Pid:  instruccionIO.PidDesalojado,
+		Dir:  instruccionIO.Direccion,
+		Data: []byte(inputTruncado),
 	}
 
 	body, err := json.Marshal(bodyWriteMemoria)
@@ -160,7 +161,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía la request a memoria
-	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "/movout", body) // TODO: Cambiar endpoint de la request a memoria
+	respuesta := config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body) // TODO: Cambiar endpoint de la request a memoria
 	if respuesta == nil {
 		return
 	}
@@ -179,6 +180,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(":)"))
 	mx_interfaz.Unlock()
 
 }
@@ -199,7 +201,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	//--------- REQUEST A MEMORIA ---------
 
-	body, err := json.Marshal(instruccionIO.RegistroDireccion)
+	body, err := json.Marshal(instruccionIO.Direccion)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -220,7 +222,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Recorta la longitud del input en base al registroTamaño
-	inputTruncado = inputTruncado[0:instruccionIO.RegistroTamaño]
+	inputTruncado = inputTruncado[0:instruccionIO.Tamaño]
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
 	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.

@@ -396,17 +396,17 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
-		go ioGenSleep(variable[1], variable[2], registrosMap8, PCB.PID)
+		go ioGenSleep(variable[1], variable[2], PCB.PID)
 
 	case "IO_STDIN_READ":
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
-		go IoSTDINread(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB)
+		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDIN_READ")
 
 	case "IO_STDOUT_WRITE":
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
-		go ioSTDOUTwrite(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB) //TODO: IN -> OUT
+		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDOUT_WRITE") //TODO: IN -> OUT
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -675,27 +675,27 @@ func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[stri
 	}
 }
 
+func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) []byte {
+	if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
+		return []byte{*registrosMap8[registroDato]} //?[]byte{byte(*registrosMap8[registroDato])}
+	} else {
+		data := make([]byte, 4)
+		binary.BigEndian.PutUint32(data, *registrosMap32[registroDato]) //? uint32 a []byte
+		return data
+	}
+}
+
+func obtenerDireccionFisica(registroDireccion string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
+	if registroDireccion == "AX" || registroDireccion == "BX" || registroDireccion == "CX" || registroDireccion == "DX" {
+		return TraduccionMMU(PidEnEjecucion, int(*(registrosMap8[registroDireccion])), TLB, prioridadesTLB)
+	}
+	return TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
+}
+
 // TODO: Probar
 func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
 
-	extraerDatos := func(registroDato string) []byte {
-		if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
-			return []byte{byte(*registrosMap8[registroDato])}
-		} else {
-			data := make([]byte, 4)
-			binary.BigEndian.PutUint32(data, *registrosMap32[registroDato]) //? uint32 a []byte
-			return data
-		}
-	}
-
-	obtenerDireccionFisica := func(registroDireccion string) (uint32, bool) {
-		if registroDireccion == "AX" || registroDireccion == "BX" || registroDireccion == "CX" || registroDireccion == "DX" {
-			return TraduccionMMU(PidEnEjecucion, int(*(registrosMap8[registroDireccion])), TLB, prioridadesTLB)
-		}
-		return TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
-	}
-
-	direccionFisica, encontrado := obtenerDireccionFisica(registroDireccion)
+	direccionFisica, encontrado := obtenerDireccionFisica(registroDireccion, registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
@@ -703,7 +703,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	}
 
-	valor := extraerDatos(registroDato)
+	valor := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
 
 	body, err := json.Marshal(structs.RequestMovOUT{Pid: PidEnEjecucion, Dir: direccionFisica, Data: valor})
 
@@ -729,7 +729,6 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	return "OK"
 }
-
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
@@ -809,7 +808,7 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 }
 
 // Envía una request a Kernel con el nombre de una interfaz y las unidades de trabajo a multiplicar.
-func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap map[string]*uint8, PID uint32) {
+func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, PID uint32) {
 
 	// Convierte el tiempo de trabajo de la unidad de cadena a entero.
 	unitWorkTime, err := strconv.Atoi(unitWorkTimeString)
@@ -836,7 +835,7 @@ func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, registroMap ma
 
 }
 
-func IoSTDINread(
+func ioSTD(
 	nombreInterfaz string,
 	regDir string,
 	regTamaño string,
@@ -844,39 +843,26 @@ func IoSTDINread(
 	registroMap32 map[string]*uint32,
 	PID uint32,
 	tlb *TLB,
-	prioridadesTLB *[]ElementoPrioridad) {
+	prioridadesTLB *[]ElementoPrioridad, instruccionIO string) {
 
-	// Verifica si existe el registro especificado en la instrucción.
-	registroDireccion, encontrado := registroMap32[regDir] //TODO: Adaptar para los dos tipos de registro
-	if !encontrado {
-		fmt.Println("Registro invalido")
-		return
-	}
-
-	// Verifica si existe el registro especificado en la instrucción.
-	registroTamaño, encontrado := registroMap8[regTamaño] //TODO: Adaptar para los dos tipos de registro
-	if !encontrado {
-		fmt.Println("Registro invalido")
-		return
-	}
+	//Extrae el tamaño de la instrucción
+	tamañoBytes := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
+	tamaño := binary.BigEndian.Uint32(tamañoBytes)
 
 	//Traduce dirección lógica a física
-	registroDireccionFisica, encontrado := TraduccionMMU(PID, int(*registroDireccion), tlb, prioridadesTLB)
+	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
 	if !encontrado {
 		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
 		return
 	}
 
-	//Le asigna el valor de la dirección física al registroDireccion.
-	*registroDireccion = registroDireccionFisica
-
 	//Crea una variable que contiene el cuerpo de la request.
 	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
-		PidDesalojado:     PID,
-		NombreInterfaz:    nombreInterfaz,
-		Instruccion:       "IO_STDIN_READ",
-		RegistroDireccion: *registroDireccion,
-		RegistroTamaño:    *registroTamaño,
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		Instruccion:    instruccionIO,
+		Direccion:      direccion,
+		Tamaño:         tamaño,
 	}
 
 	// Convierte request a JSON
@@ -886,64 +872,6 @@ func IoSTDINread(
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
-}
-
-/*
-IO_STDOUT_WRITE (Interfaz, Registro Dirección, Registro Tamaño):
-Esta instrucción solicita al Kernel que mediante la interfaz seleccionada,
-se lea desde la posición de memoria indicada por la Dirección Lógica almacenada en el Registro Dirección,
-un tamaño indicado por el Registro Tamaño y se imprima por pantalla.
-*/
-func ioSTDOUTwrite(nombreInterfaz string,
-	regDir string,
-	regTamaño string,
-	registroMap8 map[string]*uint8,
-	registroMap32 map[string]*uint32,
-	PID uint32,
-	tlb *TLB,
-	prioridadesTLB *[]ElementoPrioridad) {
-
-	// Verifica si existe el registro especificado en la instrucción.
-	registroDireccion, encontrado := registroMap32[regDir]
-	if !encontrado {
-		fmt.Println("Registro invalido")
-		return
-	}
-
-	// Verifica si existe el registro especificado en la instrucción.
-	registroTamaño, encontrado := registroMap8[regTamaño]
-	if !encontrado {
-		fmt.Println("Registro invalido")
-		return
-	}
-
-	//Traduce dirección lógica a física
-	registroDireccionFisica, encontrado := TraduccionMMU(PID, int(*registroDireccion), tlb, prioridadesTLB)
-	if !encontrado {
-		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
-		return
-	}
-
-	//Le asigna el valor de la dirección física al registroDireccion.
-	*registroDireccion = registroDireccionFisica
-
-	//Crea una variable que contiene el cuerpo de la request.
-	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
-		PidDesalojado:     PID,
-		NombreInterfaz:    nombreInterfaz,
-		Instruccion:       "IO_STDOUT_WRITE",
-		RegistroDireccion: *registroDireccion,
-		RegistroTamaño:    *registroTamaño,
-	}
-
-	// Convierte request a JSON
-	body, err := json.Marshal(requestEjecutarInstuccion)
-	if err != nil {
-		return
-	}
-
-	// Envía la solicitud de ejecución a Kernel
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
 

@@ -92,19 +92,19 @@ type RequestConectarInterfazIO struct {
 // TODO: Implementar para DialFS
 // Estructura de comunicacion entre CPU y Kernel para ejecutar una instruccion de I/O
 type RequestEjecutarInstruccionIO struct {
-	PidDesalojado     uint32
-	NombreInterfaz    string
-	Instruccion       string
-	UnitWorkTime      int
-	RegistroDireccion uint32
-	RegistroTamaño    uint8
+	PidDesalojado  uint32
+	NombreInterfaz string
+	Instruccion    string
+	UnitWorkTime   int
+	Direccion      uint32
+	Tamaño         uint32
 }
 
 // Estructura que comunica Kernel con CPU y CPU con memoria para la instruccion STDIN.
 type RequestInputSTDIN struct {
 	Pid               uint32
-	TextoUsuario      []byte
 	RegistroDireccion uint32
+	TextoUsuario      []byte
 	//? Tambien deberia estar el pid?
 }
 

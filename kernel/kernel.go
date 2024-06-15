@@ -403,10 +403,15 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
-	query := interfazSolicitada.TipoInterfaz + " /" + requestInstruccionIO.Instruccion
+	query := interfazSolicitada.TipoInterfaz + "/" + requestInstruccionIO.Instruccion
 
 	respuesta := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body)
-	if respuesta.StatusCode != http.StatusOK {
+
+	if respuesta == nil {
+		fmt.Println("jijo")
+	}
+
+	if respuesta.StatusCode != http.StatusOK { //?
 		http.Error(w, "Error en la respuesta de I/O.", http.StatusInternalServerError)
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
