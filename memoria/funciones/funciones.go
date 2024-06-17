@@ -1,13 +1,14 @@
 package funciones
 
 import (
-	"fmt"
+	"log"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -27,7 +28,7 @@ func ExtractInstructions(path string) []byte {
 	// Lee el archivo
 	file, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("Error al leer el archivo de instrucciones")
+		logueano.AuxLog.Println("Error al leer el archivo de instrucciones")
 		return nil
 	}
 
@@ -42,19 +43,15 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 	instrucciones := strings.Split(string(data), "\n")
 	// Insertar las instrucciones en la memoria de instrucciones
 	memoriaInstrucciones[pid] = instrucciones
+
 	// Imprimir las instrucciones guardadas en memoria
-	fmt.Println("Instrucciones guardadas en memoria: ")
-	for pid, instrucciones := range memoriaInstrucciones {
-		fmt.Printf("PID: %d\n", pid)
-		for _, instruccion := range instrucciones {
-			fmt.Println(instruccion)
-		}
-		fmt.Println()
-	}
+	logueano.LeerInstrucciones(memoriaInstrucciones)
 }
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
 	tablaDePaginas[pid] = structs.Tabla{}
+
+	logueano.OperoConTablaDePaginas(pid, tablaDePaginas)
 }
 
 func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Tabla) string {
@@ -63,6 +60,8 @@ func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Ta
 	}
 
 	marco := tablaDePaginas[pid][pagina]
+
+	logueano.AccesoTabla(pid, pagina, marco)
 
 	marcoStr := strconv.Itoa(marco)
 
@@ -105,6 +104,8 @@ func LiberarMarcos(marcosALiberar []int, bitMap []bool) {
 
 func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitMap []bool, size uint32) string {
 
+	var accion string
+
 	lenOriginal := len((*tablaDePaginas)[pid]) //!
 
 	cantidadDePaginas := int(math.Ceil(float64(size) / float64(ConfigJson.Page_Size)))
@@ -140,6 +141,8 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 		}
 	}
 
+	accion = "Ampliar"
+
 	//*CASO QUITAR PAGINAS
 	//?Hace falta devolver algo?
 	if len((*tablaDePaginas)[pid]) > cantidadDePaginas {
@@ -149,9 +152,12 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 		(*tablaDePaginas)[pid] = (*tablaDePaginas)[pid][:cantidadDePaginas]
 
 		LiberarMarcos(marcosALiberar, bitMap)
+
+		accion = "Reducir"
 	}
 
-	fmt.Printf("Se pasó de %d a %d páginas\n", lenOriginal, len((*tablaDePaginas)[pid]))
+	// log obligatorio ((3...4)/6)
+	log.Printf("PID: %d - Tamaño Actual: %d - Tamaño a %s: %d\n", pid, lenOriginal, accion, len((*tablaDePaginas)[pid]))
 
 	return "OK" //?
 }
@@ -178,6 +184,8 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 		}
 	}
 
+	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize)
+
 	return dato, "OK" //?
 }
 
@@ -201,6 +209,8 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 			}
 		}
 	}
+
+	logueano.AccesoEspacioUsuario(pid, "ESCRIBIR", direccionFisica, len(datoBytes))
 
 	return "OK" //?
 }

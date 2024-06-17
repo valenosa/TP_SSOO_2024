@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"

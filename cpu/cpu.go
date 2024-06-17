@@ -9,6 +9,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/cpu/funciones"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -17,7 +18,11 @@ import (
 func main() {
 
 	// Configura el logger
-	config.Logger("CPU.log")
+	// Configura el logger
+	logueano.Logger()
+	//auxLog := logueano.AuxLogger()
+
+	//auxLogger.Println("This is a message from the auxiliary logger")
 
 	// ======== Make ========
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -22,7 +23,8 @@ var configInterfaz config.IO
 func main() {
 
 	// Configura el logger
-	config.Logger("IO.log")
+	logueano.Logger()
+	//auxLog := logueano.AuxLogger()
 
 	//Toma los parametros pasados por argumento
 	nombreInterfaz := os.Args[1]

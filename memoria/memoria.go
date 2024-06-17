@@ -9,6 +9,7 @@ import (
 
 	"github.com/sisoputnfrba/tp-golang/memoria/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -36,7 +37,9 @@ func main() {
 	_ = espacioUsuario
 
 	// Configura el logger
-	config.Logger("Memoria.log")
+	logueano.Logger()
+
+	//auxLog.Println("This is a message from the auxiliary logger")
 
 	// ======== HandleFunctions ========
 	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
@@ -148,7 +151,10 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		delete(memoriaInstrucciones, uint32(pid))
 		// Desocupar marcos
 		funciones.LiberarMarcos(tablaDePaginas[uint32(pid)], bitMap)
+
 		// Borrar tabla de páginas
+		logueano.OperoConTablaDePaginas(uint32(pid), tablaDePaginas)
+
 		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
 
 		//--------- RESPUESTA ---------

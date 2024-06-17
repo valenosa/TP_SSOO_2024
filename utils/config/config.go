@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -87,15 +86,6 @@ func Iniciar(filePath string, configJson interface{}) {
 	if err != nil {
 		fmt.Println("Error al iniciar configuración: ", err)
 	}
-}
-
-func Logger(path string) {
-	logFile, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	if err != nil {
-		panic(err)
-	}
-	mw := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(mw)
 }
 
 //*======================================| TESTEO |=======================================\\
