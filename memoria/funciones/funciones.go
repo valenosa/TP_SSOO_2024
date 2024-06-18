@@ -1,7 +1,6 @@
 package funciones
 
 import (
-	"log"
 	"math"
 	"os"
 	"strconv"
@@ -13,6 +12,17 @@ import (
 )
 
 var ConfigJson config.Memoria
+
+var Auxlogger *logueano.AuxLogger
+
+// Inicializa el logger auxiliar
+func init() {
+	var err error
+	Auxlogger, err = logueano.NewLogger("memoria")
+	if err != nil {
+		panic(err)
+	}
+}
 
 // Funciones auxiliares
 // Toma de a un archivo a la vez y guarda las instrucciones en un map l
@@ -28,7 +38,7 @@ func ExtractInstructions(path string) []byte {
 	// Lee el archivo
 	file, err := os.ReadFile(path)
 	if err != nil {
-		logueano.AuxLog.Println("Error al leer el archivo de instrucciones")
+		logueano.Mensaje(Auxlogger, "Error al leer el archivo de instrucciones")
 		return nil
 	}
 
@@ -45,7 +55,7 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 	memoriaInstrucciones[pid] = instrucciones
 
 	// Imprimir las instrucciones guardadas en memoria
-	logueano.LeerInstrucciones(memoriaInstrucciones)
+	logueano.LeerInstrucciones(Auxlogger, memoriaInstrucciones) //! verificar funcionamiento
 }
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
@@ -157,7 +167,7 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 	}
 
 	// log obligatorio ((3...4)/6)
-	log.Printf("PID: %d - Tamaño Actual: %d - Tamaño a %s: %d\n", pid, lenOriginal, accion, len((*tablaDePaginas)[pid]))
+	logueano.CambioDeTamaño(pid, lenOriginal, accion, tablaDePaginas)
 
 	return "OK" //?
 }
@@ -165,6 +175,8 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, byteArraySize int, espacioUsuario *[]byte) ([]byte, string) {
 
 	var dato []byte
+
+	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize) //? Lo dejo asi o lo pongo siempre que se pueda leer (es decir, cuando no hay error)
 
 	// Itera sobre los bytes del dato recibido.
 	for ; byteArraySize > 0; byteArraySize-- {
@@ -183,14 +195,13 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 			}
 		}
 	}
-
-	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize)
-
 	return dato, "OK" //?
 }
 
 // Escribe en memoria el dato recibido en la dirección física especificada.
 func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, datoBytes []byte, espacioUsuario *[]byte) string {
+
+	logueano.AccesoEspacioUsuario(pid, "ESCRIBIR", direccionFisica, len(datoBytes)) //? Lo dejo asi o lo pongo siempre que se pueda leer (es decir, cuando no hay error)
 
 	// Itera sobre los bytes del dato recibido.
 	for i := range datoBytes {
@@ -209,8 +220,6 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 			}
 		}
 	}
-
-	logueano.AccesoEspacioUsuario(pid, "ESCRIBIR", direccionFisica, len(datoBytes))
 
 	return "OK" //?
 }

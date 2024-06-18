@@ -9,11 +9,11 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
-// Configuro el log principal
-// -------------------------------------------------------------------------
+// -------------------------- == LOG's CONFIG == -----------------------------------------------------------
 
-func Logger() {
-	logFile, err := os.OpenFile("log.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+// Configuro el log principal
+func Logger(path string) {
+	logFile, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
 	}
@@ -22,23 +22,39 @@ func Logger() {
 }
 
 // Config de logs auxiliares
-// -------------------------------------------------------------------------
-func AuxLogger() *log.Logger {
-	auxLogFile, err := os.OpenFile("logAux.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	if err != nil {
-		panic(err)
-	}
-	mw := io.MultiWriter(os.Stdout, auxLogFile)
-	return log.New(mw, "AUX: ", log.LstdFlags)
+type AuxLogger struct {
+	Logx *log.Logger
 }
 
-var AuxLog *log.Logger = AuxLogger()
+// Inicializa y devuelve un nuevo Logger para un módulo específico
+func NewLogger(modulo string) (*AuxLogger, error) {
 
-// -------------------------- == LOG's CPU == --------------------------------------------------
+	// Archivo de log auxiliar
+	auxLogFile, err :=
+		os.OpenFile(modulo+"Aux.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //"logs/"+modulo+"/"+
 
-// -------------------------- == LOG's E/S == --------------------------------------------------
+	if err != nil {
+		return nil, err
+	}
 
-// -------------------------- == LOG's KERNEL == --------------------------------------------------
+	// Logger auxiliar
+	auxLogger := log.New(auxLogFile, "", log.LstdFlags)
+
+	return &AuxLogger{
+		Logx: auxLogger,
+	}, nil
+
+}
+
+// -------------------------- == LOG's CPU == -----------------------------------------------------------
+
+//log´s auxiliares------------------------------------------------------
+
+// -------------------------- == LOG's E/S == -----------------------------------------------------------
+
+//log´s auxiliares------------------------------------------------------
+
+// -------------------------- == LOG's KERNEL == -----------------------------------------------------------
 // log obligatorio (1/6)
 func LogNuevoProceso(nuevoPCB structs.PCB) {
 
@@ -70,7 +86,7 @@ func FinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
 
 }
 
-//LUEGO IMPLEMENTAR EN NUESTRO ARCHIVO NO OFICIAL DE LOGS ----------------------------
+//log´s auxiliares------------------------------------------------------
 
 // TODO: Implementar para blockedMap.
 func PidsBlock(blockQueue []structs.PCB) {
@@ -100,7 +116,7 @@ func EsperaNuevosProcesos() {
 
 }
 
-// -------------------------- == LOG's MEMORIA == --------------------------------------------------
+// -------------------------- == LOG's MEMORIA == -----------------------------------------------------------
 
 // log obligatorio (1/5)
 func OperoConTablaDePaginas(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
@@ -114,21 +130,40 @@ func AccesoTabla(pid uint32, pagina uint32, marco int) {
 	log.Printf("PID: %d - Pagina: %d - Marco: %d\n", pid, pagina, marco)
 }
 
+// log obligatorio ((3...4)/6)
+func CambioDeTamaño(pid uint32, lenOriginal int, accion string, tablaDePaginas *map[uint32]structs.Tabla) string {
+
+	log.Printf("PID: %d - Tamaño Actual: %d - Tamaño a %s: %d\n", pid, lenOriginal, accion, len((*tablaDePaginas)[pid]))
+
+	return "OK"
+}
+
 // log obligatorio (5/5)
 func AccesoEspacioUsuario(pid uint32, accion string, direccionFisica uint32, byteArraySize int) {
 
 	log.Printf("PID: %d - Accion: %s - Direccion Fisica: %d - Tamaño: %d\n", pid, accion, direccionFisica, byteArraySize)
 }
 
-func LeerInstrucciones(memoriaInstrucciones map[uint32][]string) {
+// log´s auxiliares------------------------------------------------------
+func LeerInstrucciones(auxLog *AuxLogger, memoriaInstrucciones map[uint32][]string) {
 
 	// Imprimir las instrucciones guardadas en memoria
-	AuxLog.Println("Instrucciones guardadas en memoria: ")
+	auxLog.Logx.Println("Instrucciones guardadas en memoria: ")
 	for pid, instrucciones := range memoriaInstrucciones {
-		AuxLog.Printf("PID: %d\n", pid)
+		auxLog.Logx.Printf("PID: %d\n", pid)
 		for _, instruccion := range instrucciones {
 			fmt.Println(instruccion)
 		}
 		fmt.Println()
 	}
+}
+
+func Error(auxLog *AuxLogger, err error) {
+	auxLog.Logx.Println(err)
+}
+
+// -------------------------- == AUX GENERICAS == -----------------------------------------------------------
+
+func Mensaje(auxLog *AuxLogger, mensaje string) {
+	auxLog.Logx.Println(mensaje)
 }

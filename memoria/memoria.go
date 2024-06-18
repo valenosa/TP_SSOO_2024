@@ -36,10 +36,8 @@ func main() {
 	_ = tablasDePaginas
 	_ = espacioUsuario
 
-	// Configura el logger
-	logueano.Logger()
-
-	//auxLog.Println("This is a message from the auxiliary logger")
+	// Configura el logger (aux en funciones.go)
+	logueano.Logger("memoria.log")
 
 	// ======== HandleFunctions ========
 	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
@@ -71,7 +69,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			logueano.Error(funciones.Auxlogger, err) //log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -89,7 +87,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			logueano.Error(funciones.Auxlogger, err) //log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -246,7 +244,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			logueano.Error(funciones.Auxlogger, err) // log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -256,7 +254,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		pagina := funciones.ObtenerPagina(request.Pid, request.Dir, tablaDePaginas)
 
 		if pagina == -1 {
-			fmt.Println("No se encontró la página")
+			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página")
 		}
 
 		estado := funciones.EscribirEnMemoria(request.Pid, tablaDePaginas, uint32(pagina), request.Dir, request.Data, espacioUsuario)
@@ -303,7 +301,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		//--------- REQUEST ---------
-		fmt.Println("Recibí un request copystr")
+		logueano.Mensaje(funciones.Auxlogger, "Recibí un request copystr")
 		//Obtengo los query params
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
@@ -324,7 +322,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		paginaLectura := funciones.ObtenerPagina(uint32(pid), uint32(direccionLectura), tablaDePaginas)
 
 		if paginaEscritura == -1 || paginaLectura == -1 {
-			fmt.Println("No se encontró la página") //? No debería pasar nunca pero x las dudas
+			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página") //? No debería pasar nunca pero x las dudas
 		}
 
 		//--------- LECTURA ---------

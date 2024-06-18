@@ -18,6 +18,17 @@ import (
 // ----------------------( VARIABLES )---------------------------\\
 var ConfigJson config.Kernel
 
+var Auxlogger *logueano.AuxLogger
+
+// Inicializa el logger auxiliar
+func init() {
+	var err error
+	Auxlogger, err = logueano.NewLogger("kernel")
+	if err != nil {
+		panic(err)
+	}
+}
+
 // ---------------------------- Recursos
 var MapRecursos = make(map[string]*structs.Recurso)
 

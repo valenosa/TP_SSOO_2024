@@ -17,12 +17,8 @@ import (
 
 func main() {
 
-	// Configura el logger
-	// Configura el logger
-	logueano.Logger()
-	//auxLog := logueano.AuxLogger()
-
-	//auxLogger.Println("This is a message from the auxiliary logger")
+	// Configura el logger (aux en funciones.go)
+	logueano.Logger("cpu.log")
 
 	// ======== Make ========
 

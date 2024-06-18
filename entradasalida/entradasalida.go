@@ -19,12 +19,22 @@ import (
 var mx_interfaz sync.Mutex // Mutex para Ejecutar las intrucciones IO en orden FIFO
 var configInterfaz config.IO
 
+var Auxlogger *logueano.AuxLogger
+
+// Inicializa el logger auxiliar
+func init() {
+	var err error
+	Auxlogger, err = logueano.NewLogger("entradasalida")
+	if err != nil {
+		panic(err)
+	}
+}
+
 // *======================================| MAIN |======================================\\
 func main() {
 
 	// Configura el logger
-	logueano.Logger()
-	//auxLog := logueano.AuxLogger()
+	logueano.Logger("entradasalida.log")
 
 	//Toma los parametros pasados por argumento
 	nombreInterfaz := os.Args[1]
