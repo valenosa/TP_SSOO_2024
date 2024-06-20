@@ -9,6 +9,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/cpu/funciones"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -16,8 +17,10 @@ import (
 
 func main() {
 
-	// Configura el logger
-	config.Logger("CPU.log")
+	// Configura el logger (aux en funciones.go)
+	logueano.Logger("cpu.log")
+
+	funciones.Auxlogger = logueano.InitAuxLog("cpu")
 
 	// ======== Make ========
 
@@ -36,7 +39,7 @@ func main() {
 	config.IniciarServidor(funciones.ConfigJson.Port)
 }
 
-// *======================================| HANDLERS |=======================================\\
+//*======================================| HANDLERS |=======================================\\
 
 // Maneja la ejecución de un proceso a través de un PCB
 // Devuelve a dispatch el contexto de ejecución y el motivo del desalojo.

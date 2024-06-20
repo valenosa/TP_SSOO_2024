@@ -7,8 +7,9 @@ import (
 	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/funciones"
-	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
+
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -23,8 +24,10 @@ func main() {
 	// Inicializar recursos
 	funciones.LeerRecursos(funciones.ConfigJson.Resources, funciones.ConfigJson.Resource_Instances)
 
-	// Configura el logger
-	config.Logger("Kernel.log")
+	// Configura el logger (aux en funciones.go)
+	logueano.Logger("kernel.log")
+
+	funciones.Auxlogger = logueano.InitAuxLog("kernel")
 
 	// ======== HandleFunctions ========
 

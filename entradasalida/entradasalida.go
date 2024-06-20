@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -12,17 +13,22 @@ import (
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
 var mx_interfaz sync.Mutex // Mutex para Ejecutar las intrucciones IO en orden FIFO
 var configInterfaz config.IO
 
+var Auxlogger *log.Logger
+
 // *======================================| MAIN |======================================\\
 func main() {
 
 	// Configura el logger
-	config.Logger("IO.log")
+	logueano.Logger("IO.log")
+
+	Auxlogger = logueano.InitAuxLog("IO")
 
 	//Toma los parametros pasados por argumento
 	nombreInterfaz := os.Args[1]

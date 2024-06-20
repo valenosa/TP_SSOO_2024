@@ -9,6 +9,7 @@ import (
 
 	"github.com/sisoputnfrba/tp-golang/memoria/funciones"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -35,8 +36,10 @@ func main() {
 	_ = tablasDePaginas
 	_ = espacioUsuario
 
-	// Configura el logger
-	config.Logger("Memoria.log")
+	// Configura el logger (aux en funciones.go)
+	logueano.Logger("memoria.log")
+
+	funciones.Auxlogger = logueano.InitAuxLog("memoria")
 
 	// ======== HandleFunctions ========
 	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
@@ -68,7 +71,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			logueano.Error(funciones.Auxlogger, err) //log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -86,7 +89,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			logueano.Error(funciones.Auxlogger, err) //log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -148,7 +151,10 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		delete(memoriaInstrucciones, uint32(pid))
 		// Desocupar marcos
 		funciones.LiberarMarcos(tablaDePaginas[uint32(pid)], bitMap)
+
 		// Borrar tabla de páginas
+		logueano.OperoConTablaDePaginas(uint32(pid), tablaDePaginas)
+
 		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
 
 		//--------- RESPUESTA ---------
@@ -240,7 +246,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			fmt.Println(err) //TODO: por el momento se deja para desarrollo, eliminar al terminar el TP / log
+			logueano.Error(funciones.Auxlogger, err) // log
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -250,7 +256,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		pagina := funciones.ObtenerPagina(request.Pid, request.Dir, tablaDePaginas)
 
 		if pagina == -1 {
-			fmt.Println("No se encontró la página")
+			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página")
 		}
 
 		estado := funciones.EscribirEnMemoria(request.Pid, tablaDePaginas, uint32(pagina), request.Dir, request.Data, espacioUsuario)
@@ -297,7 +303,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		//--------- REQUEST ---------
-		fmt.Println("Recibí un request copystr")
+		logueano.Mensaje(funciones.Auxlogger, "Recibí un request copystr")
 		//Obtengo los query params
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
@@ -318,7 +324,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		paginaLectura := funciones.ObtenerPagina(uint32(pid), uint32(direccionLectura), tablaDePaginas)
 
 		if paginaEscritura == -1 || paginaLectura == -1 {
-			fmt.Println("No se encontró la página") //? No debería pasar nunca pero x las dudas
+			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página") //? No debería pasar nunca pero x las dudas
 		}
 
 		//--------- LECTURA ---------

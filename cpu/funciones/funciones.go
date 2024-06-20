@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -27,6 +28,8 @@ var ConfigJson config.Cpu
 
 // Es global porque la uso para "depositar" el motivo de desalojo del proceso (que a excepción de EXIT, es traído por una interrupción)
 var MotivoDeDesalojo string
+
+var Auxlogger *log.Logger
 
 // ----------------------( TLB )----------------------\\
 

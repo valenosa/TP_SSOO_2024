@@ -3,13 +3,14 @@ package funciones
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/sisoputnfrba/tp-golang/kernel/logueano"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
@@ -17,6 +18,8 @@ import (
 
 // ----------------------( VARIABLES )---------------------------\\
 var ConfigJson config.Kernel
+
+var Auxlogger *log.Logger
 
 // ---------------------------- Recursos
 var MapRecursos = make(map[string]*structs.Recurso)
