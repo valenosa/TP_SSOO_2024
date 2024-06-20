@@ -47,7 +47,7 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 	memoriaInstrucciones[pid] = instrucciones
 
 	// Imprimir las instrucciones guardadas en memoria
-	logueano.LeerInstrucciones(Auxlogger, memoriaInstrucciones, pid) //! verificar funcionamiento
+	logueano.LeerInstrucciones(Auxlogger, memoriaInstrucciones, pid)
 }
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
