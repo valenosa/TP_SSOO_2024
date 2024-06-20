@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
-	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -29,16 +29,7 @@ var ConfigJson config.Cpu
 // Es global porque la uso para "depositar" el motivo de desalojo del proceso (que a excepción de EXIT, es traído por una interrupción)
 var MotivoDeDesalojo string
 
-var Auxlogger *logueano.AuxLogger
-
-// Inicializa el logger auxiliar
-func init() {
-	var err error
-	Auxlogger, err = logueano.NewLogger("cpu")
-	if err != nil {
-		panic(err)
-	}
-}
+var Auxlogger *log.Logger
 
 // ----------------------( TLB )----------------------\\
 

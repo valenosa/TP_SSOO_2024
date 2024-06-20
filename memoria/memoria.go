@@ -39,6 +39,8 @@ func main() {
 	// Configura el logger (aux en funciones.go)
 	logueano.Logger("memoria.log")
 
+	funciones.Auxlogger = logueano.InitAuxLog("memoria")
+
 	// ======== HandleFunctions ========
 	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))

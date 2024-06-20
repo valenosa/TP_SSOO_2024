@@ -20,6 +20,8 @@ func main() {
 	// Configura el logger (aux en funciones.go)
 	logueano.Logger("cpu.log")
 
+	funciones.Auxlogger = logueano.InitAuxLog("cpu")
+
 	// ======== Make ========
 
 	TLB := make(funciones.TLB)                                                                   // TLB (Translation Lookaside Buffer).
@@ -37,7 +39,7 @@ func main() {
 	config.IniciarServidor(funciones.ConfigJson.Port)
 }
 
-// *======================================| HANDLERS |=======================================\\
+//*======================================| HANDLERS |=======================================\\
 
 // Maneja la ejecución de un proceso a través de un PCB
 // Devuelve a dispatch el contexto de ejecución y el motivo del desalojo.

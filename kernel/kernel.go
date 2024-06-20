@@ -27,6 +27,8 @@ func main() {
 	// Configura el logger (aux en funciones.go)
 	logueano.Logger("kernel.log")
 
+	funciones.Auxlogger = logueano.InitAuxLog("kernel")
+
 	// ======== HandleFunctions ========
 
 	//PLANIFICACION

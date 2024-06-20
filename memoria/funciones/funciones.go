@@ -1,6 +1,7 @@
 package funciones
 
 import (
+	"log"
 	"math"
 	"os"
 	"strconv"
@@ -13,16 +14,7 @@ import (
 
 var ConfigJson config.Memoria
 
-var Auxlogger *logueano.AuxLogger
-
-// Inicializa el logger auxiliar
-func init() {
-	var err error
-	Auxlogger, err = logueano.NewLogger("memoria")
-	if err != nil {
-		panic(err)
-	}
-}
+var Auxlogger *log.Logger
 
 // Funciones auxiliares
 // Toma de a un archivo a la vez y guarda las instrucciones en un map l
@@ -55,7 +47,7 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 	memoriaInstrucciones[pid] = instrucciones
 
 	// Imprimir las instrucciones guardadas en memoria
-	logueano.LeerInstrucciones(Auxlogger, memoriaInstrucciones) //! verificar funcionamiento
+	logueano.LeerInstrucciones(Auxlogger, memoriaInstrucciones, pid) //! verificar funcionamiento
 }
 
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {

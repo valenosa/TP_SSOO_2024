@@ -3,6 +3,7 @@ package funciones
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,16 +19,7 @@ import (
 // ----------------------( VARIABLES )---------------------------\\
 var ConfigJson config.Kernel
 
-var Auxlogger *logueano.AuxLogger
-
-// Inicializa el logger auxiliar
-func init() {
-	var err error
-	Auxlogger, err = logueano.NewLogger("kernel")
-	if err != nil {
-		panic(err)
-	}
-}
+var Auxlogger *log.Logger
 
 // ---------------------------- Recursos
 var MapRecursos = make(map[string]*structs.Recurso)

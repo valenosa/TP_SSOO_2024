@@ -22,16 +22,12 @@ func Logger(path string) {
 }
 
 // Config de logs auxiliares
-type AuxLogger struct {
-	Logx *log.Logger
-}
 
 // Inicializa y devuelve un nuevo Logger para un módulo específico
-func NewLogger(modulo string) (*AuxLogger, error) {
+func NewLogger(modulo string) (*log.Logger, error) {
 
 	// Archivo de log auxiliar
-	auxLogFile, err :=
-		os.OpenFile(modulo+"Aux.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //"logs/"+modulo+"/"+
+	auxLogFile, err := os.OpenFile(modulo+"Aux.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //"logs/"+modulo+"/"+
 
 	if err != nil {
 		return nil, err
@@ -40,10 +36,18 @@ func NewLogger(modulo string) (*AuxLogger, error) {
 	// Logger auxiliar
 	auxLogger := log.New(auxLogFile, "", log.LstdFlags)
 
-	return &AuxLogger{
-		Logx: auxLogger,
-	}, nil
+	return auxLogger, nil
 
+}
+
+func InitAuxLog(modulo string) *log.Logger {
+	var err error
+	auxLogger, err := NewLogger(modulo)
+	if err != nil {
+		panic(err)
+	}
+
+	return auxLogger
 }
 
 // -------------------------- == LOG's CPU == -----------------------------------------------------------
@@ -145,25 +149,22 @@ func AccesoEspacioUsuario(pid uint32, accion string, direccionFisica uint32, byt
 }
 
 // log´s auxiliares------------------------------------------------------
-func LeerInstrucciones(auxLog *AuxLogger, memoriaInstrucciones map[uint32][]string) {
+func LeerInstrucciones(auxLog *log.Logger, memoriaInstrucciones map[uint32][]string, pid uint32) {
 
 	// Imprimir las instrucciones guardadas en memoria
-	auxLog.Logx.Println("Instrucciones guardadas en memoria: ")
-	for pid, instrucciones := range memoriaInstrucciones {
-		auxLog.Logx.Printf("PID: %d\n", pid)
-		for _, instruccion := range instrucciones {
-			fmt.Println(instruccion)
-		}
-		fmt.Println()
+	auxLog.Println("Instrucciones guardadas en memoria: ")
+	auxLog.Printf("PID: %d\n", pid)
+	for _, instruccion := range memoriaInstrucciones[pid] {
+		auxLog.Println(instruccion)
 	}
 }
 
-func Error(auxLog *AuxLogger, err error) {
-	auxLog.Logx.Println(err)
+func Error(auxLog *log.Logger, err error) {
+	auxLog.Println(err)
 }
 
 // -------------------------- == AUX GENERICAS == -----------------------------------------------------------
 
-func Mensaje(auxLog *AuxLogger, mensaje string) {
-	auxLog.Logx.Println(mensaje)
+func Mensaje(auxLog *log.Logger, mensaje string) {
+	auxLog.Println(mensaje)
 }
