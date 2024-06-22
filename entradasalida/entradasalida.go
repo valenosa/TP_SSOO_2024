@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,10 @@ func main() {
 	configPath := os.Args[2]
 
 	config.Iniciar(configPath, &configInterfaz)
+
+	//----------( LEVANTAMOS ARCHIVOS FS )----------
+
+	levantarFS(configInterfaz)
 
 	//----------( INICIAMOS INTERFAZ )----------
 
@@ -77,6 +82,7 @@ func iniciarServidorInterfaz() error {
 	http.HandleFunc("POST /GENERICA/IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
 	http.HandleFunc("POST /STDIN/IO_STDIN_READ", handlerIO_STDIN_READ)
 	http.HandleFunc("POST /STDOUT/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
+	http.HandleFunc("POST /IO_DIAL_FS", handlerIO_DIAL_FS)
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -187,6 +193,8 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 }
 
+//*---------------( STDOUT )--------------------
+
 func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	mx_interfaz.Lock()
 
@@ -253,4 +261,126 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	mx_interfaz.Unlock()
 
+}
+
+//*---------------( DIALFS )--------------------
+
+type metadata struct {
+	InitialBlock int `json:"initial_block"`
+	Size         int `json:"size"`
+}
+
+func handlerIO_DIAL_FS(w http.ResponseWriter, r *http.Request) {
+	mx_interfaz.Lock()
+
+	//--------- RECIBE ---------
+	// var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	instruccionYNombre, err := io.ReadAll(r.Body)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Decodifica el request (codificado en formato json)
+	// err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+
+	//-------- EJECUTA ---------
+	//! Hay que hacer que el CPU envíe tanto la instrucción como el nombre del archivo, en caso de que vengan concatenadas en un string, las separo
+	instruccion := strings.Split(string(instruccionYNombre), " ")
+	//instruccion[0] tiene siempre la instrucción, luego dependiendo de cual se ejecute, los demás elementos de la lista pueden ser nombres de archivos, tamaños, etc.
+	switch instruccion[0] {
+	case "IO_FS_CREATE":
+		nuevoArchivo, err := os.Create(configInterfaz.Dialfs_Path + "/" + instruccion[1] + ".txt")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		defer nuevoArchivo.Close()
+
+		//TODO: bloque := func asignarEspacio(bitmap)
+
+		var bloque int = 3 //? Esto debería ser el resultado de la función asignarEspacio(bitmap)
+
+		metadata := metadata{bloque, 1}
+
+		encoder := json.NewEncoder(nuevoArchivo)
+		err = encoder.Encode(metadata)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		// i, err := nuevoArchivo.Write([]byte(metadata))
+		// if err != nil {
+		// 	fmt.println(err)
+		// 	return
+		// } else {
+		// 	fmt.println("Se escribieron: " + i + " bytes")
+		// }
+		//TODO: Abrir el bitmap y el block
+		return
+
+	// case "IO_FS_DELETE":
+	// 	return
+
+	// case "IO_FS_TRUNCATE":
+	// 	return
+
+	// case "IO_FS_WRITE":
+	// 	return
+
+	// case: "IO_FS_READ":
+	// 	return
+
+	default:
+		return
+
+	}
+
+}
+
+func levantarFS(configInterfaz config.IO) {
+
+	if configInterfaz.Type == "DIALFS" {
+
+		//-------- BLOQUES.DAT ---------
+
+		bloques, err := os.Create(configInterfaz.Dialfs_Path + "/bloques.dat")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer bloques.Close()
+
+		// Establecer el tamaño del archivo
+		err = bloques.Truncate(int64(configInterfaz.Dialfs_Block_Size * configInterfaz.Dialfs_Block_Count))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		//-------- BITMAP.DAT ---------
+
+		bitmap, err := os.Create(configInterfaz.Dialfs_Path + "/bitmap.dat")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer bitmap.Close()
+
+		// Establecer el tamaño del archivo
+		err = bitmap.Truncate(int64(configInterfaz.Dialfs_Block_Count)) //? Cada byte representa un bloque. Debería ser cada bit?
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
 }
