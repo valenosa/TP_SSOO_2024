@@ -423,6 +423,18 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		MotivoDeDesalojo = "IO"
 		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDOUT_WRITE") //TODO: IN -> OUT
 
+	case "IO_FS_CREATE":
+		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_CREATE")
+
+	case "IO_FS_DELETE":
+		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_DELETE")
+
+	case "IO_FS_TRUNCATE":
+		go ioFSTruncate(variable[1], variable[2], variable[3], PCB.PID, registrosMap8, registrosMap32)
+
+	case "IO_FS_WRITE":
+		go ioFSWrite(variable[1], variable[2], variable[3], variable[4], variable[5], PCB.PID, registrosMap8, registrosMap32, TLB, prioridadesTLB)
+
 	case "EXIT":
 		*cicloFinalizado = true
 		PCB.Estado = "EXIT"
@@ -954,4 +966,90 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 
 	return "OK"
 
+}
+
+//TODO: Testear que se comuniquen estas funciones con kernel.
+
+func ioFSCreateOrDelete(nombreInterfaz string, nombreArchivo string, PID uint32, instruccionIO string) {
+
+	//Creo estructura de request
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		Instruccion:    instruccionIO,
+		NombreArchivo:  nombreArchivo,
+	}
+
+	//Convierto request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+}
+
+func ioFSTruncate(nombreInterfaz string, nombreArchivo string, registroTamaño string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32) {
+
+	//Extrae el tamaño de la instrucción
+	tamañoBytes := extraerDatosDelRegistro(registroTamaño, registroMap8, registroMap32)
+	tamaño := binary.BigEndian.Uint32(tamañoBytes)
+
+	//Crea una variable que contiene el cuerpo de la request.
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		NombreArchivo:  nombreArchivo,
+		Instruccion:    "IO_FS_TRUNCATE",
+		Tamaño:         tamaño,
+	}
+
+	// Convierte request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+}
+
+func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTamaño string,
+	regPuntero string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+
+	//Extrae el tamaño de la instrucción
+	tamañoBytes := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
+	tamaño := binary.BigEndian.Uint32(tamañoBytes)
+
+	//! Chequear que se deba enviar así el puntero.
+	punteroBytes := extraerDatosDelRegistro(regPuntero, registroMap8, registroMap32)
+	puntero := binary.BigEndian.Uint32(punteroBytes)
+
+	//Traduce dirección lógica a física
+	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
+	if !encontrado {
+		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		return
+	}
+
+	//Crea una variable que contiene el cuerpo de la request.
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		NombreArchivo:  nombreArchivo,
+		Instruccion:    "IO_FS_WRITE",
+		Direccion:      direccion,
+		Tamaño:         tamaño,
+		Puntero:        puntero,
+	}
+
+	// Convierte request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
