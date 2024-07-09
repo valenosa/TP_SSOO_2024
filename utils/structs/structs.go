@@ -1,5 +1,7 @@
 package structs
 
+import "sync"
+
 // =====================================| PROCESO |========================================================\\
 
 //	Kernel -> Cliente
@@ -71,8 +73,9 @@ type RequestRecurso struct {
 }
 
 type Recurso struct {
-	Instancias int
-	ListaBlock []uint32
+	Instancias    int
+	Mx_ListaBlock *sync.Mutex
+	ListaBlock    []uint32
 }
 
 //=====================================| I/O |=====================================\\

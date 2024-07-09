@@ -324,19 +324,7 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
-	if len(recurso.ListaBlock) != 0 {
-		// Tomo el primer PID de la lista de BLOCK (del recurso)
-		pid := recurso.ListaBlock[0]
-		recurso.ListaBlock = recurso.ListaBlock[1:]
-
-		//Se pasa el proceso a de BOLCK -> READY
-		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
-		pcbDesbloqueado.Estado = "READY"
-		funciones.AdministrarQueues(pcbDesbloqueado)
-	} else {
-		recurso.Instancias++
-	}
+	funciones.LiberarRecurso(recurso)
 
 	w.WriteHeader(http.StatusOK)
 }
