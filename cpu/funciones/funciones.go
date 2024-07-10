@@ -424,15 +424,23 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDOUT_WRITE") //TODO: IN -> OUT
 
 	case "IO_FS_CREATE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
 		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_CREATE")
 
 	case "IO_FS_DELETE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
 		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_DELETE")
 
 	case "IO_FS_TRUNCATE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
 		go ioFSTruncate(variable[1], variable[2], variable[3], PCB.PID, registrosMap8, registrosMap32)
 
 	case "IO_FS_WRITE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
 		go ioFSWrite(variable[1], variable[2], variable[3], variable[4], variable[5], PCB.PID, registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 	case "EXIT":

@@ -312,6 +312,9 @@ func ValidarInstruccionIO(tipo string, instruccion string) bool {
 
 	case "STDOUT":
 		return instruccion == "IO_STDOUT_WRITE"
+
+	case "DIALFS":
+		return instruccion == "IO_FS_CREATE" || instruccion == "IO_FS_READ" || instruccion == "IO_FS_WRITE" || instruccion == "IO_FS_DELETE" || instruccion == "IO_FS_TRUNCATE"
 	}
 	return false
 }
