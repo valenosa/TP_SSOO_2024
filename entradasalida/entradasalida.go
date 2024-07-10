@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -42,7 +43,7 @@ func main() {
 		levantarFS(configInterfaz)
 	}
 
-	var cantBloquesDisponibles int = configInterfaz.Dialfs_Block_Count //?Esto funciona solamente si una vez que se termina la ejecución de la interfaz, se reinicia el sistema. Si hay permanencia, entonces cada vez que levantemos la interfaz deberíamos leer el bitmap.dat y contar la cantidad de bloques libres.
+	var cantBloquesDisponiblesTotal int = configInterfaz.Dialfs_Block_Count //?Esto funciona solamente si una vez que se termina la ejecución de la interfaz, se reinicia el sistema. Si hay permanencia, entonces cada vez que levantemos la interfaz deberíamos leer el bitmap.dat y contar la cantidad de bloques libres.
 
 	//----------( INICIAMOS INTERFAZ )----------
 
@@ -50,7 +51,7 @@ func main() {
 	conectarInterfazIO(nombreInterfaz)
 
 	// Levanta el server de la nuevaInterfazIO
-	serverErr := iniciarServidorInterfaz(&cantBloquesDisponibles)
+	serverErr := iniciarServidorInterfaz(&cantBloquesDisponiblesTotal)
 	if serverErr != nil {
 		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
 		return
@@ -80,12 +81,14 @@ func conectarInterfazIO(nombre string) {
 	}
 }
 
-func iniciarServidorInterfaz(cantBloquesDisponibles *int) error {
+func iniciarServidorInterfaz(cantBloquesDisponiblesTotal *int) error {
 
 	http.HandleFunc("POST /GENERICA/IO_GEN_SLEEP", handlerIO_GEN_SLEEP)
 	http.HandleFunc("POST /STDIN/IO_STDIN_READ", handlerIO_STDIN_READ)
 	http.HandleFunc("POST /STDOUT/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
-	http.HandleFunc("POST /DIALFS/IO_FS_CREATE", handlerIO_FS_CREATE(cantBloquesDisponibles)) //!Modificar la request desde kernel para que no ponga /TipoDeInstruccion
+
+	http.HandleFunc("POST /DIALFS/IO_FS_CREATE", handlerIO_FS_CREATE(cantBloquesDisponiblesTotal)) //!Modificar la request desde kernel para que no ponga /TipoDeInstruccion
+	http.HandleFunc("POST /DIALFS/handlerIO_FS_TRUNCATE", handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal))
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -93,7 +96,7 @@ func iniciarServidorInterfaz(cantBloquesDisponibles *int) error {
 
 //*======================================| INTERFACES |======================================\\
 
-//*---------------( GENERICA )------------------
+//*======================( GENERICA )======================
 
 func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 
@@ -126,7 +129,7 @@ func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 	mx_interfaz.Unlock()
 }
 
-//*---------------( STDIN )--------------------
+//*======================( STDIN )======================
 
 func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
@@ -196,7 +199,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//*---------------( STDOUT )--------------------
+//*======================( STDOUT )======================
 
 func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	mx_interfaz.Lock()
@@ -266,106 +269,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// *---------------( DIALFS )--------------------
-
-type metadata struct {
-	InitialBlock int `json:"initial_block"`
-	Size         int `json:"size"`
-}
-
-func handlerIO_FS_CREATE(cantBloquesDisponibles *int) func(http.ResponseWriter, *http.Request) {
-
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		mx_interfaz.Lock()
-		defer mx_interfaz.Unlock()
-		//--------- RECIBE ---------
-		var instruccionIO structs.RequestEjecutarInstruccionIO
-		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Decodifica el request (codificado en formato json)
-		// err := json.NewDecoder(r.Body).Decode(&instruccionIO)
-		// if err != nil {
-		// 	fmt.Println(err)
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-
-		//-------- EJECUTA ---------
-
-		nuevoArchivo, err := os.Create(configInterfaz.Dialfs_Path + "/" + instruccionIO.NombreArchivo)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		defer nuevoArchivo.Close()
-
-		var bloque int = asignarEspacio(cantBloquesDisponibles)
-
-		//Data del archivo
-		metadata := metadata{bloque, 0}
-
-		//Se escribe en el archivo
-		encoder := json.NewEncoder(nuevoArchivo)
-		err = encoder.Encode(metadata)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		// Envía el status al Kernel
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(":/"))
-	}
-}
-
-func asignarEspacio(cantBloquesDisponibles *int) int {
-
-	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
-	if err != nil {
-		fmt.Println(err)
-		return -1
-	}
-	defer file.Close()
-
-	byteCount := 0
-	buf := make([]byte, 1)
-	for {
-		_, err := file.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println(err)
-			return -1
-		}
-
-		if buf[0] == 0 {
-			// Encontramos un byte que es 0
-			Auxlogger.Println("Bloque libre: ", byteCount) //!LOG
-			*cantBloquesDisponibles--
-			Auxlogger.Println("Cantidad de Blq. Libres: ", *cantBloquesDisponibles) //!LOG
-
-			// Escribimos un 1 en el byte que encontramos
-			_, err = file.WriteAt([]byte{1}, int64(byteCount))
-			if err != nil {
-				fmt.Println(err)
-				return -1
-			}
-
-			return byteCount
-		}
-		byteCount++
-	}
-	// No encontramos ningún byte que sea 0
-	return -1
-}
+//*======================( DIALFS )======================
 
 func levantarFS(configInterfaz config.IO) {
 
@@ -399,5 +303,320 @@ func levantarFS(configInterfaz config.IO) {
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+}
+
+func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		mx_interfaz.Lock()
+		defer mx_interfaz.Unlock()
+		//--------- RECIBE ---------
+		var instruccionIO structs.RequestEjecutarInstruccionIO
+		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//-------- EJECUTA ---------
+		metadata := structs.MetadataFS{}
+
+		metadata.InitialBlock = asignarEspacio(cantBloquesDisponiblesTotal)
+
+		metadata.Size = int(instruccionIO.Tamaño)
+
+		actualizarMetadata(instruccionIO.NombreArchivo, metadata)
+
+		//--------- RESPUESTA ---------
+		// Envía el status al Kernel
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(":/"))
+	}
+}
+
+// TODO: ACTUALIZAR EL CANTIDAD DE BLOQUES DISPONIBLES EN EL BITMAP.DAT
+func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		mx_interfaz.Lock()
+		defer mx_interfaz.Unlock()
+		//--------- RECIBE ---------
+		var instruccionIO structs.RequestEjecutarInstruccionIO
+		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//-------- EJECUTA ---------
+
+		metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		tamañoEnBloques := int(math.Ceil(float64(metadata.Size) / float64(configInterfaz.Dialfs_Block_Size)))
+
+		nuevoTamañoEnBloques := int(math.Ceil(float64(instruccionIO.Tamaño) / float64(configInterfaz.Dialfs_Block_Size)))
+
+		if nuevoTamañoEnBloques > tamañoEnBloques {
+			agrandarArchivo(nuevoTamañoEnBloques, &metadata, tamañoEnBloques, cantBloquesDisponiblesTotal)
+		}
+		if nuevoTamañoEnBloques < tamañoEnBloques {
+			achicarArchivo(nuevoTamañoEnBloques, tamañoEnBloques, metadata, cantBloquesDisponiblesTotal)
+		}
+
+		metadata.Size = int(instruccionIO.Tamaño)
+
+		actualizarMetadata(instruccionIO.NombreArchivo, metadata)
+
+		//--------- RESPUESTA ---------
+		// Envía el status al Kernel
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(":/"))
+	}
+}
+
+//--------------- FUNCIONES DIALFS ---------------
+
+// --------------- METADATA
+// TODO: Probar
+func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
+	file, err := os.Open(configInterfaz.Dialfs_Path + "/" + nombreArchivo)
+	if err != nil {
+		fmt.Println(err)
+		return structs.MetadataFS{}, err
+	}
+
+	defer file.Close()
+	// Lee todo el contenido del archivo
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		fmt.Println(err)
+		return structs.MetadataFS{}, err
+	}
+
+	// Deserializa los bytes a la estructura Metadata
+	var metadata structs.MetadataFS
+	err = json.Unmarshal(bytes, &metadata)
+	if err != nil {
+		fmt.Println(err)
+		return structs.MetadataFS{}, err
+	}
+	return metadata, nil
+}
+
+func actualizarMetadata(nombreArchivo string, nuevaMetadata structs.MetadataFS) {
+
+	nuevoArchivo, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+nombreArchivo, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer nuevoArchivo.Close()
+
+	//Se escribe en el archivo
+	encoder := json.NewEncoder(nuevoArchivo)
+	err = encoder.Encode(nuevaMetadata)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+}
+
+//--------------- IO_FS_CREATE
+
+func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
+
+	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+	defer file.Close()
+
+	byteCount := 0
+	buf := make([]byte, 1)
+	for {
+		_, err := file.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println(err)
+			return -1
+		}
+
+		if buf[0] == 0 {
+			// Encontramos un byte que es 0
+			Auxlogger.Println("Bloque libre: ", byteCount) //!LOG
+			*cantBloquesDisponiblesTotal--
+			Auxlogger.Println("Cantidad de Blq. Libres: ", *cantBloquesDisponiblesTotal) //!LOG
+
+			// Escribimos un 1 en el byte que encontramos
+			_, err = file.WriteAt([]byte{1}, int64(byteCount))
+			if err != nil {
+				fmt.Println(err)
+				return -1
+			}
+
+			return byteCount
+		}
+		byteCount++
+	}
+	// No encontramos ningún byte que sea 0
+	return -1
+}
+
+// --------------- IO_FS_TRUNCATE
+
+//----- Agrandar Archivo
+
+func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, tamañoEnBloques int, cantBloquesDisponiblesTotal *int) {
+
+	//Verifico si hay espacio suficiente en el disco
+	if nuevoTamañoEnBloques < *cantBloquesDisponiblesTotal {
+		fmt.Println("No hay suficiente espacio en el disco")
+		//!Que pinga devuelvo? No se que se hace en el caso de que no haya espacio suficiente
+		return
+	}
+
+	//Verifico si existe tamaño suficiente contiguo al bloque
+	espacioEsContiguo, err := espacioContiguo(tamañoEnBloques, *metadata)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	//En caso de que haya espacio contiguo se reservan los bloques necesarios
+	if espacioEsContiguo {
+		reservarBloques(nuevoTamañoEnBloques, tamañoEnBloques, *metadata, cantBloquesDisponiblesTotal)
+		return
+	}
+
+	//En caso de que no haya espacio suficiente contiguo al bloque, se reorganizan los bloques (compactación y recolocacion del archivo)
+	metadata.InitialBlock = reorganizarBloques(metadata.InitialBlock, tamañoEnBloques, cantBloquesDisponiblesTotal)
+
+}
+
+func espacioContiguo(tamaño int, metadata structs.MetadataFS) (bool, error) {
+
+	bitmap, err := os.Open(configInterfaz.Dialfs_Path + "/" + "bitmap.dat")
+	if err != nil {
+		fmt.Println(err)
+		return false, err
+	}
+	defer bitmap.Close()
+
+	// Primer bloque a recorrer para ver si hay espacio contiguo
+	primerBloqueARecorrer := metadata.InitialBlock + int(math.Ceil(float64(metadata.Size)/float64(configInterfaz.Dialfs_Block_Size)))
+
+	buf := make([]byte, 1)
+
+	// Recorre n bloques a partir del primer bloque a recorrer, siendo n la variable "tamaño"
+	for i := primerBloqueARecorrer; i < primerBloqueARecorrer+tamaño; i++ {
+		_, err := bitmap.ReadAt(buf, int64(i))
+		if err != nil {
+			fmt.Println(err)
+			return false, err
+		}
+		if buf[0] == 1 {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func reservarBloques(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata structs.MetadataFS, cantBloquesDisponiblesTotal *int) {
+
+	// Abro bitmap
+	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	//Asigno (1) los bloques nuevos
+	bloquesAgregados := nuevoTamañoEnBloques - tamañoEnBloques
+
+	pos := metadata.InitialBlock + tamañoEnBloques + 1
+
+	for i := bloquesAgregados; i > 0; i-- {
+		_, err = file.WriteAt([]byte{1}, int64(pos))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		*cantBloquesDisponiblesTotal--
+		pos++
+	}
+}
+
+func reorganizarBloques(initialBlock int, tamañoEnBloques int, cantBloquesDisponiblesTotal *int) int {
+	//Subo bloques de archivo a un buffer
+	bitmap, err := os.Open(configInterfaz.Dialfs_Path + "/" + "bitmap.dat")
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+	defer bitmap.Close()
+
+	buf := make([]byte, tamañoEnBloques*configInterfaz.Dialfs_Block_Size)
+
+	_, err = bitmap.ReadAt(buf, int64(initialBlock))
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+
+	//Libero los bloques del bitmap
+	//liberarBloques()
+	//Compacto
+	//Recoloco los bloques del buffer al final de la "cola"
+	nuevaPosInicial := 0
+	//ReservarBloques
+
+	return nuevaPosInicial
+}
+
+//----- Achicar Archivo
+
+// TODO: Modificar para que se pueda utilizar reorganizarBloques()
+func achicarArchivo(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata structs.MetadataFS, cantBloquesDisponiblesTotal *int) {
+	liberarBloques(tamañoEnBloques, nuevoTamañoEnBloques, metadata, cantBloquesDisponiblesTotal)
+}
+
+func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, metadata structs.MetadataFS, cantBloquesDisponiblesTotal *int) {
+
+	// Abro bitmap
+	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	//Libero (0) los bloques extra
+	bloquesABorrar := tamañoEnBloques - nuevoTamañoEnBloques
+
+	pos := metadata.InitialBlock + nuevoTamañoEnBloques
+
+	for i := bloquesABorrar; i > 0; i-- {
+		_, err = file.WriteAt([]byte{0}, int64(pos))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		*cantBloquesDisponiblesTotal++
+		pos++
 	}
 }

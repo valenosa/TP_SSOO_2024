@@ -110,6 +110,11 @@ type RequestInputSTDIN struct {
 	//? Tambien deberia estar el pid?
 }
 
+type MetadataFS struct {
+	InitialBlock int `json:"initial_block"`
+	Size         int `json:"size"`
+}
+
 //=====================================| MEMORIA DE USUARIO |=====================================\\
 
 // Memoria
