@@ -705,13 +705,11 @@ func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[stri
 	}
 }
 
-func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) []byte {
+func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) uint32 {
 	if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
-		return []byte{*registrosMap8[registroDato]}
+		return uint32(*registrosMap8[registroDato])
 	} else {
-		data := make([]byte, 4)
-		binary.BigEndian.PutUint32(data, *registrosMap32[registroDato])
-		return data
+		return *registrosMap32[registroDato]
 	}
 }
 
@@ -732,7 +730,10 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	}
 
-	valor := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
+	regData := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
+
+	valor := make([]byte, 4)
+	binary.BigEndian.PutUint32(valor, regData)
 
 	body, err := json.Marshal(structs.RequestMovOUT{Pid: PidEnEjecucion, Dir: direccionFisica, Data: valor})
 
@@ -869,15 +870,13 @@ func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, PID uint32) {
 
 	// Envía la solicitud de ejecucion a Kernel
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
-
 }
 
 func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32, tlb *TLB,
 	prioridadesTLB *[]ElementoPrioridad, instruccionIO string) {
 
 	//Extrae el tamaño de la instrucción
-	tamañoBytes := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
-	tamaño := binary.BigEndian.Uint32(tamañoBytes)
+	tamaño := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
 
 	//Traduce dirección lógica a física
 	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
@@ -973,7 +972,6 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 	fmt.Println(string(data)) //*log
 
 	return "OK"
-
 }
 
 //TODO: Testear que se comuniquen estas funciones con kernel.
@@ -1001,8 +999,7 @@ func ioFSCreateOrDelete(nombreInterfaz string, nombreArchivo string, PID uint32,
 func ioFSTruncate(nombreInterfaz string, nombreArchivo string, registroTamaño string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32) {
 
 	//Extrae el tamaño de la instrucción
-	tamañoBytes := extraerDatosDelRegistro(registroTamaño, registroMap8, registroMap32)
-	tamaño := binary.BigEndian.Uint32(tamañoBytes)
+	tamaño := extraerDatosDelRegistro(registroTamaño, registroMap8, registroMap32)
 
 	//Crea una variable que contiene el cuerpo de la request.
 	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
@@ -1027,12 +1024,10 @@ func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTa
 	regPuntero string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
 
 	//Extrae el tamaño de la instrucción
-	tamañoBytes := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
-	tamaño := binary.BigEndian.Uint32(tamañoBytes)
+	tamaño := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
 
 	//! Chequear que se deba enviar así el puntero.
-	punteroBytes := extraerDatosDelRegistro(regPuntero, registroMap8, registroMap32)
-	puntero := binary.BigEndian.Uint32(punteroBytes)
+	puntero := extraerDatosDelRegistro(regPuntero, registroMap8, registroMap32)
 
 	//Traduce dirección lógica a física
 	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
