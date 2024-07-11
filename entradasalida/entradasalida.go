@@ -632,12 +632,12 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	//Tomo todos los archivos y los escribo contiguos en el archivo temporal
 	var punteroUltimoBloqueLibre int
 	for i := 0; i < len(listaArchivos); i++ {
-		if listaArchivos[i] == nombreArchivo {
-			continue
-		}
 
 		//Tomo el archivo i-esimo y lo escribo en el data temporal
 		archivo := listaArchivos[i]
+		if archivo == nombreArchivo {
+			continue
+		}
 
 		//Abrir la metadata del archivo
 		metadata, err := extraerMetadata(archivo)
@@ -648,6 +648,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 
 		sizeEnBloques := int(math.Ceil(float64(metadata.Size) / float64(configInterfaz.Dialfs_Block_Size)))
 		tempBuffer := make([]byte, sizeEnBloques*configInterfaz.Dialfs_Block_Size)
+
 		//Leer, de acuerdo a la metadata, los bloques de fDataBloques
 		_, err = fDataBloques.ReadAt(tempBuffer, int64(metadata.InitialBlock*configInterfaz.Dialfs_Block_Size))
 		if err != nil {
@@ -676,40 +677,15 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 		return -1
 	}
 
-	//Copiamos
-	copiarArchivo(fTemp, fDataBloques)
-
 	fTemp.Close()
 
-	err = os.Remove(configInterfaz.Dialfs_Path + "/" + "bloques.dat.tmp")
+	//renombro el archivo temporal con el nombre del archivo original
+	err = os.Rename(configInterfaz.Dialfs_Path+"/"+"bloques.dat.tmp", configInterfaz.Dialfs_Path+"/"+"bloques.dat")
 	if err != nil {
 		fmt.Println(err)
-		return -1
 	}
 
 	return punteroUltimoBloqueLibre
-}
-
-func copiarArchivo(fTemp *os.File, fDataBloques *os.File) {
-
-	//Copiar el archivo temporal al archivo de bloques
-	_, err := fTemp.Seek(0, 0)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	_, err = fDataBloques.Seek(0, 0)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	_, err = io.Copy(fDataBloques, fTemp)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 }
 
 //----- Achicar Archivo
