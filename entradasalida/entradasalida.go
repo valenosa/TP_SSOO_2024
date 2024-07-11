@@ -380,7 +380,6 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 		}
 
 		metadata.Size = int(instruccionIO.Tamaño)
-
 		actualizarMetadata(instruccionIO.NombreArchivo, metadata)
 
 		//--------- RESPUESTA ---------
@@ -484,8 +483,7 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 
 // --------------- IO_FS_TRUNCATE
 
-//----- Agrandar Archivo
-
+// ----- Agrandar Archivo
 func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, tamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) {
 
 	//Verifico si hay espacio suficiente en el disco
@@ -509,7 +507,7 @@ func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, ta
 	}
 
 	//En caso de que no haya espacio suficiente contiguo al bloque, se reorganizan los bloques (compactación y recolocacion del archivo)
-	metadata.InitialBlock = reorganizarBloques(metadata.InitialBlock, tamañoEnBloques, cantBloquesDisponiblesTotal, nombreArchivo)
+	metadata.InitialBlock = reorganizarBloques(metadata.InitialBlock, tamañoEnBloques, nuevoTamañoEnBloques, cantBloquesDisponiblesTotal, nombreArchivo)
 
 }
 
@@ -568,7 +566,7 @@ func reservarBloques(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata s
 	}
 }
 
-func reorganizarBloques(initialBlock int, tamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) int {
+func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) int {
 
 	//Abro el archivo .dat
 	fDataBloques, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat", os.O_RDWR|os.O_CREATE, 0755)
@@ -576,7 +574,6 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, cantBloquesDispo
 		fmt.Println(err)
 		return -1
 	}
-	defer fDataBloques.Close()
 
 	//Guardo data del archivo a agrandar en un buffer
 	bufferTruncate := make([]byte, tamañoEnBloques*configInterfaz.Dialfs_Block_Size)
@@ -586,11 +583,39 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, cantBloquesDispo
 		return -1
 	}
 
-	//Libero los bloques del archivo copiado
-	liberarBloques(tamañoEnBloques, 0, initialBlock, cantBloquesDisponiblesTotal) //? Creo que esta de mas, ya que en compactar al final no se utiliza el bitmap
-
 	//Compacto los archivos en dico (dejo los bloques libres al final del disco)
 	nuevaPosInicial := compactar(fDataBloques, nombreArchivo, bufferTruncate)
+
+	fDataBloques.Close()
+
+	//Actualizo bitmap
+	bitmap, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+
+	//Pongo 1 desdel el inicio del bitmap hasta: nuevaPosInicial + nuevoTamañoEnBloques y ceros en el resto
+	for i := 0; i < nuevaPosInicial+nuevoTamañoEnBloques; i++ {
+		_, err = bitmap.WriteAt([]byte{1}, int64(i))
+		if err != nil {
+			fmt.Println(err)
+			return -1
+		}
+	}
+
+	for i := nuevaPosInicial + nuevoTamañoEnBloques; i < configInterfaz.Dialfs_Block_Count; i++ {
+		_, err = bitmap.WriteAt([]byte{0}, int64(i))
+		if err != nil {
+			fmt.Println(err)
+			return -1
+		}
+	}
+
+	bitmap.Close()
+
+	//? Verificar este calculo
+	*cantBloquesDisponiblesTotal = configInterfaz.Dialfs_Block_Count - (nuevaPosInicial + nuevoTamañoEnBloques)
 
 	return nuevaPosInicial
 }
