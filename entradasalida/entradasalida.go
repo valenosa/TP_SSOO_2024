@@ -393,7 +393,7 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 //--------------- FUNCIONES DIALFS ---------------
 
 // --------------- METADATA
-// TODO: Probar
+
 func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
 	file, err := os.Open(configInterfaz.Dialfs_Path + "/" + nombreArchivo)
 	if err != nil {
@@ -491,7 +491,7 @@ func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, ta
 	//Verifico si hay espacio suficiente en el disco
 	if nuevoTamañoEnBloques < *cantBloquesDisponiblesTotal {
 		fmt.Println("No hay suficiente espacio en el disco")
-		//!Que pinga devuelvo? No se que se hace en el caso de que no haya espacio suficiente
+		//Este caso no se testea, ni se realiza ninguna operacion en especifico
 		return
 	}
 
@@ -570,6 +570,7 @@ func reservarBloques(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata s
 
 func reorganizarBloques(initialBlock int, tamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) int {
 
+	//Abro el archivo .dat
 	fDataBloques, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat", os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		fmt.Println(err)
@@ -577,24 +578,113 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, cantBloquesDispo
 	}
 	defer fDataBloques.Close()
 
-	//Subo data del archivo a un buffer
+	//Guardo data del archivo a agrandar en un buffer
 	bufferTruncate := make([]byte, tamañoEnBloques*configInterfaz.Dialfs_Block_Size)
-	_, err = fDataBloques.ReadAt(bufferTruncate, int64(initialBlock))
+	_, err = fDataBloques.ReadAt(bufferTruncate, int64(initialBlock*configInterfaz.Dialfs_Block_Size))
 	if err != nil {
 		fmt.Println(err)
 		return -1
 	}
 
-	//Libero los bloques del bitmap
-	liberarBloques(tamañoEnBloques, 0, initialBlock, cantBloquesDisponiblesTotal)
+	//Libero los bloques del archivo copiado
+	liberarBloques(tamañoEnBloques, 0, initialBlock, cantBloquesDisponiblesTotal) //? Creo que esta de mas, ya que en compactar al final no se utiliza el bitmap
 
 	//Compacto los archivos en dico (dejo los bloques libres al final del disco)
-	compactar(fDataBloques, nombreArchivo, bufferTruncate)
-
-	//Obtengo la nueva posición inicial
-	nuevaPosInicial := *cantBloquesDisponiblesTotal
+	nuevaPosInicial := compactar(fDataBloques, nombreArchivo, bufferTruncate)
 
 	return nuevaPosInicial
+}
+
+func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byte) int {
+
+	//Crear un nuevo archivo temporal
+	fTemp, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat.tmp", os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+
+	//Tomo todos los archivos y los escribo contiguos en el archivo temporal
+	var punteroUltimoBloqueLibre int
+	for i := 0; i < len(listaArchivos); i++ {
+		if listaArchivos[i] == nombreArchivo {
+			continue
+		}
+
+		//Tomo el archivo i-esimo y lo escribo en el data temporal
+		archivo := listaArchivos[i]
+
+		//Abrir la metadata del archivo
+		metadata, err := extraerMetadata(archivo)
+		if err != nil {
+			fmt.Println(err)
+			return -1
+		}
+
+		sizeEnBloques := int(math.Ceil(float64(metadata.Size) / float64(configInterfaz.Dialfs_Block_Size)))
+		tempBuffer := make([]byte, sizeEnBloques*configInterfaz.Dialfs_Block_Size)
+		//Leer, de acuerdo a la metadata, los bloques de fDataBloques
+		_, err = fDataBloques.ReadAt(tempBuffer, int64(metadata.InitialBlock*configInterfaz.Dialfs_Block_Size))
+		if err != nil {
+			fmt.Println(err)
+			return -1
+		}
+
+		punteroUltimoBloqueLibre += sizeEnBloques
+
+		//Actualizar la metadata en base al nuevo bloque inicial
+		metadata.InitialBlock = punteroUltimoBloqueLibre
+		actualizarMetadata(archivo, metadata)
+
+		//Escribir en el archivo temporal el tmpBuffer
+		_, err = fTemp.Write(tempBuffer)
+		if err != nil {
+			fmt.Println(err)
+			return -1
+		}
+	}
+
+	//Escribir en el archivo temporal el bufferTruncate (archivo que se quiere agrandar)
+	_, err = fTemp.Write(bufferTruncate)
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+
+	//Copiamos
+	copiarArchivo(fTemp, fDataBloques)
+
+	fTemp.Close()
+
+	err = os.Remove(configInterfaz.Dialfs_Path + "/" + "bloques.dat.tmp")
+	if err != nil {
+		fmt.Println(err)
+		return -1
+	}
+
+	return punteroUltimoBloqueLibre
+}
+
+func copiarArchivo(fTemp *os.File, fDataBloques *os.File) {
+
+	//Copiar el archivo temporal al archivo de bloques
+	_, err := fTemp.Seek(0, 0)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	_, err = fDataBloques.Seek(0, 0)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	_, err = io.Copy(fDataBloques, fTemp)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
 
 //----- Achicar Archivo
@@ -626,92 +716,5 @@ func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, bloqueInici
 		}
 		*cantBloquesDisponiblesTotal++
 		pos++
-	}
-}
-
-func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byte) {
-
-	//Crear un nuevo archivo temporal
-	fTemp, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat.tmp", os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-//? Se debe cerrar aun cuando el archivo ha sido eliminado al final
-	defer fTemp.Close()
-
-	//Tomo todos los archivos y los escribo contiguos en el archivo temporal
-	for i := 0; i < len(listaArchivos); i++ {
-		if listaArchivos[i] == nombreArchivo {
-			continue
-		}
-
-		//Tomo el archivo i-esimo y lo escribo en el data temporal
-		archivo := listaArchivos[i]
-
-		//Abrir la metadata del archivo
-		metadata, err := extraerMetadata(archivo)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		//TODO: solucionar problema de tamaño de buffer
-		tempBuffer := make([]byte, metadata.Size) //! Este tamaño tiene que ser el tamaño del bloque, ya que cunado lo agrego al archivo temporal, lo debo hacer por bloques
-		//Leer, de acuerdo a la metadata, los bloques de fDataBloques
-		_, err = fDataBloques.ReadAt(tempBuffer, int64(metadata.InitialBlock*configInterfaz.Dialfs_Block_Size))
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		//TODO: Actualizar la metadata en base al nuevo bloque inicial
-		//Actualizar la metadata en base al nuevo bloque inicial
-
-		//Escribir en el archivo temporal el tmpBuffer (archivo qeu se quiere agrandar)
-		_, err = fTemp.Write(tempBuffer)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	}
-
-	_, err = fTemp.Write(bufferTruncate)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	//Copiamos
-	copiarArchivo(fTemp, fDataBloques)
-
-	err = os.Remove(configInterfaz.Dialfs_Path + "/" + "bloques.dat.tmp")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-}
-
-func copiarArchivo(fTemp *os.File, fDataBloques *os.File) {
-
-	//Copiar el archivo temporal al archivo de bloques
-	_, err := fTemp.Seek(0, 0)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	_, err = fDataBloques.Seek(0, 0)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	_, err = io.Copy(fDataBloques, fTemp)
-	if err != nil {
-		fmt.Println(err)
-		return
 	}
 }
