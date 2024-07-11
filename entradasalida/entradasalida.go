@@ -34,8 +34,8 @@ func main() {
 	Auxlogger = logueano.InitAuxLog("IO")
 
 	//Toma los parametros pasados por argumento
-	nombreInterfaz := os.Args[1]
-	configPath := os.Args[2]
+	nombreInterfaz := "FS"      //os.Args[1]
+	configPath := "dialfs.json" //os.Args[2]
 
 	config.Iniciar(configPath, &configInterfaz)
 
@@ -90,7 +90,7 @@ func iniciarServidorInterfaz(cantBloquesDisponiblesTotal *int) error {
 	http.HandleFunc("POST /STDOUT/IO_STDOUT_WRITE", handlerIO_STDOUT_WRITE)
 
 	http.HandleFunc("POST /DIALFS/IO_FS_CREATE", handlerIO_FS_CREATE(cantBloquesDisponiblesTotal)) //!Modificar la request desde kernel para que no ponga /TipoDeInstruccion
-	http.HandleFunc("POST /DIALFS/handlerIO_FS_TRUNCATE", handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal))
+	http.HandleFunc("POST /DIALFS/IO_FS_TRUNCATE", handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal))
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -368,9 +368,9 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 			return
 		}
 
-		tamañoEnBloques := int(math.Ceil(float64(metadata.Size) / float64(configInterfaz.Dialfs_Block_Size)))
+		tamañoEnBloques := calcularTamañoEnBloques(metadata.Size)
 
-		nuevoTamañoEnBloques := int(math.Ceil(float64(instruccionIO.Tamaño) / float64(configInterfaz.Dialfs_Block_Size)))
+		nuevoTamañoEnBloques := calcularTamañoEnBloques(int(instruccionIO.Tamaño))
 
 		if nuevoTamañoEnBloques > tamañoEnBloques {
 			agrandarArchivo(nuevoTamañoEnBloques, &metadata, tamañoEnBloques, cantBloquesDisponiblesTotal, instruccionIO.NombreArchivo)
@@ -437,6 +437,15 @@ func actualizarMetadata(nombreArchivo string, nuevaMetadata structs.MetadataFS) 
 	}
 }
 
+func calcularTamañoEnBloques(tamañoEnBytes int) int {
+
+	if tamañoEnBytes != 0 {
+		return int(math.Ceil(float64(tamañoEnBytes) / float64(configInterfaz.Dialfs_Block_Size)))
+	} else {
+		return 1
+	}
+}
+
 //--------------- IO_FS_CREATE
 
 func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
@@ -487,7 +496,7 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, tamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) {
 
 	//Verifico si hay espacio suficiente en el disco
-	if nuevoTamañoEnBloques < *cantBloquesDisponiblesTotal {
+	if nuevoTamañoEnBloques > *cantBloquesDisponiblesTotal {
 		fmt.Println("No hay suficiente espacio en el disco")
 		//Este caso no se testea, ni se realiza ninguna operacion en especifico
 		return
@@ -521,7 +530,7 @@ func espacioContiguo(tamaño int, metadata structs.MetadataFS) (bool, error) {
 	defer bitmap.Close()
 
 	// Primer bloque a recorrer para ver si hay espacio contiguo
-	primerBloqueARecorrer := metadata.InitialBlock + int(math.Ceil(float64(metadata.Size)/float64(configInterfaz.Dialfs_Block_Size)))
+	primerBloqueARecorrer := metadata.InitialBlock + calcularTamañoEnBloques(metadata.Size)
 
 	buf := make([]byte, 1)
 
@@ -553,7 +562,7 @@ func reservarBloques(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata s
 	//Asigno (1) los bloques nuevos
 	bloquesAgregados := nuevoTamañoEnBloques - tamañoEnBloques
 
-	pos := metadata.InitialBlock + tamañoEnBloques + 1
+	pos := metadata.InitialBlock + tamañoEnBloques
 
 	for i := bloquesAgregados; i > 0; i-- {
 		_, err = file.WriteAt([]byte{1}, int64(pos))
@@ -646,7 +655,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 			return -1
 		}
 
-		sizeEnBloques := int(math.Ceil(float64(metadata.Size) / float64(configInterfaz.Dialfs_Block_Size)))
+		sizeEnBloques := calcularTamañoEnBloques(metadata.Size)
 		tempBuffer := make([]byte, sizeEnBloques*configInterfaz.Dialfs_Block_Size)
 
 		//Leer, de acuerdo a la metadata, los bloques de fDataBloques
