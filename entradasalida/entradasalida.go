@@ -637,6 +637,8 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 		fmt.Println(err)
 		return
 	}
+
+//? Se debe cerrar aun cuando el archivo ha sido eliminado al final
 	defer fTemp.Close()
 
 	//Tomo todos los archivos y los escribo contiguos en el archivo temporal
