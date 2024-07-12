@@ -423,6 +423,26 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		MotivoDeDesalojo = "IO"
 		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDOUT_WRITE") //TODO: IN -> OUT
 
+	case "IO_FS_CREATE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
+		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_CREATE")
+
+	case "IO_FS_DELETE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
+		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_DELETE")
+
+	case "IO_FS_TRUNCATE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
+		go ioFSTruncate(variable[1], variable[2], variable[3], PCB.PID, registrosMap8, registrosMap32)
+
+	case "IO_FS_WRITE":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
+		go ioFSWrite(variable[1], variable[2], variable[3], variable[4], variable[5], PCB.PID, registrosMap8, registrosMap32, TLB, prioridadesTLB)
+
 	case "EXIT":
 		*cicloFinalizado = true
 		PCB.Estado = "EXIT"
@@ -685,13 +705,11 @@ func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[stri
 	}
 }
 
-func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) []byte {
+func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) uint32 {
 	if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
-		return []byte{*registrosMap8[registroDato]}
+		return uint32(*registrosMap8[registroDato])
 	} else {
-		data := make([]byte, 4)
-		binary.BigEndian.PutUint32(data, *registrosMap32[registroDato])
-		return data
+		return *registrosMap32[registroDato]
 	}
 }
 
@@ -712,7 +730,10 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	}
 
-	valor := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
+	regData := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
+
+	valor := make([]byte, 4)
+	binary.BigEndian.PutUint32(valor, regData)
 
 	body, err := json.Marshal(structs.RequestMovOUT{Pid: PidEnEjecucion, Dir: direccionFisica, Data: valor})
 
@@ -849,15 +870,13 @@ func ioGenSleep(nombreInterfaz string, unitWorkTimeString string, PID uint32) {
 
 	// Envía la solicitud de ejecucion a Kernel
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
-
 }
 
 func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PID uint32, tlb *TLB,
 	prioridadesTLB *[]ElementoPrioridad, instruccionIO string) {
 
 	//Extrae el tamaño de la instrucción
-	tamañoBytes := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
-	tamaño := binary.BigEndian.Uint32(tamañoBytes)
+	tamaño := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
 
 	//Traduce dirección lógica a física
 	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
@@ -953,5 +972,87 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 	fmt.Println(string(data)) //*log
 
 	return "OK"
+}
 
+//TODO: Testear que se comuniquen estas funciones con kernel.
+
+func ioFSCreateOrDelete(nombreInterfaz string, nombreArchivo string, PID uint32, instruccionIO string) {
+
+	//Creo estructura de request
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		Instruccion:    instruccionIO,
+		NombreArchivo:  nombreArchivo,
+	}
+
+	//Convierto request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+}
+
+func ioFSTruncate(nombreInterfaz string, nombreArchivo string, registroTamaño string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32) {
+
+	//Extrae el tamaño de la instrucción
+	tamaño := extraerDatosDelRegistro(registroTamaño, registroMap8, registroMap32)
+
+	//Crea una variable que contiene el cuerpo de la request.
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		NombreArchivo:  nombreArchivo,
+		Instruccion:    "IO_FS_TRUNCATE",
+		Tamaño:         tamaño,
+	}
+
+	// Convierte request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+}
+
+func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTamaño string,
+	regPuntero string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+
+	//Extrae el tamaño de la instrucción
+	tamaño := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
+
+	//! Chequear que se deba enviar así el puntero.
+	puntero := extraerDatosDelRegistro(regPuntero, registroMap8, registroMap32)
+
+	//Traduce dirección lógica a física
+	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
+	if !encontrado {
+		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		return
+	}
+
+	//Crea una variable que contiene el cuerpo de la request.
+	var requestEjecutarInstuccion = structs.RequestEjecutarInstruccionIO{
+		PidDesalojado:  PID,
+		NombreInterfaz: nombreInterfaz,
+		NombreArchivo:  nombreArchivo,
+		Instruccion:    "IO_FS_WRITE",
+		Direccion:      direccion,
+		Tamaño:         tamaño,
+		PunteroArchivo: puntero,
+	}
+
+	// Convierte request a JSON
+	body, err := json.Marshal(requestEjecutarInstuccion)
+	if err != nil {
+		return
+	}
+
+	// Envía la solicitud de ejecucion a Kernel
+	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }

@@ -98,6 +98,8 @@ type RequestEjecutarInstruccionIO struct {
 	UnitWorkTime   int
 	Direccion      uint32
 	Tamaño         uint32
+	NombreArchivo  string
+	PunteroArchivo uint32
 }
 
 // Estructura que comunica Kernel con CPU y CPU con memoria para la instruccion STDIN.
@@ -106,6 +108,11 @@ type RequestInputSTDIN struct {
 	RegistroDireccion uint32
 	TextoUsuario      []byte
 	//? Tambien deberia estar el pid?
+}
+
+type MetadataFS struct {
+	InitialBlock int `json:"initial_block"`
+	Size         int `json:"size"`
 }
 
 //=====================================| MEMORIA DE USUARIO |=====================================\\
