@@ -34,8 +34,8 @@ func main() {
 	Auxlogger = logueano.InitAuxLog("IO")
 
 	//Toma los parametros pasados por argumento
-	nombreInterfaz := "FS"      //os.Args[1]
-	configPath := "dialfs.json" //os.Args[2]
+	nombreInterfaz := os.Args[1]
+	configPath := os.Args[2]
 
 	config.Iniciar(configPath, &configInterfaz)
 
@@ -91,6 +91,7 @@ func iniciarServidorInterfaz(cantBloquesDisponiblesTotal *int) error {
 
 	http.HandleFunc("POST /DIALFS/IO_FS_CREATE", handlerIO_FS_CREATE(cantBloquesDisponiblesTotal)) //!Modificar la request desde kernel para que no ponga /TipoDeInstruccion
 	http.HandleFunc("POST /DIALFS/IO_FS_TRUNCATE", handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal))
+	http.HandleFunc("POST /DIALFS/IO_FS_DELETE", handlerIO_FS_DELETE(cantBloquesDisponiblesTotal))
 
 	var err = config.IniciarServidor(configInterfaz.Port)
 	return err
@@ -325,6 +326,12 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		//-------- EJECUTA ---------
 
+		if *cantBloquesDisponiblesTotal == 0 {
+			//No hay espacio en disco
+			fmt.Println("No hay espacio en disco")
+			return
+		}
+
 		metadata := structs.MetadataFS{}
 
 		//Asigna su primer bloque
@@ -381,6 +388,55 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 
 		metadata.Size = int(instruccionIO.Tamaño)
 		actualizarMetadata(instruccionIO.NombreArchivo, metadata)
+
+		//--------- RESPUESTA ---------
+		// Envía el status al Kernel
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(":/"))
+	}
+}
+
+func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		mx_interfaz.Lock()
+		defer mx_interfaz.Unlock()
+		//--------- RECIBE ---------
+		var instruccionIO structs.RequestEjecutarInstruccionIO
+		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//-------- EJECUTA ---------
+
+		//Extraigo la metadata
+		metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		//Libero los bloques
+		liberarBloques(calcularTamañoEnBloques(metadata.Size), 0, metadata.InitialBlock, cantBloquesDisponiblesTotal)
+
+		//Elimino la metadata
+		err = os.Remove(configInterfaz.Dialfs_Path + "/" + instruccionIO.NombreArchivo)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		//Elimino el archivo de la lista de archivos
+		for i, archivo := range listaArchivos {
+			if archivo == instruccionIO.NombreArchivo {
+				listaArchivos = append(listaArchivos[:i], listaArchivos[i+1:]...)
+				break
+			}
+		}
 
 		//--------- RESPUESTA ---------
 		// Envía el status al Kernel
