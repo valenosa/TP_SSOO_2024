@@ -266,6 +266,9 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//Espera una unidad de trabajo
+	time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
+
 	var inputTruncado = string(data)
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
@@ -336,6 +339,9 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		//--------- EJECUTA ---------
 
+		//Espera una unidad de trabajo
+		time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
+
 		if *cantBloquesDisponiblesTotal == 0 {
 			//No hay espacio en disco
 			fmt.Println("No hay espacio en disco")
@@ -362,6 +368,7 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 	}
 }
 
+// TODO: ACTUALIZAR EL CANTIDAD DE BLOQUES DISPONIBLES EN EL BITMAP.DAT
 func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -378,6 +385,9 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 		}
 
 		//-------- EJECUTA ---------
+
+		//Espera una unidad de trabajo
+		time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
 
 		//Extrae el tamaño y el bloque inicial del archivo recibido.
 		metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
@@ -425,6 +435,9 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		}
 
 		//-------- EJECUTA ---------
+
+		//Espera una unidad de trabajo
+		time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
 
 		//Extraigo la metadata
 		metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
