@@ -99,7 +99,7 @@ type RequestEjecutarInstruccionIO struct {
 	Direccion      uint32
 	Tamaño         uint32
 	NombreArchivo  string
-	Puntero        uint32
+	PunteroArchivo uint32
 }
 
 // Estructura que comunica Kernel con CPU y CPU con memoria para la instruccion STDIN.

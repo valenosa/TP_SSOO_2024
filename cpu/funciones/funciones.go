@@ -1044,7 +1044,7 @@ func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTa
 		Instruccion:    "IO_FS_WRITE",
 		Direccion:      direccion,
 		Tamaño:         tamaño,
-		Puntero:        puntero,
+		PunteroArchivo: puntero,
 	}
 
 	// Convierte request a JSON
