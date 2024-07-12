@@ -503,7 +503,7 @@ func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, ta
 	}
 
 	//Verifico si existe tamaño suficiente contiguo al bloque
-	espacioEsContiguo, err := espacioContiguo(tamañoEnBloques, *metadata)
+	espacioEsContiguo, err := espacioContiguo(nuevoTamañoEnBloques, *metadata)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -520,7 +520,7 @@ func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, ta
 
 }
 
-func espacioContiguo(tamaño int, metadata structs.MetadataFS) (bool, error) {
+func espacioContiguo(nuevoTamañoEnBloques int, metadata structs.MetadataFS) (bool, error) {
 
 	bitmap, err := os.Open(configInterfaz.Dialfs_Path + "/" + "bitmap.dat")
 	if err != nil {
@@ -534,8 +534,8 @@ func espacioContiguo(tamaño int, metadata structs.MetadataFS) (bool, error) {
 
 	buf := make([]byte, 1)
 
-	// Recorre n bloques a partir del primer bloque a recorrer, siendo n la variable "tamaño"
-	for i := primerBloqueARecorrer; i < primerBloqueARecorrer+tamaño; i++ {
+	// Recorre n bloques a partir del primer bloque a recorrer, siendo n la nueva cantidad de bloques
+	for i := primerBloqueARecorrer; i < metadata.InitialBlock+nuevoTamañoEnBloques; i++ {
 		_, err := bitmap.ReadAt(buf, int64(i))
 		if err != nil {
 			fmt.Println(err)
@@ -665,11 +665,11 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 			return -1
 		}
 
-		punteroUltimoBloqueLibre += sizeEnBloques
-
 		//Actualizar la metadata en base al nuevo bloque inicial
 		metadata.InitialBlock = punteroUltimoBloqueLibre
 		actualizarMetadata(archivo, metadata)
+
+		punteroUltimoBloqueLibre += sizeEnBloques
 
 		//Escribir en el archivo temporal el tmpBuffer
 		_, err = fTemp.Write(tempBuffer)
