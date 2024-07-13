@@ -117,6 +117,9 @@ func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_GEN_SLEEP")
+
 	// Decodifica el request (codificado en formato json).
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
@@ -148,6 +151,9 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDIN_READ")
 
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
@@ -217,6 +223,10 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDOUT_WRITE")
+
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		fmt.Println(err)
@@ -330,6 +340,10 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		//--------- RECIBE ---------
 		var instruccionIO structs.RequestEjecutarInstruccionIO
+
+		//^ log obligatorio (1/6)
+		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_CREATE")
+
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
 			fmt.Println(err)
@@ -361,6 +375,9 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		//Agrega el nombre del archivo a la listaArchivo
 		listaArchivos = append(listaArchivos, instruccionIO.NombreArchivo)
 
+		//^ log obligatorio (2/6)
+		logueano.CrearArchivo(instruccionIO.PidDesalojado, instruccionIO.NombreArchivo)
+
 		//--------- RESPUESTA ---------
 		// Envía el status al Kernel
 		w.WriteHeader(http.StatusOK)
@@ -377,6 +394,13 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 		defer mx_interfaz.Unlock()
 		//--------- RECIBE ---------
 		var instruccionIO structs.RequestEjecutarInstruccionIO
+
+		//^ log obligatorio (1/6)
+		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_TRUNCATE")
+
+		//^ log obligatorio (4/6)
+		logueano.TruncarArchivo(instruccionIO.PidDesalojado, instruccionIO.NombreArchivo, instruccionIO.Tamaño)
+
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
 			fmt.Println(err)
@@ -427,6 +451,10 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		//--------- RECIBE ---------
 
 		var instruccionIO structs.RequestEjecutarInstruccionIO
+
+		//^ log obligatorio (1/6)
+		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_DELETE")
+
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
 			fmt.Println(err)
@@ -459,6 +487,9 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		//Elimino el archivo de la lista de archivos
 		for i, archivo := range listaArchivos {
 			if archivo == instruccionIO.NombreArchivo {
+				//^ log obligatorio (2/6)
+				logueano.EliminarArchivo(instruccionIO.PidDesalojado, instruccionIO.NombreArchivo)
+
 				listaArchivos = append(listaArchivos[:i], listaArchivos[i+1:]...)
 				break
 			}
@@ -478,6 +509,13 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 	defer mx_interfaz.Unlock()
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_WRITE")
+
+	//^ log obligatorio (6/6)
+	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "ESCRIBIR", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
+
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		fmt.Println(err)
@@ -520,7 +558,6 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------- EJECUTA ---------
-
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
 		fmt.Println(err)
@@ -568,6 +605,13 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	defer mx_interfaz.Unlock()
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_READ")
+
+	//^ log obligatorio (6/6)
+	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "LEER", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
+
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		fmt.Println(err)

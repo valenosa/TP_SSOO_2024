@@ -105,6 +105,34 @@ func LecturaEscritura(pcb structs.PCB, accion string, direccionFisica string, va
 //log´s auxiliares------------------------------------------------------
 
 // -------------------------- == LOG's E/S == -----------------------------------------------------------
+// log obligatorio (1/6)
+func Operacion(pid uint32, operacion string) {
+	log.Printf("PID: %d - Operacion %s", pid, operacion)
+}
+
+// log obligatorio (2/6)
+func CrearArchivo(pid uint32, nombre string) {
+	log.Printf("PID: %d - Crear Archivo %s", pid, nombre)
+}
+
+// log obligatorio (3/6)
+func EliminarArchivo(pid uint32, nombre string) {
+	log.Printf("PID: %d - Eliminar Archivo %s", pid, nombre)
+}
+
+// log obligatorio (4/6)
+func TruncarArchivo(pid uint32, nombre string, tamaño uint32) {
+	log.Printf("PID: %d - Truncar Archivo %s - Tamaño: %d", pid, nombre, tamaño)
+}
+
+// log obligatorio (5...6/6)
+func LeerEscribirArchivo(pid uint32, accion string, nombre string, tamaño int, puntero uint32) {
+	if accion == "LEER" {
+		log.Printf("PID: %d - Leer Archivo %s - Tamaño a Leer: %d - Puntero Archivo: %d", pid, nombre, tamaño, puntero)
+	} else {
+		log.Printf("PID: %d - Escribir Archivo %s - Tamaño a Escribir: %d - Puntero Archivo: %d", pid, nombre, tamaño, puntero)
+	}
+}
 
 //log´s auxiliares------------------------------------------------------
 

@@ -53,6 +53,7 @@ func InsertData(pid uint32, memoriaInstrucciones map[uint32][]string, data []byt
 func AsignarTabla(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
 	tablaDePaginas[pid] = structs.Tabla{}
 
+	//^ log obligatorio (1/6)
 	logueano.OperoConTablaDePaginas(pid, tablaDePaginas)
 }
 
@@ -63,6 +64,7 @@ func BuscarMarco(pid uint32, pagina uint32, tablaDePaginas map[uint32]structs.Ta
 
 	marco := tablaDePaginas[pid][pagina]
 
+	//^ log obligatorio (2/6)
 	logueano.AccesoTabla(pid, pagina, marco)
 
 	marcoStr := strconv.Itoa(marco)
@@ -158,7 +160,7 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 		accion = "Reducir"
 	}
 
-	// log obligatorio ((3...4)/6)
+	//^ log obligatorio ((3...4)/6)
 	logueano.CambioDeTamaño(pid, lenOriginal, accion, tablaDePaginas)
 
 	return "OK" //?
@@ -168,6 +170,7 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 
 	var dato []byte
 
+	//^ log obligatorio (5/5)
 	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize) //? Lo dejo asi o lo pongo siempre que se pueda leer (es decir, cuando no hay error)
 
 	// Itera sobre los bytes del dato recibido.
@@ -193,6 +196,7 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 // Escribe en memoria el dato recibido en la dirección física especificada.
 func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, datoBytes []byte, espacioUsuario *[]byte) string {
 
+	//^ log obligatorio (5/5)
 	logueano.AccesoEspacioUsuario(pid, "ESCRIBIR", direccionFisica, len(datoBytes)) //? Lo dejo asi o lo pongo siempre que se pueda leer (es decir, cuando no hay error)
 
 	// Itera sobre los bytes del dato recibido.

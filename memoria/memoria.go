@@ -152,9 +152,10 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		// Desocupar marcos
 		funciones.LiberarMarcos(tablaDePaginas[uint32(pid)], bitMap)
 
-		// Borrar tabla de páginas
+		//^log obligatorio (1/6)
 		logueano.OperoConTablaDePaginas(uint32(pid), tablaDePaginas)
 
+		// Borrar tabla de páginas
 		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
 
 		//--------- RESPUESTA ---------
