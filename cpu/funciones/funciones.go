@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
+	"github.com/sisoputnfrba/tp-golang/utils/logueano"
 	"github.com/sisoputnfrba/tp-golang/utils/structs"
 )
 
@@ -121,12 +122,19 @@ func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]Element
 	// Busca en la TLB
 	marco, encontrado := (*tlb).Hit(pid, pagina)
 
+	//^log obligatorio (3...4/6)
+	logueano.TLBAccion(pid, encontrado, pagina)
+
 	// Si no está en la TLB, busca en la tabla de páginas y de paso lo agrega
 	if !encontrado {
 		marco, encontrado = buscarEnMemoria(pid, pagina)
 
+		//^log obligatorio (5/6)
+		logueano.ObtenerMarcolg(pid, encontrado, pagina, marco)
+
 		//TODO: manejar caso en donde la TLB no pueda agregar marco (no existe marco en memoria)
 		agregarEnTLB(pagina, marco, pid, tlb, prioridadesTLB)
+
 	}
 
 	//!Manejar tema TLBEANO
@@ -271,6 +279,10 @@ func EjecutarCiclosDeInstruccion(PCB *structs.PCB, TLB *TLB, prioridadesTLB *[]E
 		// Obtiene la próxima instrucción a ejecutar.
 		instruccion := Fetch(PCB.PID, RegistrosCPU.PC)
 
+		//TODO: Probar
+		//^log obligatorio (1/6)
+		logueano.FetchInstruccion(*PCB)
+
 		// Decodifica y ejecuta la instrucción.
 		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado, TLB, prioridadesTLB)
 	}
@@ -350,8 +362,8 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	// Parsea las instrucciones de la cadena de instrucción
 	variable := strings.Split(instruccion, " ")
 
-	// Imprime la instrucción y sus parámetros
-	fmt.Println("Instruccion: ", variable[0], " Parametros: ", variable[1:])
+	//^log obligatorio (2/6)
+	logueano.EjecucionInstruccion(*PCB, variable)
 
 	// Switch para determinar la operación a realizar según la instrucción
 	switch variable[0] {
@@ -368,34 +380,54 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "MOV_IN":
-		movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
-		//TODO: logueano
+		var valor string
+		var dirF string
+		var estado string
 
-	case "MOV_OUT":
-		estado := movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
-		//TODO: logueano
-		if estado == "OUT OF MEMORY" {
+		estado, valor, dirF = movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
+
+		if estado != "OK" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"
+			PCB.Estado = "EXIT"       //TODO: Manejar en kernel
 			MotivoDeDesalojo = estado //TODO: Manejar en kernel
 			return
+		} else {
+			//^log obligatorio (6/6)
+			logueano.LecturaEscritura(*PCB, "LEER", dirF, valor)
+		}
+	case "MOV_OUT":
+
+		estado, valor, dirF := movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
+
+		if estado != "OK" {
+			*cicloFinalizado = true
+			PCB.Estado = "EXIT"       //TODO: Manejar en kernel
+			MotivoDeDesalojo = estado //TODO: Manejar en kernel
+			return
+		} else {
+			//^log obligatorio (6/6)
+			logueano.LecturaEscritura(*PCB, "ESCRIBIR", dirF, valor)
 		}
 
 	case "COPY_STRING":
-		estado := copyString(variable[1], TLB, prioridadesTLB)
-		//TODO: logueano
-		if estado == "OUT OF MEMORY" {
+		estado, valor, dirFR, dirFW := copyString(variable[1], TLB, prioridadesTLB)
+
+		if estado != "OK" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"
+			PCB.Estado = "EXIT"       //TODO: Manejar en kernel
 			MotivoDeDesalojo = estado //TODO: Manejar en kernel
 			return
+		} else {
+			//^log obligatorio (6/6)
+			logueano.LecturaEscritura(*PCB, "LEER", dirFR, valor)
+			logueano.LecturaEscritura(*PCB, "ESCRIBIR", dirFW, valor)
 		}
 
 	case "RESIZE":
 		estado := resize(variable[1])
 		if estado == "OUT OF MEMORY" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"
+			PCB.Estado = "EXIT"       //TODO: Manejar en kernel
 			MotivoDeDesalojo = estado //TODO: Manejar en kernel
 			return
 		}
@@ -623,7 +655,7 @@ func resize(tamañoEnBytes string) string {
 	return string(bodyBytes)
 }
 
-func movIN(registroDato string, registroDireccion string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
+func movIN(registroDato string, registroDireccion string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (string, string, string) {
 
 	var direccionFisica uint32
 	var encontrado bool
@@ -635,7 +667,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
-		return "PAGE FAULT" //?Es correcto esto?
+		return "PAGE FAULT", "", "" //?Es correcto esto?
 
 	}
 
@@ -654,7 +686,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	req, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
-		return ""
+		return "", "", ""
 	}
 
 	//Parsea la direccion física de uint32 a string.
@@ -675,26 +707,28 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	respuesta, err := cliente.Do(req)
 
 	if err != nil {
-		return ""
+		return "", "", ""
 	}
 
 	if respuesta.StatusCode == http.StatusNotFound {
-		return "OUT OF MEMORY"
+		return "OUT OF MEMORY", "", ""
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
-		return ""
+		return "", "", ""
 	}
 
 	// Lee el cuerpo de la respuesta
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		return ""
+		return "", "", ""
 	}
+
+	var datas string = string(data)
 
 	escribirEnRegistro(registroDato, data, registrosMap8, registrosMap32)
 
-	return "OK"
+	return "OK", datas, direccionFisicaStr
 }
 
 func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {
@@ -720,13 +754,15 @@ func obtenerDireccionFisica(registroDireccion string, registrosMap8 map[string]*
 	return TraduccionMMU(PidEnEjecucion, int(*(registrosMap32[registroDireccion])), TLB, prioridadesTLB)
 }
 
-func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
+func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (string, string, string) {
 
 	direccionFisica, encontrado := obtenerDireccionFisica(registroDireccion, registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
+	direccionFisicaStr := strconv.FormatUint(uint64(direccionFisica), 10)
+
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
-		return "PAGE FAULT" //?Es correcto esto?
+		return "PAGE FAULT", "", "" //?Es correcto esto?
 
 	}
 
@@ -735,29 +771,31 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	valor := make([]byte, 4)
 	binary.BigEndian.PutUint32(valor, regData)
 
+	var valorStr string = string(valor)
+
 	body, err := json.Marshal(structs.RequestMovOUT{Pid: PidEnEjecucion, Dir: direccionFisica, Data: valor})
 
 	if err != nil {
-		return ""
+		return "", "", ""
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
 	respuesta, err := config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
 		fmt.Println(err)
-		return ""
+		return "", "", ""
 	}
 
 	if respuesta.StatusCode == http.StatusNotFound {
-		return "OUT OF MEMORY"
+		return "OUT OF MEMORY", "", ""
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
 		fmt.Println("Error: ", respuesta.StatusCode)
-		return ""
+		return "", "", ""
 	}
 
-	return "OK"
+	return "OK", valorStr, direccionFisicaStr
 }
 
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
@@ -904,13 +942,13 @@ func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
 
-func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) string {
+func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (string, string, string, string) {
 
 	direccionEscritura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.DI), TLB, prioridadesTLB)
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
-		return "PAGE FAULT" //?Es correcto esto?
+		return "PAGE FAULT", "", "", "" //?Es correcto esto?
 
 	}
 
@@ -918,7 +956,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 
 	if !encontrado {
 		fmt.Println("Error: Page Fault")
-		return "PAGE FAULT" //?Es correcto esto?
+		return "PAGE FAULT", "", "", "" //?Es correcto esto?
 
 	}
 
@@ -929,7 +967,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 	// Crea una nueva solicitud GET
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return ""
+		return "", "", "", ""
 	}
 
 	//Parsea la direccion física de uint32 a string.
@@ -952,26 +990,24 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) s
 	respuesta, err := cliente.Do(req)
 
 	if err != nil {
-		return ""
+		return "", "", "", ""
 	}
 
 	if respuesta.StatusCode == http.StatusNotFound {
-		return "OUT OF MEMORY"
+		return "OUT OF MEMORY", "", "", ""
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
-		return ""
+		return "", "", "", ""
 	}
 
 	// Lee el cuerpo de la respuesta
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		return ""
+		return "", "", "", ""
 	}
 
-	fmt.Println(string(data)) //*log
-
-	return "OK"
+	return "OK", (string(data)), direccionLecturaStr, direccionEscrituraStr
 }
 
 //TODO: Testear que se comuniquen estas funciones con kernel.

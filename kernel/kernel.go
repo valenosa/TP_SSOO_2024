@@ -382,6 +382,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Imprime la solicitud
 	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //! Borrar despues
 
+	//^log obligatorio (6/6)
+	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
+
 	//--------- EJECUTA ---------
 
 	//--- VALIDA

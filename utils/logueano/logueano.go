@@ -66,6 +66,41 @@ func MensajeConFormato(auxLog *log.Logger, mensaje string, args ...interface{}) 
 }
 
 // -------------------------- == LOG's CPU == -----------------------------------------------------------
+// log obligatorio (1/6)
+func FetchInstruccion(pcb structs.PCB) {
+
+	log.Printf("PID: %d - FETCH - Program Counter: %d", pcb.PID, pcb.PC)
+}
+
+// log obligatorio (2/6)
+func EjecucionInstruccion(pcb structs.PCB, variable []string) {
+
+	log.Println("PID: ", pcb.PID, " - Ejecutando: ", variable[0], " - Parametros: ", variable[1:])
+}
+
+// log obligatorio (3...4/6)
+func TLBAccion(pid uint32, encontrado bool, pagina uint32) {
+
+	if encontrado {
+		log.Printf("PID: %d - TLB HIT - Pagina %d", pid, pagina)
+	} else {
+		log.Printf("PID: %d - TLB MISS - Pagina %d", pid, pagina)
+	}
+}
+
+// log obligatorio (5/6)
+func ObtenerMarcolg(pid uint32, encontrado bool, pagina uint32, marco uint32) {
+	if encontrado {
+		log.Printf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d", pid, pagina, marco)
+	}
+}
+
+// log obligatorio (6/6)
+func LecturaEscritura(pcb structs.PCB, accion string, direccionFisica string, valor string) {
+
+	log.Printf("PID: %d - Accion: %s - Direccion Fisica: %s - Valor: %s", pcb.PID, accion, direccionFisica, valor)
+
+}
 
 //log´s auxiliares------------------------------------------------------
 
@@ -118,11 +153,11 @@ func FinDeQuantum(pcb structs.PCB) {
 	log.Printf("PID: %d - Desalojado por fin de Quantum", pcb.PID)
 }
 
-// TODO : Sin usar
+// TODO : usado solo para interfaz (falta usarlo para recursos)
 // log obligatorio (6/6)
-func MotivoBloqueo(pcb structs.PCB, motivo string) {
+func MotivoBloqueo(pid uint32, motivo string) {
 
-	log.Printf("PID: %d - Bloqueado por: %s", pcb.PID, motivo)
+	log.Printf("PID: %d - Bloqueado por: %s", pid, motivo)
 }
 
 //log´s auxiliares------------------------------------------------------
