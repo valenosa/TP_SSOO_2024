@@ -31,18 +31,13 @@ func main() {
 
 	bitMap := make([]bool, funciones.ConfigJson.Memory_Size/funciones.ConfigJson.Page_Size) // TRUE = ocupado, FALSE = libre
 
-	// Variables que no se usan pero se dejan para que no tire error el compilador
-	_ = bitMap
-	_ = tablasDePaginas
-	_ = espacioUsuario
-
 	// Configura el logger (aux en funciones.go)
 	logueano.Logger("memoria.log")
 
 	funciones.Auxlogger = logueano.InitAuxLog("memoria")
 
 	// ======== HandleFunctions ========
-	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas, bitMap))
+	http.HandleFunc("PUT /process", handlerMemIniciarProceso(memoriaInstrucciones, tablasDePaginas))
 	http.HandleFunc("GET /instrucciones", handlerEnviarInstruccion(memoriaInstrucciones))
 	http.HandleFunc("DELETE /process", handlerFinalizarProcesoMemoria(memoriaInstrucciones, tablasDePaginas, bitMap))
 	http.HandleFunc("PUT /memoria/resize", handlerResize(&tablasDePaginas, bitMap))
@@ -58,7 +53,7 @@ func main() {
 //================================| HANDLERS |================================\\
 
 // Wrapper que crea un PCB con el pid recibido.
-func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
+func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla) func(http.ResponseWriter, *http.Request) {
 
 	// Handler para iniciar un proceso.
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +114,7 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 		//--------- EJECUTA ---------
 
 		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
-		fmt.Println(instruccion) //! Borrar despues
+		fmt.Println(instruccion)
 
 		// Esperar un tiempo determinado a tiempo de retardo
 		time.Sleep(time.Duration(funciones.ConfigJson.Delay_Response) * time.Millisecond)
@@ -131,7 +126,6 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 	}
 }
 
-// TODO: Crear request que venga a este handler, el endpoint, y probar // TODO: no olvidarse de desalojar los recursos
 func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, tablaDePaginas map[uint32]structs.Tabla, bitMap []bool) func(http.ResponseWriter, *http.Request) {
 
 	// Recibe el pid y borra las estructuras relacionadas al mismo (instrucciones, tabla de páginas, libera bitmap)
@@ -155,7 +149,7 @@ func handlerFinalizarProcesoMemoria(memoriaInstrucciones map[uint32][]string, ta
 		// Borrar tabla de páginas
 		logueano.OperoConTablaDePaginas(uint32(pid), tablaDePaginas)
 
-		delete(tablaDePaginas, uint32(pid)) //?Alcanza o hace falta mandarle un puntero?
+		delete(tablaDePaginas, uint32(pid))
 
 		//--------- RESPUESTA ---------
 
@@ -324,7 +318,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		paginaLectura := funciones.ObtenerPagina(uint32(pid), uint32(direccionLectura), tablaDePaginas)
 
 		if paginaEscritura == -1 || paginaLectura == -1 {
-			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página") //? No debería pasar nunca pero x las dudas
+			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página")
 		}
 
 		//--------- LECTURA ---------
@@ -349,5 +343,3 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		w.Write(data)
 	}
 }
-
-//VALEN SOCOTROCO

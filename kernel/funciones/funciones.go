@@ -25,11 +25,13 @@ var Auxlogger *log.Logger
 var MapRecursos = make(map[string]*structs.Recurso)
 
 // ----------------------------Listas de Estados
-var ListaNEW = ListaSegura{} //? Es simplemente para mostrarlo en listarProcesos
 var ListaREADY = ListaSegura{}
-var ListaEXIT = ListaSegura{} //? Es simplemente para mostrarlo en listarProcesos
 var MapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
-var ProcesoExec structs.PCB //? Es simplemente para mostrarlo en listarProcesos
+
+// Solo para mostrarlo en listarProcesos
+var ListaNEW = ListaSegura{}
+var ListaEXIT = ListaSegura{}
+var ProcesoExec structs.PCB
 
 // ---------------------------- VRR
 var ListaREADY_PRIORITARIO = ListaSegura{}
@@ -53,8 +55,8 @@ var CounterPID uint32 = 0
 
 //*=======================================| PLANIFICADOR |=======================================\\
 
-// TODO: Verificar el tema del semaforo de hay pcb en ready (31/05/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
+// TODO: Testear VRR mas a fondo
 func Planificador() {
 
 	//Espero a que se active el planificador
@@ -69,7 +71,6 @@ func Planificador() {
 		var siguientePCB structs.PCB      // PCB a enviar al CPU
 		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
 
-		//! A lo mejor tiene que ser con semaforos pero es para testear la idea
 		if strings.ToUpper(ConfigJson.Planning_Algorithm) == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 {
 
 			siguientePCB = ListaREADY_PRIORITARIO.Dequeue()
@@ -112,11 +113,8 @@ func Planificador() {
 	}
 }
 
-// TODO: TODOS LOS CAMBIOS DE ESTADO QUE SE HACEN EN CPU SE TIENEN QUE HACER ACA EN BASE A EL MOTIVO DE DESALOJO (14/6/24)
+// TODO: Todos los cambios de estado se hacen desde aca
 func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
-
-	// Imprime el motivo de desalojo.
-	fmt.Println("===================================== Proceso", pcb.PID, "desalojado por:", motivoDesalojo)
 
 	switch motivoDesalojo {
 	case "Fin de QUANTUM":
@@ -158,7 +156,7 @@ func AdministrarQueues(pcb structs.PCB) {
 		Bin_hayPCBenREADY <- 0
 
 		//^ log obligatorio (3/6)
-		logueano.PidsReady(ListaREADY.List) //!No se si tengo que sync esto
+		logueano.PidsReady(ListaREADY.List)
 
 	case "READY_PRIORITARIO":
 		ListaREADY_PRIORITARIO.Append(pcb)
@@ -179,8 +177,6 @@ func AdministrarQueues(pcb structs.PCB) {
 		LiberarProceso(pcb)
 		<-Cont_producirPCB
 	}
-
-	//TODO: loguear cambios de estado directo desde aca, esto para no llamar a la funcion por todos lados :)
 }
 
 func LiberarProceso(pcb structs.PCB) {
@@ -370,7 +366,6 @@ func (sList *ListaSegura) Append(value structs.PCB) {
 	sList.Mx.Unlock()
 }
 
-// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
 func (sList *ListaSegura) Dequeue() structs.PCB {
 	sList.Mx.Lock()
 	var pcb = sList.List[0]

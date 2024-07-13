@@ -108,14 +108,12 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 
 	var accion string
 
-	lenOriginal := len((*tablaDePaginas)[pid]) //!
+	lenOriginal := len((*tablaDePaginas)[pid])
 
 	cantidadDePaginas := int(math.Ceil(float64(size) / float64(ConfigJson.Page_Size)))
 
-	//*CASO AGREGAR PAGINAS
-	//?Hace falta devolver algo?
+	//------------- CASO AGREGAR PAGINAS
 	// Itera n cantidad de veces, siendo n la cantidad de paginas a agregar
-	//? Funcionan los punteros así?
 	for len((*tablaDePaginas)[pid]) < cantidadDePaginas {
 
 		// Por cada página a agregar, si no hay marcos disponibles, se devuelve un error OUT OF MEMORY
@@ -123,7 +121,6 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 
 		// Recorre el bitMap buscando un marco desocupado
 		for marco, ocupado := range bitMap {
-			//?optimizar? (no se si es necesario recorrer todo el bitMap)
 
 			if !ocupado {
 				// Guarda en la tabla de páginas del proceso el marco asignado a una página
@@ -138,15 +135,13 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 
 		//Si no hubo ningun marco desocupado para la página anterior, devuelve OUT OF MEMORY
 		if outOfMemory {
-			return "OUT OF MEMORY" //?
-			//!OUT OF MEMORY
+			return "OUT OF MEMORY"
 		}
 	}
 
 	accion = "Ampliar"
 
-	//*CASO QUITAR PAGINAS
-	//?Hace falta devolver algo?
+	//------------- CASO QUITAR PAGINAS
 	if len((*tablaDePaginas)[pid]) > cantidadDePaginas {
 
 		marcosALiberar := (*tablaDePaginas)[pid][cantidadDePaginas:]
@@ -161,14 +156,14 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 	// log obligatorio ((3...4)/6)
 	logueano.CambioDeTamaño(pid, lenOriginal, accion, tablaDePaginas)
 
-	return "OK" //?
+	return "OK"
 }
 
 func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, byteArraySize int, espacioUsuario *[]byte) ([]byte, string) {
 
 	var dato []byte
 
-	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize) //? Lo dejo asi o lo pongo siempre que se pueda leer (es decir, cuando no hay error)
+	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize)
 
 	// Itera sobre los bytes del dato recibido.
 	for ; byteArraySize > 0; byteArraySize-- {
@@ -187,13 +182,13 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 			}
 		}
 	}
-	return dato, "OK" //?
+	return dato, "OK"
 }
 
 // Escribe en memoria el dato recibido en la dirección física especificada.
 func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina uint32, direccionFisica uint32, datoBytes []byte, espacioUsuario *[]byte) string {
 
-	logueano.AccesoEspacioUsuario(pid, "ESCRIBIR", direccionFisica, len(datoBytes)) //? Lo dejo asi o lo pongo siempre que se pueda leer (es decir, cuando no hay error)
+	logueano.AccesoEspacioUsuario(pid, "ESCRIBIR", direccionFisica, len(datoBytes))
 
 	// Itera sobre los bytes del dato recibido.
 	for i := range datoBytes {
@@ -213,7 +208,7 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 		}
 	}
 
-	return "OK" //?
+	return "OK"
 }
 
 func cambioDePagina(direccionFisica *uint32, pid uint32, tablasDePaginas map[uint32]structs.Tabla, pagina uint32) bool {

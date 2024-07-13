@@ -61,7 +61,6 @@ func main() {
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("IniciarPlanificacion-------------------------")
 	funciones.TogglePlanificador = true
 
 	funciones.OnePlani.Lock()
@@ -70,6 +69,7 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("DetenerPlanificacion-------------------------")
@@ -83,8 +83,6 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 //----------------------( PROCESOS )----------------------\\
 
 func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("IniciarProceso-------------------------")
 
 	//----------- RECIBE ---------
 	//variable que recibirá la request.
@@ -164,10 +162,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respIniciarProceso)
 }
 
-// TODO: BUSCAR EL PCB Y MANDARLO A LAFUNCION LIBERER PROCESO
 func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
 	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 32)
@@ -181,15 +176,15 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	//TODO: Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
 	var pcb structs.PCB
+	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar pcb por el encontrado
 	funciones.LiberarProceso(pcb)
 
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
+// TODO: Testear Listar procesos
 func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("ListarProceso-------------------------")
@@ -219,7 +214,6 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-// TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
 func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("DetenerEstadoProceso-------------------------")
@@ -236,7 +230,7 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	//TODO: Busca en base al pid el proceso en todas las colas (y el map de BLOCK) y devuelvo el estado
+	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar "ANASHE" por el estado del proceso
 	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
 
 	//--------- DEVUELVE ---------
@@ -319,7 +313,7 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	var _, find = funciones.MapRecursos[recursoLiberado]
 	if !find {
-		//TODO Si no existe el recurso Mandar a EXIT
+		//TODO Si no existe el recurso Mandar a EXIT (en base a la respuesta al igual que wait)
 		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
 		return
 	}
@@ -334,8 +328,6 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 // Recibe una iterfaz y la guarda en InterfacesConectadas
 func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("ConexionInterfazIO-------------------------")
-
 	// Almaceno la interfazConectada en una variable
 	var interfazConectada structs.RequestConectarInterfazIO
 	err := json.NewDecoder(r.Body).Decode(&interfazConectada)
@@ -344,7 +336,7 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Interfaz Conectada:", interfazConectada) //! Borrar despues
+	fmt.Println("Interfaz Conectada:", interfazConectada)
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
@@ -358,13 +350,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 	marshalError := json.NewDecoder(r.Body).Decode(&requestInstruccionIO)
 	if marshalError != nil {
-		fmt.Println(marshalError) //! Borrar despues.
 		http.Error(w, marshalError.Error(), http.StatusBadRequest)
 		return
 	}
-
-	// Imprime la solicitud
-	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //! Borrar despues
 
 	//--------- EJECUTA ---------
 
@@ -393,7 +381,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Codifica instruccion a ejecutar en JSON
 	body, marshalError := json.Marshal(requestInstruccionIO)
 	if marshalError != nil {
-		fmt.Println(marshalError) //! Borrar despues.
 		http.Error(w, marshalError.Error(), http.StatusInternalServerError)
 		return
 	}

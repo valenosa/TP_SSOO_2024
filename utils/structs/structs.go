@@ -91,7 +91,6 @@ type RequestConectarInterfazIO struct {
 	Interfaz       Interfaz
 }
 
-// TODO: Implementar para DialFS
 // Estructura de comunicacion entre CPU y Kernel para ejecutar una instruccion de I/O
 type RequestEjecutarInstruccionIO struct {
 	PidDesalojado  uint32
