@@ -402,11 +402,9 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "WAIT":
 		wait(variable[1], PCB, cicloFinalizado)
-		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "SIGNAL":
 		signal(variable[1], PCB, cicloFinalizado)
-		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
