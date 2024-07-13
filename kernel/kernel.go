@@ -284,7 +284,7 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 		if recurso.Instancias < 0 {
 
 			//Agrego PID a su lista de bloqueados
-			recurso.ListaBlock = append(recurso.ListaBlock, recursoSolicitado.PidSolicitante)
+			recurso.ListaBlock.Append(recursoSolicitado.PidSolicitante)
 
 			respAsignaiconRecurso = "BLOQUEAR: Recurso no disponible"
 		}
@@ -317,26 +317,14 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	var recurso, find = funciones.MapRecursos[recursoLiberado]
+	var _, find = funciones.MapRecursos[recursoLiberado]
 	if !find {
 		//TODO Si no existe el recurso Mandar a EXIT
 		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
 		return
 	}
 
-	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
-	if len(recurso.ListaBlock) != 0 {
-		// Tomo el primer PID de la lista de BLOCK (del recurso)
-		pid := recurso.ListaBlock[0]
-		recurso.ListaBlock = recurso.ListaBlock[1:]
-
-		//Se pasa el proceso a de BOLCK -> READY
-		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
-		pcbDesbloqueado.Estado = "READY"
-		funciones.AdministrarQueues(pcbDesbloqueado)
-	} else {
-		recurso.Instancias++
-	}
+	funciones.LiberarRecurso(recursoLiberado)
 
 	w.WriteHeader(http.StatusOK)
 }

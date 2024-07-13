@@ -212,7 +212,7 @@ func LiberarProceso(pcb structs.PCB) {
 	//-------------- Liberar Recursos ------------------------------
 
 	for _, recurso := range pcb.Recursos {
-		MapRecursos[recurso].Instancias++
+		LiberarRecurso(recurso)
 	}
 }
 
@@ -332,6 +332,27 @@ func LeerRecursos(recursos []string, instancia_recursos []int) {
 	//Tomo de resources y resource_instances los recursos y sus instancias y los guardo en Recursos
 	for i, recurso := range recursos {
 		MapRecursos[recurso] = &structs.Recurso{Instancias: instancia_recursos[i]}
+	}
+}
+
+func LiberarRecurso(nombreRecurso string) {
+
+	recurso := MapRecursos[nombreRecurso]
+
+	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
+	if len(recurso.ListaBlock.List) != 0 {
+
+		// Tomo el primer PID de la lista de BLOCK (del recurso)
+		pid := recurso.ListaBlock.Dequeue()
+
+		pcbDesbloqueado := MapBLOCK.Delete(pid)
+		//Se agrega el recurso a la lista de recursos del proceso
+		pcbDesbloqueado.Recursos = append(pcbDesbloqueado.Recursos, nombreRecurso)
+		//Se pasa el proceso a de BOLCK -> READY
+		pcbDesbloqueado.Estado = "READY"
+		AdministrarQueues(pcbDesbloqueado)
+	} else {
+		recurso.Instancias++
 	}
 }
 
