@@ -120,12 +120,17 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 	switch motivoDesalojo {
 	case "Fin de QUANTUM":
+		logueano.FinDeQuantum(*pcb)
+		logueano.CambioDeEstadoInverso(*pcb, "READY")
 		pcb.Estado = "READY"
 
 	case "Finalizar PROCESO":
+		logueano.CambioDeEstadoInverso(*pcb, "EXIT")
 		pcb.Estado = "EXIT"
 
+		//TODO: Se debe indicar qué interfaz se desconectó
 	case "IO":
+		logueano.CambioDeEstadoInverso(*pcb, "BLOCK")
 		pcb.Estado = "BLOCK"
 	}
 
@@ -162,7 +167,7 @@ func AdministrarQueues(pcb structs.PCB) {
 
 	case "READY_PRIORITARIO":
 		ListaREADY_PRIORITARIO.Append(pcb)
-		fmt.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
+		logueano.PidsReadyPrioritarios(Auxlogger, pcb)
 		Bin_hayPCBenREADY <- 0
 
 	case "BLOCK":
@@ -171,6 +176,7 @@ func AdministrarQueues(pcb structs.PCB) {
 		MapBLOCK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
+		logueano.PidsBlock(Auxlogger, MapBLOCK.m)
 
 	case "EXIT":
 
@@ -193,7 +199,7 @@ func LiberarProceso(pcb structs.PCB) {
 	// Crea una nueva solicitud PUT
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -205,7 +211,7 @@ func LiberarProceso(pcb structs.PCB) {
 	// Realiza la solicitud al servidor de memoria
 	_, err = cliente.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -238,7 +244,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 	// Envía una solicitud al servidor CPU.
 	respuesta, err := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return structs.PCB{}, "ERROR"
 	}
 
@@ -250,7 +256,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Maneja los errores para la decodificación
 	if err != nil {
-		fmt.Printf("Error decodificando\n")
+		logueano.Mensaje(Auxlogger, "Error decodificando respuesta del CPU.")
 		return structs.PCB{}, "ERROR"
 	}
 
@@ -286,17 +292,17 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 
 	// Verifica si hubo un error al enviar la solicitud
 	if err != nil {
-		fmt.Println("Error al enviar la interrupción a CPU.")
+		logueano.Mensaje(Auxlogger, "Error al enviar la interrupción al CPU.")
 		return
 	}
 
 	// Verifica si hubo un error en la respuesta
 	if respuesta.StatusCode != http.StatusOK {
-		fmt.Println("Error al interpretar el motivo de desalojo.")
+		logueano.Mensaje(Auxlogger, "Error en la respuesta del CPU.")
 		return
 	}
 
-	fmt.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
+	logueano.EnviarInterrupcion(Auxlogger, tipoDeInterrupcion)
 }
 
 //*======================================| ENTRADA SALIDA (I/O) |=======================================\\
@@ -323,6 +329,7 @@ func ValidarInstruccionIO(tipo string, instruccion string) bool {
 func DesalojarProcesoIO(pid uint32) {
 	pcbDesalojado := MapBLOCK.Delete(pid)
 	pcbDesalojado.Estado = "EXIT"
+	logueano.CambioDeEstado("BLOCK", pcbDesalojado)
 	AdministrarQueues(pcbDesalojado)
 }
 

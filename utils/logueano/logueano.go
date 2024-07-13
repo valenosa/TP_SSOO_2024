@@ -50,6 +50,15 @@ func InitAuxLog(modulo string) *log.Logger {
 	return auxLogger
 }
 
+// -------------------------- == LOG's AUXILIARES GRALES == -----------------------------------------------------------
+func Error(auxLog *log.Logger, err error) {
+	auxLog.Println(err)
+}
+
+func Mensaje(auxLog *log.Logger, mensaje string) {
+	auxLog.Println(mensaje)
+}
+
 // -------------------------- == LOG's CPU == -----------------------------------------------------------
 
 //log´s auxiliares------------------------------------------------------
@@ -72,6 +81,12 @@ func CambioDeEstado(pcb_estado_viejo string, pcb structs.PCB) {
 
 }
 
+func CambioDeEstadoInverso(pcb structs.PCB, pcb_estado_nuevo string) {
+
+	log.Printf("PID: %d - Estado anterior: %s - Estado actual: %s", pcb.PID, pcb.Estado, pcb_estado_nuevo)
+
+}
+
 // log obligatorio (3/6)
 func PidsReady(readyQueue []structs.PCB) {
 	var pids []uint32
@@ -90,17 +105,24 @@ func FinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
 
 }
 
+// log obligatorio (5/6)
+func FinDeQuantum(pcb structs.PCB) {
+
+	log.Printf("PID: %d - Desalojado por fin de Quantum", pcb.PID)
+}
+
 //log´s auxiliares------------------------------------------------------
 
 // TODO: Implementar para blockedMap.
-func PidsBlock(blockQueue []structs.PCB) {
+func PidsBlock(auxLog *log.Logger, blockedQueue map[uint32]structs.PCB) {
 	var pids []uint32
-	//Recorre la lista BLOCK y guarda sus PIDs
-	for _, pcb := range blockQueue {
+	//Recorre la lista BLOCKED y guarda sus PIDs
+	for _, pcb := range blockedQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	fmt.Printf("Cola Block 'blockQueue' : %v", pids)
+	auxLog.Printf("Cola Blocked 'blockedQueue' : %v", pids)
+
 }
 
 // log para el manejo de listas EXEC
@@ -118,6 +140,25 @@ func EsperaNuevosProcesos() {
 
 	fmt.Println("Esperando nuevos procesos...")
 
+}
+
+func IndicarPath(auxLog *log.Logger, path string) {
+
+	auxLog.Printf("Path: %s\n", path)
+}
+
+func IndicarPID(auxLog *log.Logger, pid uint32) {
+	auxLog.Printf("PID: %d\n", pid)
+}
+
+func PidsReadyPrioritarios(auxLog *log.Logger, pcb structs.PCB) {
+
+	auxLog.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
+}
+
+func EnviarInterrupcion(auxLog *log.Logger, tipoDeInterrupcion string) {
+
+	auxLog.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 // -------------------------- == LOG's MEMORIA == -----------------------------------------------------------
@@ -157,14 +198,4 @@ func LeerInstrucciones(auxLog *log.Logger, memoriaInstrucciones map[uint32][]str
 	for _, instruccion := range memoriaInstrucciones[pid] {
 		auxLog.Println(instruccion)
 	}
-}
-
-func Error(auxLog *log.Logger, err error) {
-	auxLog.Println(err)
-}
-
-// -------------------------- == AUX GENERICAS == -----------------------------------------------------------
-
-func Mensaje(auxLog *log.Logger, mensaje string) {
-	auxLog.Println(mensaje)
 }

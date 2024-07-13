@@ -61,7 +61,7 @@ func main() {
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("IniciarPlanificacion-------------------------")
+	fmt.Println("IniciarPlanificacion-------------------------") //? Este tipo de mensajes se pueden usar como log
 	funciones.TogglePlanificador = true
 
 	funciones.OnePlani.Lock()
@@ -93,12 +93,12 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("Path: %s\n", request.Path)
+	logueano.IndicarPath(funciones.Auxlogger, request.Path)
 
 	//----------- EJECUTA ---------
 
@@ -120,7 +120,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	//Envía el path a memoria para que cree el proceso
 	respuesta, err := config.Request(funciones.ConfigJson.Port_Memory, funciones.ConfigJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		return
 	}
 
@@ -128,7 +128,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -155,7 +155,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -172,7 +172,7 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 32)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -209,7 +209,7 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -227,12 +227,12 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	pid, err := strconv.Atoi(r.PathValue("pid"))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Println("PID:", pid)
+	logueano.IndicarPID(funciones.Auxlogger, uint32(pid))
 
 	//--------- EJECUTA ---------
 
@@ -244,7 +244,7 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//Crea una variable tipo Response
 	respuesta, err := json.Marshal(respEstadoProceso)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -386,7 +386,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	interfazSolicitada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
 	if !encontrado {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		fmt.Println("Interfaz no conectada.")
+		logueano.Mensaje(funciones.Auxlogger, "Interfaz no conectada.")
 		http.Error(w, "Interfaz no conectada.", http.StatusNotFound)
 		return
 	}
@@ -395,7 +395,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazSolicitada.TipoInterfaz, requestInstruccionIO.Instruccion)
 	if !laInstruccionEsValida {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		fmt.Println("Instruccion incompatible.")
+		logueano.Mensaje(funciones.Auxlogger, "Instruccion incompatible.")
 		http.Error(w, "Instruccion incompatible.", http.StatusBadRequest)
 		return
 	}
@@ -415,7 +415,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body) //TODO: Cambiar localhost por IP de la interfaz (agregar ip interfaz)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		return
 	}
 
@@ -424,7 +424,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		funciones.InterfacesConectadas.Delete(requestInstruccionIO.NombreInterfaz)
-		fmt.Println("Interfaz desconectada.")
+		logueano.Mensaje(funciones.Auxlogger, "Interfaz desconectada.")
 		http.Error(w, "Interfaz desconectada.", http.StatusInternalServerError)
 		return
 	}
