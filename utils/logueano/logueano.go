@@ -1,7 +1,6 @@
 package logueano
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -52,11 +51,18 @@ func InitAuxLog(modulo string) *log.Logger {
 
 // -------------------------- == LOG's AUXILIARES GRALES == -----------------------------------------------------------
 func Error(auxLog *log.Logger, err error) {
+
 	auxLog.Println(err)
 }
 
 func Mensaje(auxLog *log.Logger, mensaje string) {
+
 	auxLog.Println(mensaje)
+}
+
+func MensajeConFormato(auxLog *log.Logger, mensaje string, args ...interface{}) {
+
+	auxLog.Printf(mensaje, args...)
 }
 
 // -------------------------- == LOG's CPU == -----------------------------------------------------------
@@ -69,7 +75,7 @@ func Mensaje(auxLog *log.Logger, mensaje string) {
 
 // -------------------------- == LOG's KERNEL == -----------------------------------------------------------
 // log obligatorio (1/6)
-func LogNuevoProceso(nuevoPCB structs.PCB) {
+func NuevoProceso(nuevoPCB structs.PCB) {
 
 	log.Printf("Se crea el proceso %d en estado %s", nuevoPCB.PID, nuevoPCB.Estado)
 }
@@ -95,9 +101,10 @@ func PidsReady(readyQueue []structs.PCB) {
 		pids = append(pids, pcb.PID)
 	}
 
-	log.Printf("Cola Ready 'readyQueue' : %v", pids)
+	log.Printf("Cola Ready 'ListaREADY' : %v", pids)
 }
 
+// TODO: Sin usar
 // log obligatorio (4/6)
 func FinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
 
@@ -111,6 +118,13 @@ func FinDeQuantum(pcb structs.PCB) {
 	log.Printf("PID: %d - Desalojado por fin de Quantum", pcb.PID)
 }
 
+// TODO : Sin usar
+// log obligatorio (6/6)
+func MotivoBloqueo(pcb structs.PCB, motivo string) {
+
+	log.Printf("PID: %d - Bloqueado por: %s", pcb.PID, motivo)
+}
+
 //log´s auxiliares------------------------------------------------------
 
 // TODO: Implementar para blockedMap.
@@ -121,44 +135,33 @@ func PidsBlock(auxLog *log.Logger, blockedQueue map[uint32]structs.PCB) {
 		pids = append(pids, pcb.PID)
 	}
 
-	auxLog.Printf("Cola Blocked 'blockedQueue' : %v", pids)
+	auxLog.Printf("Cola Blocked 'MapBLOCK' : %v", pids)
 
 }
 
-// log para el manejo de listas EXEC
-func PidsExec(ExecQueue []structs.PCB) {
+func PidsNew(auxLog *log.Logger, newQueue []structs.PCB) {
 	var pids []uint32
-	//Recorre la lista EXEC y guarda sus PIDs
-	for _, pcb := range ExecQueue {
+	//Recorre la lista NEW y guarda sus PIDs
+	for _, pcb := range newQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	fmt.Printf("Cola Executing 'ExecQueue' : %v", pids)
+	auxLog.Printf("Cola New 'ListaNEW' : %v", pids)
 }
 
-func EsperaNuevosProcesos() {
+func PidsExit(auxLog *log.Logger, exitQueue []structs.PCB) {
+	var pids []uint32
+	//Recorre la lista EXIT y guarda sus PIDs
+	for _, pcb := range exitQueue {
+		pids = append(pids, pcb.PID)
+	}
 
-	fmt.Println("Esperando nuevos procesos...")
-
-}
-
-func IndicarPath(auxLog *log.Logger, path string) {
-
-	auxLog.Printf("Path: %s\n", path)
-}
-
-func IndicarPID(auxLog *log.Logger, pid uint32) {
-	auxLog.Printf("PID: %d\n", pid)
+	auxLog.Printf("Cola Exit 'ListaEXIT' : %v", pids)
 }
 
 func PidsReadyPrioritarios(auxLog *log.Logger, pcb structs.PCB) {
 
 	auxLog.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
-}
-
-func EnviarInterrupcion(auxLog *log.Logger, tipoDeInterrupcion string) {
-
-	auxLog.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 // -------------------------- == LOG's MEMORIA == -----------------------------------------------------------

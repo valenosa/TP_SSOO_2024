@@ -98,7 +98,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logueano.IndicarPath(funciones.Auxlogger, request.Path)
+	logueano.MensajeConFormato(funciones.Auxlogger, "Path: %s\n", request.Path)
 
 	//----------- EJECUTA ---------
 
@@ -148,7 +148,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Agrega el nuevo PCB a readyQueue
 	funciones.AdministrarQueues(nuevoPCB)
 
-	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	//^ log obligatorio (2/6)
 	logueano.CambioDeEstado("NEW", nuevoPCB)
 
 	// ----------- DEVUELVE -----------
@@ -232,7 +232,7 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logueano.IndicarPID(funciones.Auxlogger, uint32(pid))
+	logueano.MensajeConFormato(funciones.Auxlogger, "PID: %d\n", uint32(pid))
 
 	//--------- EJECUTA ---------
 
@@ -330,8 +330,12 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 		pid := recurso.ListaBlock[0]
 		recurso.ListaBlock = recurso.ListaBlock[1:]
 
-		//Se pasa el proceso a de BOLCK -> READY
+		//Se pasa el proceso a de BLOCK -> READY
 		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstadoInverso(pcbDesbloqueado, "READY")
+
 		pcbDesbloqueado.Estado = "READY"
 		funciones.AdministrarQueues(pcbDesbloqueado)
 	} else {
@@ -433,6 +437,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
 	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+
+	//^ log obligatorio (2/6)
+	logueano.CambioDeEstadoInverso(pcbDesalojado, "READY")
 	pcbDesalojado.Estado = "READY"
 
 	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR

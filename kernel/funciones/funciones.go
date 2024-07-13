@@ -90,6 +90,8 @@ func Planificador() {
 		// Proceso READY -> EXEC
 		siguientePCB.Estado = "EXEC"
 		ProcesoExec = siguientePCB
+
+		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado("READY", siguientePCB)
 
 		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
@@ -120,16 +122,24 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 	switch motivoDesalojo {
 	case "Fin de QUANTUM":
+
+		//^ log obligatorio (5/6)
 		logueano.FinDeQuantum(*pcb)
+
+		//^ log obligatorio (2/6)
 		logueano.CambioDeEstadoInverso(*pcb, "READY")
 		pcb.Estado = "READY"
 
 	case "Finalizar PROCESO":
+
+		//^ log obligatorio (2/6)
 		logueano.CambioDeEstadoInverso(*pcb, "EXIT")
 		pcb.Estado = "EXIT"
 
 		//TODO: Se debe indicar qué interfaz se desconectó
 	case "IO":
+
+		//^ log obligatorio (2/6)
 		logueano.CambioDeEstadoInverso(*pcb, "BLOCK")
 		pcb.Estado = "BLOCK"
 	}
@@ -151,8 +161,13 @@ func AdministrarQueues(pcb structs.PCB) {
 	switch pcb.Estado {
 	case "NEW":
 
+		//^ log obligatorio (1/6)
+		logueano.NuevoProceso(pcb)
+
 		//PCB --> cola de NEW
 		ListaNEW.Append(pcb)
+
+		logueano.PidsNew(Auxlogger, ListaNEW.List)
 
 	case "READY":
 
@@ -182,6 +197,7 @@ func AdministrarQueues(pcb structs.PCB) {
 
 		//PCB --> cola de EXIT
 		ListaEXIT.Append(pcb)
+		logueano.PidsExit(Auxlogger, ListaEXIT.List)
 		LiberarProceso(pcb)
 		<-Cont_producirPCB
 	}
@@ -302,7 +318,7 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 		return
 	}
 
-	logueano.EnviarInterrupcion(Auxlogger, tipoDeInterrupcion)
+	logueano.MensajeConFormato(Auxlogger, "Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 //*======================================| ENTRADA SALIDA (I/O) |=======================================\\
@@ -329,6 +345,8 @@ func ValidarInstruccionIO(tipo string, instruccion string) bool {
 func DesalojarProcesoIO(pid uint32) {
 	pcbDesalojado := MapBLOCK.Delete(pid)
 	pcbDesalojado.Estado = "EXIT"
+
+	//^ log obligatorio (2/6)
 	logueano.CambioDeEstado("BLOCK", pcbDesalojado)
 	AdministrarQueues(pcbDesalojado)
 }
