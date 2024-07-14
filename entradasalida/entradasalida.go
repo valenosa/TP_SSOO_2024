@@ -55,7 +55,7 @@ func main() {
 	// Levanta el server de la nuevaInterfazIO
 	serverErr := iniciarServidorInterfaz(&cantBloquesDisponiblesTotal)
 	if serverErr != nil {
-		fmt.Printf("Error al iniciar servidor de interfaz: %s", serverErr.Error())
+		logueano.MensajeConFormato(Auxlogger, "Error al iniciar servidor de interfaz: %s", serverErr.Error())
 		return
 	}
 }
@@ -71,14 +71,14 @@ func conectarInterfazIO(nombre string) {
 	var requestConectarIO = structs.RequestConectarInterfazIO{NombreInterfaz: nombre, Interfaz: nuevaInterfazIO}
 	body, marshalErr := json.Marshal(requestConectarIO)
 	if marshalErr != nil {
-		fmt.Printf("error codificando body: %s", marshalErr.Error())
+		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", marshalErr.Error())
 		return
 	}
 
 	// Envia la request de conexion a Kernel
 	_, err := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 }
@@ -158,7 +158,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -202,7 +202,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	// Envía la request a memoria
 	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -229,7 +229,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -264,7 +264,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -272,7 +272,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -282,6 +282,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	var inputTruncado = string(data)
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
+	//! Considerar borrar, pues todos los datos leidos/escritos forman parte de los logs obligatorios
 	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.
 
 	//--------- RESPUESTA ---------
@@ -302,7 +303,7 @@ func levantarFS(configInterfaz config.IO) {
 
 	bloques, err := os.Create(configInterfaz.Dialfs_Path + "/bloques.dat")
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 	defer bloques.Close()
@@ -310,7 +311,7 @@ func levantarFS(configInterfaz config.IO) {
 	// Establecer el tamaño del archivo
 	err = bloques.Truncate(int64(configInterfaz.Dialfs_Block_Size * configInterfaz.Dialfs_Block_Count))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -318,7 +319,7 @@ func levantarFS(configInterfaz config.IO) {
 
 	bitmap, err := os.Create(configInterfaz.Dialfs_Path + "/bitmap.dat")
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 	defer bitmap.Close()
@@ -326,7 +327,7 @@ func levantarFS(configInterfaz config.IO) {
 	// Establecer el tamaño del archivo
 	err = bitmap.Truncate(int64(configInterfaz.Dialfs_Block_Count))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 }
@@ -346,7 +347,7 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -358,7 +359,7 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		if *cantBloquesDisponiblesTotal == 0 {
 			//No hay espacio en disco
-			fmt.Println("No hay espacio en disco")
+			logueano.Mensaje(Auxlogger, "No hay espacio en disco")
 			return
 		}
 
@@ -403,7 +404,7 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -416,7 +417,7 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 		//Extrae el tamaño y el bloque inicial del archivo recibido.
 		metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return
 		}
 
@@ -457,7 +458,7 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -470,7 +471,7 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		//Extraigo la metadata
 		metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return
 		}
 
@@ -480,7 +481,7 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		//Elimino la metadata
 		err = os.Remove(configInterfaz.Dialfs_Path + "/" + instruccionIO.NombreArchivo)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return
 		}
 
@@ -518,7 +519,7 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -553,27 +554,27 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
 	//--------- EJECUTA ---------
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
 	//Extraigo la metadata
 	metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
 	//Valido que no se pase del limite del archivo
 	if uint32(calcularTamañoEnBloques(metadata.Size)*configInterfaz.Dialfs_Block_Size) < instruccionIO.PunteroArchivo+instruccionIO.Tamaño {
-		fmt.Println("ERROR: No se puede escribir en el archivo, sobrepasa el tamaño")
+		logueano.Mensaje(Auxlogger, "Error: No se puede escribir en el archivo, sobrepasa el tamaño")
 		http.Error(w, "No se puede escribir en el archivo, sobrepasa", http.StatusConflict)
 		return
 	}
@@ -581,7 +582,7 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 	//Escribo el inputTruncado en la pos de bloques.dat correspondiente + RegistroPunteroArchivo
 	fDataBloques, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat", os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -589,7 +590,7 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	_, err = fDataBloques.WriteAt(data, int64(uint32(metadata.InitialBlock*configInterfaz.Dialfs_Block_Size)+instruccionIO.PunteroArchivo))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -614,7 +615,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -624,13 +625,13 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	//Extraigo la metadata
 	metadata, err := extraerMetadata(instruccionIO.NombreArchivo)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
 	//Valido que no se pase del limite del archivo
 	if uint32(calcularTamañoEnBloques(metadata.Size)*configInterfaz.Dialfs_Block_Size) < instruccionIO.PunteroArchivo+instruccionIO.Tamaño {
-		fmt.Println("ERROR: No se puede leer del archivo, sobrepasa el tamaño")
+		logueano.Mensaje(Auxlogger, "Error: No se puede leer del archivo, sobrepasa el tamaño")
 		http.Error(w, "No se puede leer del archivo, sobrepasa el tamaño", http.StatusConflict)
 		return
 	}
@@ -638,7 +639,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	//Abro el archivo de DataBloques
 	fDataBloques, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat", os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -646,7 +647,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	buffer := make([]byte, instruccionIO.Tamaño)
 	_, err = fDataBloques.ReadAt(buffer, int64(uint32(metadata.InitialBlock*configInterfaz.Dialfs_Block_Size)+instruccionIO.PunteroArchivo))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -668,7 +669,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	// Envía la request a memoria
 	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 	//--------- RESPUESTA ---------
@@ -685,7 +686,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
 	file, err := os.Open(configInterfaz.Dialfs_Path + "/" + nombreArchivo)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return structs.MetadataFS{}, err
 	}
 
@@ -693,7 +694,7 @@ func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
 	// Lee todo el contenido del archivo
 	bytes, err := io.ReadAll(file)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return structs.MetadataFS{}, err
 	}
 
@@ -701,7 +702,7 @@ func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
 	var metadata structs.MetadataFS
 	err = json.Unmarshal(bytes, &metadata)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return structs.MetadataFS{}, err
 	}
 	return metadata, nil
@@ -711,7 +712,7 @@ func actualizarMetadata(nombreArchivo string, nuevaMetadata structs.MetadataFS) 
 
 	nuevoArchivo, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+nombreArchivo, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -721,7 +722,7 @@ func actualizarMetadata(nombreArchivo string, nuevaMetadata structs.MetadataFS) 
 	encoder := json.NewEncoder(nuevoArchivo).Encode(nuevaMetadata)
 	err = encoder
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 }
@@ -742,7 +743,7 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 
 	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return -1
 	}
 	defer file.Close()
@@ -753,10 +754,10 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 		_, err := file.Read(buf)
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("EOF en asignarEspacio().")
+				logueano.Mensaje(Auxlogger, "EOF en asignarEspacio().")
 				break
 			}
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return -1
 		}
 
@@ -769,7 +770,7 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 			// Escribimos un 1 en el byte que encontramos
 			_, err = file.WriteAt([]byte{1}, int64(byteCount))
 			if err != nil {
-				fmt.Println(err)
+				logueano.Error(Auxlogger, err)
 				return -1
 			}
 
@@ -788,7 +789,7 @@ func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, ta
 
 	//Verifico si hay espacio suficiente en el disco
 	if nuevoTamañoEnBloques > *cantBloquesDisponiblesTotal {
-		fmt.Println("No hay suficiente espacio en el disco")
+		logueano.Mensaje(Auxlogger, "No hay espacio suficiente en disco")
 		//Este caso no se testea, ni se realiza ninguna operacion en especifico
 		return
 	}
@@ -796,7 +797,7 @@ func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, ta
 	//Verifico si existe tamaño suficiente contiguo al bloque
 	espacioEsContiguo, err := espacioContiguo(nuevoTamañoEnBloques, *metadata)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -815,7 +816,7 @@ func espacioContiguo(nuevoTamañoEnBloques int, metadata structs.MetadataFS) (bo
 
 	bitmap, err := os.Open(configInterfaz.Dialfs_Path + "/" + "bitmap.dat")
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return false, err
 	}
 	defer bitmap.Close()
@@ -829,7 +830,7 @@ func espacioContiguo(nuevoTamañoEnBloques int, metadata structs.MetadataFS) (bo
 	for i := primerBloqueARecorrer; i < metadata.InitialBlock+nuevoTamañoEnBloques; i++ {
 		_, err := bitmap.ReadAt(buf, int64(i))
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return false, err
 		}
 		if buf[0] == 1 {
@@ -845,7 +846,7 @@ func reservarBloques(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata s
 	// Abro bitmap
 	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 	defer file.Close()
@@ -858,7 +859,7 @@ func reservarBloques(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata s
 	for i := bloquesAgregados; i > 0; i-- {
 		_, err = file.WriteAt([]byte{1}, int64(pos))
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return
 		}
 		*cantBloquesDisponiblesTotal--
@@ -871,7 +872,7 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBl
 	//Abro el archivo .dat
 	fDataBloques, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat", os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return -1
 	}
 
@@ -879,7 +880,7 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBl
 	bufferTruncate := make([]byte, tamañoEnBloques*configInterfaz.Dialfs_Block_Size)
 	_, err = fDataBloques.ReadAt(bufferTruncate, int64(initialBlock*configInterfaz.Dialfs_Block_Size))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return -1
 	}
 
@@ -891,7 +892,7 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBl
 	//Actualizo bitmap
 	bitmap, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return -1
 	}
 
@@ -899,7 +900,7 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBl
 	for i := 0; i < nuevaPosInicial+nuevoTamañoEnBloques; i++ {
 		_, err = bitmap.WriteAt([]byte{1}, int64(i))
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return -1
 		}
 	}
@@ -907,7 +908,7 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBl
 	for i := nuevaPosInicial + nuevoTamañoEnBloques; i < configInterfaz.Dialfs_Block_Count; i++ {
 		_, err = bitmap.WriteAt([]byte{0}, int64(i))
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return -1
 		}
 	}
@@ -925,7 +926,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	//Crear un nuevo archivo temporal
 	fTemp, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bloques.dat.tmp", os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return -1
 	}
 
@@ -942,7 +943,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 		//Abrir la metadata del archivo
 		metadata, err := extraerMetadata(archivo)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return -1
 		}
 
@@ -952,7 +953,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 		//Leer, de acuerdo a la metadata, los bloques de fDataBloques
 		_, err = fDataBloques.ReadAt(tempBuffer, int64(metadata.InitialBlock*configInterfaz.Dialfs_Block_Size))
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return -1
 		}
 
@@ -965,7 +966,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 		//Escribir en el archivo temporal el tmpBuffer
 		_, err = fTemp.Write(tempBuffer)
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return -1
 		}
 	}
@@ -973,7 +974,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	//Escribir en el archivo temporal el bufferTruncate (archivo que se quiere agrandar)
 	_, err = fTemp.Write(bufferTruncate)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return -1
 	}
 
@@ -988,7 +989,7 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	//renombro el archivo temporal con el nombre del archivo original
 	err = os.Rename(configInterfaz.Dialfs_Path+"/"+"bloques.dat.tmp", configInterfaz.Dialfs_Path+"/"+"bloques.dat")
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 	}
 
 	return punteroUltimoBloqueLibre
@@ -1005,7 +1006,7 @@ func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, bloqueInici
 	// Abro bitmap
 	file, err := os.OpenFile(configInterfaz.Dialfs_Path+"/"+"bitmap.dat", os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 	defer file.Close()
@@ -1018,7 +1019,7 @@ func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, bloqueInici
 	for i := bloquesABorrar; i > 0; i-- {
 		_, err = file.WriteAt([]byte{0}, int64(pos))
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(Auxlogger, err)
 			return
 		}
 		*cantBloquesDisponiblesTotal++

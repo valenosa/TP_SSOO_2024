@@ -257,7 +257,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		pagina := funciones.ObtenerPagina(request.Pid, request.Dir, tablaDePaginas)
 
 		if pagina == -1 {
-			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página")
+			logueano.Mensaje(funciones.Auxlogger, "Error: no se encontró la página")
 		}
 
 		estado := funciones.EscribirEnMemoria(request.Pid, tablaDePaginas, uint32(pagina), request.Dir, request.Data, espacioUsuario)
@@ -304,7 +304,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		//--------- REQUEST ---------
-		logueano.Mensaje(funciones.Auxlogger, "Recibí un request copystr")
+		fmt.Println(funciones.Auxlogger, "Se recibió un request copystr")
 		//Obtengo los query params
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)
@@ -325,7 +325,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		paginaLectura := funciones.ObtenerPagina(uint32(pid), uint32(direccionLectura), tablaDePaginas)
 
 		if paginaEscritura == -1 || paginaLectura == -1 {
-			logueano.Mensaje(funciones.Auxlogger, "No se encontró la página") //? No debería pasar nunca pero x las dudas
+			logueano.Mensaje(funciones.Auxlogger, "Error: no se encontró la página") //? No debería pasar nunca pero x las dudas
 		}
 
 		//--------- LECTURA ---------

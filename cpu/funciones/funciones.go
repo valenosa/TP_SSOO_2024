@@ -724,11 +724,11 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 		return "", "", ""
 	}
 
-	var datas string = string(data)
+	var dataStr string = string(data)
 
 	escribirEnRegistro(registroDato, data, registrosMap8, registrosMap32)
 
-	return "OK", datas, direccionFisicaStr
+	return "OK", dataStr, direccionFisicaStr
 }
 
 func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) {

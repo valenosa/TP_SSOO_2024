@@ -30,7 +30,7 @@ func ExtractInstructions(path string) []byte {
 	// Lee el archivo
 	file, err := os.ReadFile(path)
 	if err != nil {
-		logueano.Mensaje(Auxlogger, "Error al leer el archivo de instrucciones")
+		logueano.Mensaje(Auxlogger, "Error: no se pudo leer el archivo de instrucciones")
 		return nil
 	}
 
