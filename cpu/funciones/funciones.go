@@ -223,7 +223,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	// Crea una nueva solicitud PUT
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return 0, false
 	}
 
@@ -239,7 +239,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return 0, false
 	}
 
@@ -257,7 +257,7 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	// Convierte el valor de la instrucción a un uint64 bits.
 	valorInt64, err := strconv.ParseUint(string(marcoBytes), 10, 32)
 	if err != nil {
-		fmt.Println("Error:", err)
+		logueano.Error(Auxlogger, err)
 		return 0, false
 	}
 
@@ -501,7 +501,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		// Convierte el valor a un entero sin signo de 32 bits
 		valorInt64, err := strconv.ParseUint(dato, 10, 32)
 		if err != nil {
-			fmt.Println("Dato no valido")
+			logueano.Mensaje(Auxlogger, "Dato no valido")
 		}
 
 		// Asigna el valor al PC (resta 1 ya que el PC se incrementará después de esta instrucción)
@@ -514,7 +514,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		// Obtiene el puntero al registro del mapa de registros
 		registro, encontrado := registroMap8[reg]
 		if !encontrado {
-			fmt.Println("Registro invalido")
+			logueano.Mensaje(Auxlogger, "Registro no encontrado")
 			return
 		}
 
@@ -522,7 +522,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		valor, err := strconv.Atoi(dato)
 
 		if err != nil {
-			fmt.Println("Dato no valido")
+			logueano.Mensaje(Auxlogger, "Dato no valido")
 		}
 
 		// Asigna el nuevo valor al registro
@@ -532,7 +532,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		// Obtiene el puntero al registro del mapa de registros
 		registro, encontrado := registroMap32[reg]
 		if !encontrado {
-			fmt.Println("Registro invalido")
+			logueano.Mensaje(Auxlogger, "Registro no encontrado")
 			return
 		}
 
@@ -540,7 +540,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		valor, err := strconv.Atoi(dato)
 
 		if err != nil {
-			fmt.Println("Dato no valido")
+			logueano.Mensaje(Auxlogger, "Dato no valido")
 		}
 
 		// Asigna el nuevo valor al registro
@@ -554,13 +554,13 @@ func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
 	// Verifica si existen los registros especificados en la instrucción.
 	registro1, encontrado := registroMap[reg1]
 	if !encontrado {
-		fmt.Println("Registro invalido")
+		logueano.Mensaje(Auxlogger, "Registro no encontrado")
 		return
 	}
 
 	registro2, encontrado := registroMap[reg2]
 	if !encontrado {
-		fmt.Println("Registro invalido")
+		logueano.Mensaje(Auxlogger, "Registro no encontrado")
 		return
 	}
 
@@ -574,13 +574,13 @@ func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
 	// Verifica si existen los registros especificados en la instrucción.
 	registro1, encontrado := registroMap[reg1]
 	if !encontrado {
-		fmt.Println("Registro invalido")
+		logueano.Mensaje(Auxlogger, "Registro no encontrado")
 		return
 	}
 
 	registro2, encontrado := registroMap[reg2]
 	if !encontrado {
-		fmt.Println("Registro invalido")
+		logueano.Mensaje(Auxlogger, "Registro no encontrado")
 		return
 	}
 
@@ -594,14 +594,14 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 	// Verifica si existe el registro especificado en la instrucción.
 	registro, encontrado := registroMap[reg]
 	if !encontrado {
-		fmt.Println("Registro invalido")
+		logueano.Mensaje(Auxlogger, "Registro no encontrado")
 		return
 	}
 
 	// Convierte el valor de la instrucción a un uint64 bits.
 	valorInt64, err := strconv.ParseUint(valor, 10, 32)
 	if err != nil {
-		fmt.Println("Error:", err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -666,7 +666,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	direccionFisica, encontrado = obtenerDireccionFisica(registroDireccion, registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 	if !encontrado {
-		fmt.Println("Error: Page Fault")
+		logueano.Mensaje(Auxlogger, "Page Fault")
 		return "PAGE FAULT", "", "" //?Es correcto esto?
 
 	}
@@ -761,7 +761,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	direccionFisicaStr := strconv.FormatUint(uint64(direccionFisica), 10)
 
 	if !encontrado {
-		fmt.Println("Error: Page Fault")
+		logueano.Mensaje(Auxlogger, "Page Fault")
 		return "PAGE FAULT", "", "" //?Es correcto esto?
 
 	}
@@ -782,7 +782,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	// Envía la solicitud de ejecucion a Kernel
 	respuesta, err := config.Request(ConfigJson.Port_Memory, ConfigJson.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return "", "", ""
 	}
 
@@ -791,7 +791,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
-		fmt.Println("Error: ", respuesta.StatusCode)
+		logueano.MensajeConFormato(Auxlogger, "Error : %d", respuesta.StatusCode)
 		return "", "", ""
 	}
 
@@ -817,7 +817,7 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	// Envía la solicitud de ejecución a Kernel
 	respuesta, err := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "wait", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -862,7 +862,7 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	// Envía la solicitud de ejecucion a Kernel
 	respuesta, err := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "signal", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -919,7 +919,7 @@ func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8
 	//Traduce dirección lógica a física
 	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
 	if !encontrado {
-		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		logueano.Mensaje(Auxlogger, "No se pudo traducir el registro de dirección lógica a física.")
 		return
 	}
 
@@ -947,7 +947,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (
 	direccionEscritura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.DI), TLB, prioridadesTLB)
 
 	if !encontrado {
-		fmt.Println("Error: Page Fault")
+		logueano.Mensaje(Auxlogger, "Error: Page Fault")
 		return "PAGE FAULT", "", "", "" //?Es correcto esto?
 
 	}
@@ -955,7 +955,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (
 	direccionLectura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.SI), TLB, prioridadesTLB)
 
 	if !encontrado {
-		fmt.Println("Error: Page Fault")
+		logueano.Mensaje(Auxlogger, "Error: Page Fault")
 		return "PAGE FAULT", "", "", "" //?Es correcto esto?
 
 	}
@@ -1068,7 +1068,7 @@ func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTa
 	//Traduce dirección lógica a física
 	direccion, encontrado := obtenerDireccionFisica(regDir, registroMap8, registroMap32, tlb, prioridadesTLB)
 	if !encontrado {
-		fmt.Println("No se pudo traducir el registro de dirección lógica a física.")
+		logueano.Mensaje(Auxlogger, "No se pudo traducir el registro de dirección lógica a física.")
 		return
 	}
 

@@ -253,7 +253,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Maneja los errores para la codificación.
 	if err != nil {
-		fmt.Printf("error codificando body: %s", err.Error())
+		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", err.Error())
 		return structs.PCB{}, "ERROR"
 	}
 

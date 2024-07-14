@@ -360,7 +360,7 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Interfaz Conectada:", interfazConectada) //! Borrar despues
+	logueano.MensajeConFormato(funciones.Auxlogger, "Interfaz conectada: %s\n", interfazConectada.NombreInterfaz)
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
@@ -378,9 +378,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, marshalError.Error(), http.StatusBadRequest)
 		return
 	}
-
-	// Imprime la solicitud
-	fmt.Println("Request de ejecutar ", requestInstruccionIO.Instruccion, " por ", requestInstruccionIO.NombreInterfaz) //! Borrar despues
 
 	//^log obligatorio (6/6)
 	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)

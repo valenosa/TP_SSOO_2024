@@ -52,7 +52,7 @@ func InitAuxLog(modulo string) *log.Logger {
 // -------------------------- == LOG's AUXILIARES GRALES == -----------------------------------------------------------
 func Error(auxLog *log.Logger, err error) {
 
-	auxLog.Println(err)
+	auxLog.Println("Error: ", err)
 }
 
 func Mensaje(auxLog *log.Logger, mensaje string) {
