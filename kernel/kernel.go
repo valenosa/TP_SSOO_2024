@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -448,4 +449,11 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	funciones.AdministrarQueues(pcbDesalojado)
+
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(bodyBytes)
 }

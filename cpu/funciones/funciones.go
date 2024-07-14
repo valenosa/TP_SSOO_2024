@@ -380,11 +380,8 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "MOV_IN":
-		var valor string
-		var dirF string
-		var estado string
 
-		estado, valor, dirF = movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
+		estado, valor, dirF := movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 		if estado != "OK" {
 			*cicloFinalizado = true
@@ -939,7 +936,20 @@ func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+	respuesta, err := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+	if err != nil {
+		logueano.Error(Auxlogger, err)
+		return
+	}
+
+	respuestaBody, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		logueano.Error(Auxlogger, err)
+		return
+	}
+	respuestaString := string(respuestaBody)
+
+	fmt.Println(respuestaString)
 }
 
 func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (string, string, string, string) {

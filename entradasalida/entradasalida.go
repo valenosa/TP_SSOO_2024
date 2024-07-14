@@ -210,7 +210,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(":)"))
+	w.Write([]byte(input))
 
 	mx_interfaz.Unlock()
 
@@ -288,7 +288,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	//--------- RESPUESTA ---------
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(":("))
+	w.Write([]byte(inputTruncado))
 
 	mx_interfaz.Unlock()
 
