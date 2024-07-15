@@ -435,3 +435,22 @@ func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
 
 	return interfaz, find
 }
+
+// ---------------------( Busqueda de PC )----------------------\\
+
+// Busco un PCB por su id en las listas de procesos
+func (msp *MapSeguroPCB) ObtenerPCB(PID uint32) (*structs.PCB, bool) {
+	msp.mx.Lock()
+	defer msp.mx.Unlock()
+
+	pcb, found := msp.m[PID]
+	return &pcb, found
+}
+
+// Actualizo el map de PCBs
+func (msp *MapSeguroPCB) ActualizarPCB(pcb structs.PCB) {
+	msp.mx.Lock()
+	defer msp.mx.Unlock()
+
+	msp.m[pcb.PID] = pcb
+}

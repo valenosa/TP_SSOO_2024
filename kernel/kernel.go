@@ -176,9 +176,14 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	var pcb structs.PCB
-	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar pcb por el encontrado
-	funciones.LiberarProceso(pcb)
+	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar pcb por el encontrado --- falta testear
+	if pcbPuntero, found := funciones.MapBLOCK.ObtenerPCB(uint32(pid)); found {
+		funciones.LiberarProceso(*pcbPuntero)
+		pcbPuntero.Estado = "EXIT"
+		funciones.MapBLOCK.ActualizarPCB(*pcbPuntero)
+	} else {
+		fmt.Println("Error: PCB no encontrado.")
+	}
 
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
