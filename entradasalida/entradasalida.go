@@ -117,9 +117,6 @@ func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	//^ log obligatorio (1/6)
-	logueano.Operacion(instruccionIO.PidDesalojado, "IO_GEN_SLEEP")
-
 	// Decodifica el request (codificado en formato json).
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
@@ -128,6 +125,9 @@ func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------- EJECUTA ---------
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_GEN_SLEEP")
 
 	sleepTime := configInterfaz.Unit_Work_Time * instruccionIO.UnitWorkTime
 
@@ -150,9 +150,6 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	//^ log obligatorio (1/6)
-	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDIN_READ")
-
 	// Decodifica el request (codificado en formato json)
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
@@ -162,6 +159,9 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------- EJECUTA ---------
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDIN_READ")
 
 	// Prepara el reader para leer el input de la terminal
 	reader := bufio.NewReader(os.Stdin)
@@ -222,17 +222,17 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	//^ log obligatorio (1/6)
-	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDOUT_WRITE")
-
+	
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	
 	//--------- REQUEST A MEMORIA ---------
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDOUT_WRITE")
 
 	// Crea un cliente HTTP
 	cliente := &http.Client{}
@@ -340,9 +340,6 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		//--------- RECIBE ---------
 		var instruccionIO structs.RequestEjecutarInstruccionIO
 
-		//^ log obligatorio (1/6)
-		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_CREATE")
-
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
 			logueano.Error(Auxlogger, err)
@@ -351,6 +348,9 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		}
 
 		//--------- EJECUTA ---------
+
+		//^ log obligatorio (1/6)
+		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_CREATE")
 
 		//Espera una unidad de trabajo
 		time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
@@ -393,12 +393,6 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 		//--------- RECIBE ---------
 		var instruccionIO structs.RequestEjecutarInstruccionIO
 
-		//^ log obligatorio (1/6)
-		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_TRUNCATE")
-
-		//^ log obligatorio (4/6)
-		logueano.TruncarArchivo(instruccionIO.PidDesalojado, instruccionIO.NombreArchivo, instruccionIO.Tamaño)
-
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
 			logueano.Error(Auxlogger, err)
@@ -407,6 +401,12 @@ func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseW
 		}
 
 		//-------- EJECUTA ---------
+
+		//^ log obligatorio (1/6)
+		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_TRUNCATE")
+
+		//^ log obligatorio (4/6)
+		logueano.TruncarArchivo(instruccionIO.PidDesalojado, instruccionIO.NombreArchivo, instruccionIO.Tamaño)
 
 		//Espera una unidad de trabajo
 		time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
@@ -450,9 +450,6 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 
 		var instruccionIO structs.RequestEjecutarInstruccionIO
 
-		//^ log obligatorio (1/6)
-		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_DELETE")
-
 		err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 		if err != nil {
 			logueano.Error(Auxlogger, err)
@@ -461,6 +458,9 @@ func handlerIO_FS_DELETE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 		}
 
 		//-------- EJECUTA ---------
+
+		//^ log obligatorio (1/6)
+		logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_DELETE")
 
 		//Espera una unidad de trabajo
 		time.Sleep(time.Duration(configInterfaz.Unit_Work_Time) * time.Millisecond)
@@ -604,12 +604,6 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	//^ log obligatorio (1/6)
-	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_READ")
-
-	//^ log obligatorio (6/6)
-	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "LEER", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
-
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
@@ -618,6 +612,12 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//-------- EJECUTA ---------
+
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_READ")
+
+	//^ log obligatorio (6/6)
+	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "LEER", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
 
 	//Extraigo la metadata
 	metadata, err := extraerMetadata(instruccionIO.NombreArchivo)

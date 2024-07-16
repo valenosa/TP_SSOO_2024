@@ -421,7 +421,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//--- VUELVE DE IO
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado , _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 
 	//^ log obligatorio (2/6)
 	logueano.CambioDeEstadoInverso(pcbDesalojado, "READY")

@@ -242,11 +242,9 @@ func AccesoTabla(pid uint32, pagina uint32, marco int) {
 }
 
 // log obligatorio ((3...4)/6)
-func CambioDeTamaño(pid uint32, lenOriginal int, accion string, tablaDePaginas *map[uint32]structs.Tabla) string {
+func CambioDeTamaño(pid uint32, lenOriginal int, accion string, tablaDePaginas *map[uint32]structs.Tabla) {
 
 	log.Printf("PID: %d - Tamaño Actual: %d - Tamaño a %s: %d\n", pid, lenOriginal, accion, len((*tablaDePaginas)[pid]))
-
-	return "OK"
 }
 
 // log obligatorio (5/5)
