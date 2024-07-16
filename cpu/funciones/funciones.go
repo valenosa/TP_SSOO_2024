@@ -362,7 +362,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		estado := movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 		if estado == "OUT OF MEMORY" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"
 			MotivoDeDesalojo = estado
 			return
 		}
@@ -371,7 +370,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		estado := copyString(variable[1], TLB, prioridadesTLB)
 		if estado == "OUT OF MEMORY" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"
 			MotivoDeDesalojo = estado
 			return
 		}
@@ -380,7 +378,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		estado := resize(variable[1])
 		if estado == "OUT OF MEMORY" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"
 			MotivoDeDesalojo = estado
 			return
 		}
@@ -428,7 +425,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "EXIT":
 		*cicloFinalizado = true
-		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "EXIT"
 		return
 
@@ -741,7 +737,6 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	return "OK"
 }
 
-// TODO: los cambios de estado de WAIT y SIGNAL se deben relizar en kernel en base a el Motivo de Desalojo ( Kernel: administrarMotivoDesalojo() )
 func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	//--------- REQUEST ---------
@@ -782,14 +777,12 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	case "BLOQUEAR: Recurso no disponible":
 		*cicloFinalizado = true
-		PCB.Estado = "BLOCK"
 		MotivoDeDesalojo = "WAIT"
 		//Bloquea el proceso
 		return
 
 	case "ERROR: Recurso no existe":
 		*cicloFinalizado = true
-		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "ERROR: Recurso no existe"
 		return
 	}
@@ -813,7 +806,6 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	if respuesta.StatusCode != http.StatusOK {
 
 		*cicloFinalizado = true
-		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "ERROR: Recurso no existe"
 		return
 	}

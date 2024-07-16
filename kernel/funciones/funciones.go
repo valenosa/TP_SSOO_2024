@@ -113,20 +113,32 @@ func Planificador() {
 	}
 }
 
-// TODO: Todos los cambios de estado se hacen desde aca
+// TODO: Todos los cambios de estado se hacen desde aca (15/7/24: Faltan las funciones de memoria que están en CPU)
 func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 	switch motivoDesalojo {
+
 	case "Fin de QUANTUM":
 		pcb.Estado = "READY"
+
+	case "IO":
+		pcb.Estado = "BLOCK"
+
+	case "WAIT":
+		pcb.Estado = "BLOCK"
 
 	case "Finalizar PROCESO":
 		pcb.Estado = "EXIT"
 
-	case "IO":
-		pcb.Estado = "BLOCK"
-	}
+	case "ERROR: Recurso no existe":
+		pcb.Estado = "EXIT"
 
+	case "OUT OF MEMORY":
+		pcb.Estado = "EXIT"
+
+	case "EXIT":
+		pcb.Estado = "EXIT"
+	}
 }
 
 //----------------------( ROUND ROBIN )----------------------\\
