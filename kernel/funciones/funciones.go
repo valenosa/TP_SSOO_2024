@@ -91,6 +91,8 @@ func Planificador() {
 		// Proceso READY -> EXEC
 		siguientePCB.Estado = "EXEC"
 		ProcesoExec = siguientePCB
+
+		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado("READY", siguientePCB)
 
 		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
@@ -121,9 +123,22 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 	switch motivoDesalojo {
 
 	case "Fin de QUANTUM":
+
+		//^ log obligatorio (5/6)
+		logueano.FinDeQuantum(*pcb)
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstadoInverso(*pcb, "READY")
 		pcb.Estado = "READY"
 
+	case "Finalizar PROCESO":
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstadoInverso(*pcb, "EXIT")
+		pcb.Estado = "EXIT"
+
 	case "IO":
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstadoInverso(*pcb, "BLOCK")
 		pcb.Estado = "BLOCK"
 
 	case "WAIT":
@@ -159,8 +174,13 @@ func AdministrarQueues(pcb structs.PCB) {
 	switch pcb.Estado {
 	case "NEW":
 
+		//^ log obligatorio (1/6)
+		logueano.NuevoProceso(pcb)
+
 		//PCB --> cola de NEW
 		ListaNEW.Append(pcb)
+
+		logueano.PidsNew(Auxlogger, ListaNEW.List)
 
 	case "READY":
 
@@ -175,7 +195,7 @@ func AdministrarQueues(pcb structs.PCB) {
 
 	case "READY_PRIORITARIO":
 		ListaREADY_PRIORITARIO.Append(pcb)
-		fmt.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
+		logueano.PidsReadyPrioritarios(Auxlogger, pcb)
 		Bin_hayPCBenREADY <- 0
 
 	case "BLOCK":
@@ -184,11 +204,13 @@ func AdministrarQueues(pcb structs.PCB) {
 		MapBLOCK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
+		logueano.PidsBlock(Auxlogger, MapBLOCK.m)
 
 	case "EXIT":
 
 		//PCB --> cola de EXIT
 		ListaEXIT.Append(pcb)
+		logueano.PidsExit(Auxlogger, ListaEXIT.List)
 		LiberarProceso(pcb)
 		<-Cont_producirPCB
 	}
@@ -204,7 +226,7 @@ func LiberarProceso(pcb structs.PCB) {
 	// Crea una nueva solicitud PUT
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -216,7 +238,7 @@ func LiberarProceso(pcb structs.PCB) {
 	// Realiza la solicitud al servidor de memoria
 	_, err = cliente.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
@@ -295,14 +317,14 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Maneja los errores para la codificación.
 	if err != nil {
-		fmt.Printf("error codificando body: %s", err.Error())
+		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", err.Error())
 		return structs.PCB{}, "ERROR"
 	}
 
 	// Envía una solicitud al servidor CPU.
 	respuesta, err := config.Request(configJson.Port_CPU, configJson.Ip_CPU, "POST", "exec", body)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(Auxlogger, err)
 		return structs.PCB{}, "ERROR"
 	}
 
@@ -314,7 +336,7 @@ func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
 	// Maneja los errores para la decodificación
 	if err != nil {
-		fmt.Printf("Error decodificando\n")
+		logueano.Mensaje(Auxlogger, "Error decodificando respuesta del CPU.")
 		return structs.PCB{}, "ERROR"
 	}
 
@@ -350,17 +372,17 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 
 	// Verifica si hubo un error al enviar la solicitud
 	if err != nil {
-		fmt.Println("Error al enviar la interrupción a CPU.")
+		logueano.Mensaje(Auxlogger, "Error al enviar la interrupción al CPU.")
 		return
 	}
 
 	// Verifica si hubo un error en la respuesta
 	if respuesta.StatusCode != http.StatusOK {
-		fmt.Println("Error al interpretar el motivo de desalojo.")
+		logueano.Mensaje(Auxlogger, "Error en la respuesta del CPU.")
 		return
 	}
 
-	fmt.Printf("Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
+	logueano.MensajeConFormato(Auxlogger, "Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 //*======================================| ENTRADA SALIDA (I/O) |=======================================\\
@@ -387,6 +409,9 @@ func ValidarInstruccionIO(tipo string, instruccion string) bool {
 func DesalojarProcesoIO(pid uint32) {
 	pcbDesalojado, _ := MapBLOCK.Delete(pid)
 	pcbDesalojado.Estado = "EXIT"
+
+	//^ log obligatorio (2/6)
+	logueano.CambioDeEstado("BLOCK", pcbDesalojado)
 	AdministrarQueues(pcbDesalojado)
 }
 

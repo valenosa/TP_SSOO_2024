@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -91,12 +92,12 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("Path: %s\n", request.Path)
+	logueano.MensajeConFormato(funciones.Auxlogger, "Path: %s\n", request.Path)
 
 	//----------- EJECUTA ---------
 
@@ -118,7 +119,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	//Envía el path a memoria para que cree el proceso
 	respuesta, err := config.Request(funciones.ConfigJson.Port_Memory, funciones.ConfigJson.Ip_Memory, "PUT", "process", bodyIniciarProceso)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		return
 	}
 
@@ -126,7 +127,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -146,14 +147,14 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Agrega el nuevo PCB a readyQueue
 	funciones.AdministrarQueues(nuevoPCB)
 
-	//^ log obligatorio (2/6) (NEW->Ready): Cambio de Estado
+	//^ log obligatorio (2/6)
 	logueano.CambioDeEstado("NEW", nuevoPCB)
 
 	// ----------- DEVUELVE -----------
 
 	respIniciarProceso, err := json.Marshal(respMemoIniciarProceso.PID)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -167,7 +168,7 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 32)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -210,7 +211,7 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -227,12 +228,12 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	pid, err := strconv.Atoi(r.PathValue("pid"))
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Println("PID:", pid)
+	logueano.MensajeConFormato(funciones.Auxlogger, "PID: %d\n", uint32(pid))
 
 	//--------- EJECUTA ---------
 
@@ -249,7 +250,7 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 	//Crea una variable tipo Response
 	respuesta, err := json.Marshal(respEstadoProceso)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -346,7 +347,7 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Interfaz Conectada:", interfazConectada)
+	logueano.MensajeConFormato(funciones.Auxlogger, "Interfaz conectada: %s\n", interfazConectada.NombreInterfaz)
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
 	funciones.InterfacesConectadas.Set(interfazConectada.NombreInterfaz, interfazConectada.Interfaz)
@@ -364,6 +365,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//^log obligatorio (6/6)
+	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
+  
 	//--------- EJECUTA ---------
 
 	//--- VALIDA
@@ -372,7 +376,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	interfazSolicitada, encontrado := funciones.InterfacesConectadas.Get(requestInstruccionIO.NombreInterfaz)
 	if !encontrado {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		fmt.Println("Interfaz no conectada.")
+		logueano.Mensaje(funciones.Auxlogger, "Interfaz no conectada.")
 		http.Error(w, "Interfaz no conectada.", http.StatusNotFound)
 		return
 	}
@@ -381,7 +385,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	laInstruccionEsValida := funciones.ValidarInstruccionIO(interfazSolicitada.TipoInterfaz, requestInstruccionIO.Instruccion)
 	if !laInstruccionEsValida {
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
-		fmt.Println("Instruccion incompatible.")
+		logueano.Mensaje(funciones.Auxlogger, "Instruccion incompatible.")
 		http.Error(w, "Instruccion incompatible.", http.StatusBadRequest)
 		return
 	}
@@ -400,7 +404,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body) //TODO: Cambiar localhost por IP de la interfaz (agregar ip interfaz)
 	if err != nil {
-		fmt.Println(err)
+		logueano.Error(funciones.Auxlogger, err)
 		return
 	}
 
@@ -409,7 +413,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		// Si no conecta con la interfaz, la elimina del map de las interfacesConectadas y desaloja el proceso.
 		funciones.DesalojarProcesoIO(requestInstruccionIO.PidDesalojado)
 		funciones.InterfacesConectadas.Delete(requestInstruccionIO.NombreInterfaz)
-		fmt.Println("Interfaz desconectada.")
+		logueano.Mensaje(funciones.Auxlogger, "Interfaz desconectada.")
 		http.Error(w, "Interfaz desconectada.", http.StatusInternalServerError)
 		return
 	}
@@ -417,7 +421,10 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//--- VUELVE DE IO
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-	pcbDesalojado, _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+
+	//^ log obligatorio (2/6)
+	logueano.CambioDeEstadoInverso(pcbDesalojado, "READY")
 	pcbDesalojado.Estado = "READY"
 
 	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR
@@ -426,4 +433,11 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	funciones.AdministrarQueues(pcbDesalojado)
+
+	bodyBytes, err := io.ReadAll(respuesta.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(bodyBytes)
 }

@@ -57,14 +57,14 @@ func handlerEjecutarProceso(TLB *funciones.TLB, prioridadesTLB *[]funciones.Elem
 
 		// Error Handler de la decodificación
 		if err != nil {
-			fmt.Println(err)
+			logueano.Error(funciones.Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		//--------- EJECUTAR ---------
 
-		fmt.Println("Se está ejecutando el proceso: ", pcbRecibido.PID)
+		logueano.MensajeConFormato(funciones.Auxlogger, "Se está ejecutando el proceso: %d", pcbRecibido.PID)
 
 		funciones.PidEnEjecucion = pcbRecibido.PID
 

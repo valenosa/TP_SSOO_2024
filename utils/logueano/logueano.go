@@ -1,7 +1,6 @@
 package logueano
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -50,17 +49,96 @@ func InitAuxLog(modulo string) *log.Logger {
 	return auxLogger
 }
 
+// -------------------------- == LOG's AUXILIARES GRALES == -----------------------------------------------------------
+func Error(auxLog *log.Logger, err error) {
+
+	auxLog.Println("Error: ", err)
+}
+
+func Mensaje(auxLog *log.Logger, mensaje string) {
+
+	auxLog.Println(mensaje)
+}
+
+func MensajeConFormato(auxLog *log.Logger, mensaje string, args ...interface{}) {
+
+	auxLog.Printf(mensaje, args...)
+}
+
 // -------------------------- == LOG's CPU == -----------------------------------------------------------
+// log obligatorio (1/6)
+func FetchInstruccion(pcb structs.PCB) {
+
+	log.Printf("PID: %d - FETCH - Program Counter: %d", pcb.PID, pcb.PC)
+}
+
+// log obligatorio (2/6)
+func EjecucionInstruccion(pcb structs.PCB, variable []string) {
+
+	log.Println("PID: ", pcb.PID, " - Ejecutando: ", variable[0], " - Parametros: ", variable[1:])
+}
+
+// log obligatorio (3...4/6)
+func TLBAccion(pid uint32, encontrado bool, pagina uint32) {
+
+	if encontrado {
+		log.Printf("PID: %d - TLB HIT - Pagina %d", pid, pagina)
+	} else {
+		log.Printf("PID: %d - TLB MISS - Pagina %d", pid, pagina)
+	}
+}
+
+// log obligatorio (5/6)
+func ObtenerMarcolg(pid uint32, encontrado bool, pagina uint32, marco uint32) {
+	if encontrado {
+		log.Printf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d", pid, pagina, marco)
+	}
+}
+
+// log obligatorio (6/6)
+func LecturaEscritura(pcb structs.PCB, accion string, direccionFisica string, valor string) {
+
+	log.Printf("PID: %d - Accion: %s - Direccion Fisica: %s - Valor: %s", pcb.PID, accion, direccionFisica, valor)
+
+}
 
 //log´s auxiliares------------------------------------------------------
 
 // -------------------------- == LOG's E/S == -----------------------------------------------------------
+// log obligatorio (1/6)
+func Operacion(pid uint32, operacion string) {
+	log.Printf("PID: %d - Operacion %s", pid, operacion)
+}
+
+// log obligatorio (2/6)
+func CrearArchivo(pid uint32, nombre string) {
+	log.Printf("PID: %d - Crear Archivo %s", pid, nombre)
+}
+
+// log obligatorio (3/6)
+func EliminarArchivo(pid uint32, nombre string) {
+	log.Printf("PID: %d - Eliminar Archivo %s", pid, nombre)
+}
+
+// log obligatorio (4/6)
+func TruncarArchivo(pid uint32, nombre string, tamaño uint32) {
+	log.Printf("PID: %d - Truncar Archivo %s - Tamaño: %d", pid, nombre, tamaño)
+}
+
+// log obligatorio (5...6/6)
+func LeerEscribirArchivo(pid uint32, accion string, nombre string, tamaño int, puntero uint32) {
+	if accion == "LEER" {
+		log.Printf("PID: %d - Leer Archivo %s - Tamaño a Leer: %d - Puntero Archivo: %d", pid, nombre, tamaño, puntero)
+	} else {
+		log.Printf("PID: %d - Escribir Archivo %s - Tamaño a Escribir: %d - Puntero Archivo: %d", pid, nombre, tamaño, puntero)
+	}
+}
 
 //log´s auxiliares------------------------------------------------------
 
 // -------------------------- == LOG's KERNEL == -----------------------------------------------------------
 // log obligatorio (1/6)
-func LogNuevoProceso(nuevoPCB structs.PCB) {
+func NuevoProceso(nuevoPCB structs.PCB) {
 
 	log.Printf("Se crea el proceso %d en estado %s", nuevoPCB.PID, nuevoPCB.Estado)
 }
@@ -72,6 +150,12 @@ func CambioDeEstado(pcb_estado_viejo string, pcb structs.PCB) {
 
 }
 
+func CambioDeEstadoInverso(pcb structs.PCB, pcb_estado_nuevo string) {
+
+	log.Printf("PID: %d - Estado anterior: %s - Estado actual: %s", pcb.PID, pcb.Estado, pcb_estado_nuevo)
+
+}
+
 // log obligatorio (3/6)
 func PidsReady(readyQueue []structs.PCB) {
 	var pids []uint32
@@ -80,9 +164,10 @@ func PidsReady(readyQueue []structs.PCB) {
 		pids = append(pids, pcb.PID)
 	}
 
-	log.Printf("Cola Ready 'readyQueue' : %v", pids)
+	log.Printf("Cola Ready 'ListaREADY' : %v", pids)
 }
 
+// TODO: Sin usar
 // log obligatorio (4/6)
 func FinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
 
@@ -90,34 +175,56 @@ func FinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
 
 }
 
+// log obligatorio (5/6)
+func FinDeQuantum(pcb structs.PCB) {
+
+	log.Printf("PID: %d - Desalojado por fin de Quantum", pcb.PID)
+}
+
+// TODO : usado solo para interfaz (falta usarlo para recursos)
+// log obligatorio (6/6)
+func MotivoBloqueo(pid uint32, motivo string) {
+
+	log.Printf("PID: %d - Bloqueado por: %s", pid, motivo)
+}
+
 //log´s auxiliares------------------------------------------------------
 
 // TODO: Implementar para blockedMap.
-func PidsBlock(blockQueue []structs.PCB) {
+func PidsBlock(auxLog *log.Logger, blockedQueue map[uint32]structs.PCB) {
 	var pids []uint32
-	//Recorre la lista BLOCK y guarda sus PIDs
-	for _, pcb := range blockQueue {
+	//Recorre la lista BLOCKED y guarda sus PIDs
+	for _, pcb := range blockedQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	fmt.Printf("Cola Block 'blockQueue' : %v", pids)
+	auxLog.Printf("Cola Blocked 'MapBLOCK' : %v", pids)
+
 }
 
-// log para el manejo de listas EXEC
-func PidsExec(ExecQueue []structs.PCB) {
+func PidsNew(auxLog *log.Logger, newQueue []structs.PCB) {
 	var pids []uint32
-	//Recorre la lista EXEC y guarda sus PIDs
-	for _, pcb := range ExecQueue {
+	//Recorre la lista NEW y guarda sus PIDs
+	for _, pcb := range newQueue {
 		pids = append(pids, pcb.PID)
 	}
 
-	fmt.Printf("Cola Executing 'ExecQueue' : %v", pids)
+	auxLog.Printf("Cola New 'ListaNEW' : %v", pids)
 }
 
-func EsperaNuevosProcesos() {
+func PidsExit(auxLog *log.Logger, exitQueue []structs.PCB) {
+	var pids []uint32
+	//Recorre la lista EXIT y guarda sus PIDs
+	for _, pcb := range exitQueue {
+		pids = append(pids, pcb.PID)
+	}
 
-	fmt.Println("Esperando nuevos procesos...")
+	auxLog.Printf("Cola Exit 'ListaEXIT' : %v", pids)
+}
 
+func PidsReadyPrioritarios(auxLog *log.Logger, pcb structs.PCB) {
+
+	auxLog.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
 }
 
 // -------------------------- == LOG's MEMORIA == -----------------------------------------------------------
@@ -157,14 +264,4 @@ func LeerInstrucciones(auxLog *log.Logger, memoriaInstrucciones map[uint32][]str
 	for _, instruccion := range memoriaInstrucciones[pid] {
 		auxLog.Println(instruccion)
 	}
-}
-
-func Error(auxLog *log.Logger, err error) {
-	auxLog.Println(err)
-}
-
-// -------------------------- == AUX GENERICAS == -----------------------------------------------------------
-
-func Mensaje(auxLog *log.Logger, mensaje string) {
-	auxLog.Println(mensaje)
 }
