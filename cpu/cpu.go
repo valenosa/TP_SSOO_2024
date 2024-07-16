@@ -100,7 +100,6 @@ func handlerInterrupcion(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
 
 	funciones.MotivoDeDesalojo = queryParams.Get("interrupt_type")
-	fmt.Println("Se recibió una interrupción de tipo: ", funciones.MotivoDeDesalojo) //!Solamente para chequear que reciba todo bien, después se borra.
 
 	PID, errPid := strconv.ParseUint(queryParams.Get("PID"), 10, 32)
 

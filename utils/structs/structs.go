@@ -1,5 +1,7 @@
 package structs
 
+import "sync"
+
 // =====================================| PROCESO |========================================================\\
 
 //	Kernel -> Cliente
@@ -72,7 +74,7 @@ type RequestRecurso struct {
 
 type Recurso struct {
 	Instancias int
-	ListaBlock []uint32
+	ListaBlock ListaSegura
 }
 
 //=====================================| I/O |=====================================\\
@@ -89,7 +91,6 @@ type RequestConectarInterfazIO struct {
 	Interfaz       Interfaz
 }
 
-// TODO: Implementar para DialFS
 // Estructura de comunicacion entre CPU y Kernel para ejecutar una instruccion de I/O
 type RequestEjecutarInstruccionIO struct {
 	PidDesalojado  uint32
@@ -126,4 +127,27 @@ type RequestMovOUT struct {
 	Pid  uint32
 	Dir  uint32
 	Data []byte
+}
+
+//=====================================| TADs SINCRONIZACION |=====================================|
+
+// ----------------------( LISTA )----------------------\\
+type ListaSegura struct {
+	Mx   sync.Mutex
+	List []uint32
+}
+
+func (sList *ListaSegura) Append(value uint32) {
+	sList.Mx.Lock()
+	sList.List = append(sList.List, value)
+	sList.Mx.Unlock()
+}
+
+func (sList *ListaSegura) Dequeue() uint32 {
+	sList.Mx.Lock()
+	var pcb = sList.List[0]
+	sList.List = sList.List[1:]
+	sList.Mx.Unlock()
+
+	return pcb
 }

@@ -62,7 +62,6 @@ func main() {
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("IniciarPlanificacion-------------------------") //? Este tipo de mensajes se pueden usar como log
 	funciones.TogglePlanificador = true
 
 	funciones.OnePlani.Lock()
@@ -70,9 +69,10 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
-
+ 
+// TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
-
+	
 	fmt.Printf("DetenerPlanificacion-------------------------")
 
 	funciones.TogglePlanificador = false
@@ -84,8 +84,6 @@ func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 //----------------------( PROCESOS )----------------------\\
 
 func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("IniciarProceso-------------------------")
 
 	//----------- RECIBE ---------
 	//variable que recibirá la request.
@@ -165,10 +163,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respIniciarProceso)
 }
 
-// TODO: BUSCAR EL PCB Y MANDARLO A LAFUNCION LIBERER PROCESO
 func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
 	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 32)
@@ -178,19 +173,20 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	funciones.Interrupt(uint32(pid), "Finalizar PROCESO") // Interrumpe el proceso
-
 	//--------- EJECUTA ---------
 
-	//TODO: Busca el Proceso (PID) lo desencola y lo pasa a EXIT (si esta en EXEC, lo interrumpe y lo pasa a EXIT)
-	var pcb structs.PCB
-	funciones.LiberarProceso(pcb)
+	funciones.Interrupt(uint32(pid), "Finalizar Proceso") // Interrumpe el proceso
+
+	pcb, encontrado := funciones.ExtraerPCB(uint32(pid))
+	if encontrado {
+		pcb.Estado = "EXIT"
+		funciones.AdministrarQueues(pcb)
+	}
 
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: Tomar los procesos creados (BLock, Ready y Exec) y devolverlos en una lista
 func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("ListarProceso-------------------------")
@@ -201,11 +197,16 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
+	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
-	listaDeProcesos = append(listaDeProcesos, procesoExec)
+	if procesoExec.Estado == "EXEC"{
+		listaDeProcesos = append(listaDeProcesos, procesoExec)
+	}
 
 	//----------- DEVUELVE -----------
+
+	fmt.Println(listaDeProcesos)
 
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
@@ -220,7 +221,6 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	w.Write(respuesta)
 }
 
-// TODO: Busca el proceso deseado y devuelve el estado en el que se encuentra
 func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("DetenerEstadoProceso-------------------------")
@@ -237,8 +237,13 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	//TODO: Busca en base al pid el proceso en todas las colas (y el map de BLOCK) y devuelvo el estado
-	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
+	pcb, encontrado := funciones.BuscarPCB(uint32(pid))
+	if !encontrado {
+		fmt.Println("Proceso no encontrado")
+		return
+	}
+
+	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: pcb.Estado}
 
 	//--------- DEVUELVE ---------
 
@@ -271,13 +276,13 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	respAsignaiconRecurso := "OK: Recurso asignado"
+	respAsignacionRecurso := "OK: Recurso asignado"
 
 	//Busco el recurso solicitado
 	var recurso, find = funciones.MapRecursos[recursoSolicitado.NombreRecurso]
 	if !find {
 		//Si no existe el recurso
-		respAsignaiconRecurso = "ERROR: Recurso no existe"
+		respAsignacionRecurso = "ERROR: Recurso no existe"
 	} else {
 
 		//Resto uno al la cantidad de instancias del recurso
@@ -285,16 +290,16 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 		if recurso.Instancias < 0 {
 
 			//Agrego PID a su lista de bloqueados
-			recurso.ListaBlock = append(recurso.ListaBlock, recursoSolicitado.PidSolicitante)
+			recurso.ListaBlock.Append(recursoSolicitado.PidSolicitante)
 
-			respAsignaiconRecurso = "BLOQUEAR: Recurso no disponible"
+			respAsignacionRecurso = "BLOQUEAR: Recurso no disponible"
 		}
 
 	}
 
 	//--------- DEVUELVE ---------
 
-	respuesta, err := json.Marshal(respAsignaiconRecurso)
+	respuesta, err := json.Marshal(respAsignacionRecurso)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -318,30 +323,13 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	var recurso, find = funciones.MapRecursos[recursoLiberado]
+	var _, find = funciones.MapRecursos[recursoLiberado]
 	if !find {
-		//TODO Si no existe el recurso Mandar a EXIT
 		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
 		return
 	}
 
-	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
-	if len(recurso.ListaBlock) != 0 {
-		// Tomo el primer PID de la lista de BLOCK (del recurso)
-		pid := recurso.ListaBlock[0]
-		recurso.ListaBlock = recurso.ListaBlock[1:]
-
-		//Se pasa el proceso a de BLOCK -> READY
-		pcbDesbloqueado := funciones.MapBLOCK.Delete(pid)
-
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(pcbDesbloqueado, "READY")
-
-		pcbDesbloqueado.Estado = "READY"
-		funciones.AdministrarQueues(pcbDesbloqueado)
-	} else {
-		recurso.Instancias++
-	}
+	funciones.LiberarRecurso(recursoLiberado)
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -350,8 +338,6 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 // Recibe una iterfaz y la guarda en InterfacesConectadas
 func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("ConexionInterfazIO-------------------------")
 
 	// Almaceno la interfazConectada en una variable
 	var interfazConectada structs.RequestConectarInterfazIO
@@ -375,14 +361,13 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	var requestInstruccionIO structs.RequestEjecutarInstruccionIO
 	marshalError := json.NewDecoder(r.Body).Decode(&requestInstruccionIO)
 	if marshalError != nil {
-		fmt.Println(marshalError) //! Borrar despues.
 		http.Error(w, marshalError.Error(), http.StatusBadRequest)
 		return
 	}
 
 	//^log obligatorio (6/6)
 	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
-
+  
 	//--------- EJECUTA ---------
 
 	//--- VALIDA
@@ -410,7 +395,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Codifica instruccion a ejecutar en JSON
 	body, marshalError := json.Marshal(requestInstruccionIO)
 	if marshalError != nil {
-		fmt.Println(marshalError) //! Borrar despues.
 		http.Error(w, marshalError.Error(), http.StatusInternalServerError)
 		return
 	}

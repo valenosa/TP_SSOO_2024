@@ -145,8 +145,7 @@ func Request(port int, ip string, metodo string, query string, bodies ...[]byte)
 		return nil, err
 	}
 
-	//Todo salió bien
-	//fmt.Printf("%s %s exitoso \n", metodo, query)
+	//T0do salió bien
 	return respuesta, err
 }
 

@@ -127,8 +127,6 @@ func handlerIO_GEN_SLEEP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Unidades de Trabajo:", instruccionIO.UnitWorkTime) //! Borrar despues.
-
 	//--------- EJECUTA ---------
 
 	sleepTime := configInterfaz.Unit_Work_Time * instruccionIO.UnitWorkTime
@@ -386,7 +384,6 @@ func handlerIO_FS_CREATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWri
 	}
 }
 
-// TODO: ACTUALIZAR EL CANTIDAD DE BLOQUES DISPONIBLES EN EL BITMAP.DAT
 func handlerIO_FS_TRUNCATE(cantBloquesDisponiblesTotal *int) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -915,7 +912,6 @@ func reorganizarBloques(initialBlock int, tamañoEnBloques int, nuevoTamañoEnBl
 
 	bitmap.Close()
 
-	//? Verificar este calculo
 	*cantBloquesDisponiblesTotal = configInterfaz.Dialfs_Block_Count - (nuevaPosInicial + nuevoTamañoEnBloques)
 
 	return nuevaPosInicial

@@ -33,14 +33,12 @@ var MotivoDeDesalojo string
 var Auxlogger *log.Logger
 
 // ----------------------( TLB )----------------------\\
-
 type pid = uint32
 type pagina = uint32
 type marco = uint32
 
-// TLB
 // Estructura de la TLB.
-// ? El pid es el key, y el valor es otro map
+// | El pid es el key, y el valor es otro mapa que tiene como key la página y como valor el marco.
 type TLB map[pid]map[pagina]marco
 
 type ElementoPrioridad struct {
@@ -56,7 +54,7 @@ func (tlb TLB) initPID(pid uint32) {
 	}
 }
 
-func (tlb TLB) longitudTLB() int { //*por ahora OK (sin elementos en tlb)
+func (tlb TLB) longitudTLB() int {
 
 	sumatoria := 0
 
@@ -67,20 +65,19 @@ func (tlb TLB) longitudTLB() int { //*por ahora OK (sin elementos en tlb)
 	return sumatoria
 }
 
-// Valida si el TLBA está lleno.
+// Valida si el TLBA está lleno
 func (tlb TLB) Full() bool {
 	return tlb.longitudTLB() >= ConfigJson.Number_Felling_tlb
 }
 
 // Hit or miss? I guess they never miss, huh?
-func (tlb TLB) Hit(pid uint32, pagina uint32) (uint32, bool) { //*OK
+func (tlb TLB) Hit(pid uint32, pagina uint32) (uint32, bool) {
 	marco, encontrado := tlb[pid][pagina]
 	return marco, encontrado
 }
 
 // ----------------------( MMU )----------------------\\
 
-// TODO: Probar
 // Recibe una direccion lógica, devuelve una física y maneja el TLB
 func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
 
@@ -92,7 +89,7 @@ func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]
 
 	// Si no se encontró el marco, se devuelve un error
 	if !encontrado {
-		//? Cómo manejar el caso de un "Page Fault" (si se debe)?
+		fmt.Println("ERROR: Page Fault")
 		return 0, false
 	}
 
@@ -107,7 +104,7 @@ func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]
 	return direccionFisica, true
 }
 
-func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) { //*OK
+func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
 
 	numeroDePagina := int(math.Floor(float64(direccionLogica) / float64(ConfigJson.Page_Size)))
 	desplazamiento := direccionLogica - numeroDePagina*int(ConfigJson.Page_Size)
@@ -115,7 +112,6 @@ func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) { //*OK
 	return numeroDePagina, desplazamiento
 }
 
-// TODO: probar
 // obtiene el marco de la pagina
 func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
 
@@ -132,29 +128,23 @@ func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]Element
 		//^log obligatorio (5/6)
 		logueano.ObtenerMarcolg(pid, encontrado, pagina, marco)
 
-		//TODO: manejar caso en donde la TLB no pueda agregar marco (no existe marco en memoria)
 		agregarEnTLB(pagina, marco, pid, tlb, prioridadesTLB)
 
 	}
-
-	//!Manejar tema TLBEANO
-
-	//? Existe la posibilidad de que un marco no sea hallado
+	// No se toma en cuenta el caso en el que no existe el marco
 	return marco, encontrado
 }
 
+// TODO: Probar TLB, especificamente los algoritmos de remplazo
 func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	if tlb.Full() {
-
-		//TODO: Reemplazar marco
-		//TODO: Eliminar marco
 		planificarTLB(pid, pagina, marco, tlb, prioridadesTLB)
-	} else {
 
+	} else {
 		(*tlb).initPID(pid)
 
 		// agregar marco al TLB
-		(*tlb)[pid][pagina] = marco //!ERROR
+		(*tlb)[pid][pagina] = marco
 		// agregar a la lista de prioridades
 		(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
 	}
@@ -164,10 +154,9 @@ func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridade
 	switch ConfigJson.Algorithm_tlb {
 
 	case "FIFO":
-
 		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
 
-	case "LRU": //?
+	case "LRU":
 		algoritmoLru(pid, pagina, marco, tlb, prioridadesTLB)
 	}
 }
@@ -265,7 +254,6 @@ func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
 	marcoEncontrado := uint32(valorInt64)
 
 	return uint32(marcoEncontrado), true
-
 }
 
 //----------------------( FUNCIONES CICLO DE INSTRUCCION )----------------------\\
@@ -340,6 +328,7 @@ func Fetch(PID uint32, PC uint32) string {
 }
 
 // Ejecuta las instrucciones traidas de memoria.
+// TODO: Todos los cambios de estado se deben relizar en kernel en base a el Motivo de Desalojo ( Kernel: administrarMotivoDesalojo() )
 func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFinalizado *bool, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) {
 
 	// Mapa de registros para acceder a los registros de la CPU por nombre
@@ -380,7 +369,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		jnz(variable[1], variable[2], PC, registrosMap8)
 
 	case "MOV_IN":
-
 		estado, valor, dirF := movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 		if estado != "OK" {
@@ -393,7 +381,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 			logueano.LecturaEscritura(*PCB, "LEER", dirF, valor)
 		}
 	case "MOV_OUT":
-
 		estado, valor, dirF := movOUT(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
 		if estado != "OK" {
@@ -424,18 +411,15 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		estado := resize(variable[1])
 		if estado == "OUT OF MEMORY" {
 			*cicloFinalizado = true
-			PCB.Estado = "EXIT"       //TODO: Manejar en kernel
-			MotivoDeDesalojo = estado //TODO: Manejar en kernel
+			MotivoDeDesalojo = estado
 			return
 		}
 
 	case "WAIT":
 		wait(variable[1], PCB, cicloFinalizado)
-		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "SIGNAL":
 		signal(variable[1], PCB, cicloFinalizado)
-		//TODO: Verificar que cuando toque finalizar ciclo de instrucción no esté perdiendo la siguiente instrucción (que el PC no se esté incrementando demás)
 
 	case "IO_GEN_SLEEP":
 		*cicloFinalizado = true
@@ -450,7 +434,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_STDOUT_WRITE":
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
-		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDOUT_WRITE") //TODO: IN -> OUT
+		go ioSTD(variable[1], variable[2], variable[3], registrosMap8, registrosMap32, PCB.PID, TLB, prioridadesTLB, "IO_STDOUT_WRITE")
 
 	case "IO_FS_CREATE":
 		*cicloFinalizado = true
@@ -474,7 +458,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "EXIT":
 		*cicloFinalizado = true
-		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "EXIT"
 		return
 
@@ -488,7 +471,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 //----------------------( FUNCIONES DE INSTRUCCIONES )----------------------\\
 
-// TODO: Manejar registros grandes
 // Asigna al registro el valor pasado como parámetro.
 func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, PC *uint32) {
 
@@ -658,7 +640,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	var encontrado bool
 	var longitud string
 
-	// D. Logica a Fisica
+	// Dir Logica a Fisica
 
 	direccionFisica, encontrado = obtenerDireccionFisica(registroDireccion, registrosMap8, registrosMap32, TLB, prioridadesTLB)
 
@@ -759,8 +741,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Page Fault")
-		return "PAGE FAULT", "", "" //?Es correcto esto?
-
+		return "PAGE FAULT", "", "" 
 	}
 
 	regData := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
@@ -822,7 +803,7 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	var respWait string
 	err = json.NewDecoder(respuesta.Body).Decode(&respWait)
 	if err != nil {
-		return //? Que va aca?
+		return
 	}
 
 	//--------- EJECUTA ---------
@@ -830,19 +811,17 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	switch respWait {
 	case "OK: Recurso asignado":
 		// Agrega el recurso a la lista de recursos retenidos por el proceso.
-		PCB.Recursos = append(PCB.Recursos, nombreRecurso) //* En base a esta lista se liberaran los recursos al finalizar el proceso
+		PCB.Recursos = append(PCB.Recursos, nombreRecurso) // En base a esta lista se liberaran los recursos al finalizar el proceso
 		return
 
 	case "BLOQUEAR: Recurso no disponible":
 		*cicloFinalizado = true
-		PCB.Estado = "BLOCK"
 		MotivoDeDesalojo = "WAIT"
 		//Bloquea el proceso
 		return
 
 	case "ERROR: Recurso no existe":
 		*cicloFinalizado = true
-		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "ERROR: Recurso no existe"
 		return
 	}
@@ -866,7 +845,6 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	if respuesta.StatusCode != http.StatusOK {
 
 		*cicloFinalizado = true
-		PCB.Estado = "EXIT"
 		MotivoDeDesalojo = "ERROR: Recurso no existe"
 		return
 	}
@@ -958,16 +936,14 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (
 
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
-		return "PAGE FAULT", "", "", "" //?Es correcto esto?
-
+		return "PAGE FAULT", "", "", "" 
 	}
 
 	direccionLectura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.SI), TLB, prioridadesTLB)
 
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
-		return "PAGE FAULT", "", "", "" //?Es correcto esto?
-
+		return "PAGE FAULT", "", "", "" 
 	}
 
 	// Crea un cliente HTTP
@@ -1016,11 +992,8 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (
 	if err != nil {
 		return "", "", "", ""
 	}
-
 	return "OK", (string(data)), direccionLecturaStr, direccionEscrituraStr
 }
-
-//TODO: Testear que se comuniquen estas funciones con kernel.
 
 func ioFSCreateOrDelete(nombreInterfaz string, nombreArchivo string, PID uint32, instruccionIO string) {
 
@@ -1072,7 +1045,6 @@ func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTa
 	//Extrae el tamaño de la instrucción
 	tamaño := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
 
-	//! Chequear que se deba enviar así el puntero.
 	puntero := extraerDatosDelRegistro(regPuntero, registroMap8, registroMap32)
 
 	//Traduce dirección lógica a física

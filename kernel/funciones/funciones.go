@@ -25,11 +25,13 @@ var Auxlogger *log.Logger
 var MapRecursos = make(map[string]*structs.Recurso)
 
 // ----------------------------Listas de Estados
-var ListaNEW = ListaSegura{} //? Es simplemente para mostrarlo en listarProcesos
 var ListaREADY = ListaSegura{}
-var ListaEXIT = ListaSegura{} //? Es simplemente para mostrarlo en listarProcesos
 var MapBLOCK = MapSeguroPCB{m: make(map[uint32]structs.PCB)}
-var ProcesoExec structs.PCB //? Es simplemente para mostrarlo en listarProcesos
+
+// Solo para mostrarlo en listarProcesos
+var ListaNEW = ListaSegura{}
+var ListaEXIT = ListaSegura{}
+var ProcesoExec structs.PCB
 
 // ---------------------------- VRR
 var ListaREADY_PRIORITARIO = ListaSegura{}
@@ -53,8 +55,8 @@ var CounterPID uint32 = 0
 
 //*=======================================| PLANIFICADOR |=======================================\\
 
-// TODO: Verificar el tema del semaforo de hay pcb en ready (31/05/24)
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
+// TODO: Testear VRR mas a fondo
 func Planificador() {
 
 	//Espero a que se active el planificador
@@ -69,7 +71,6 @@ func Planificador() {
 		var siguientePCB structs.PCB      // PCB a enviar al CPU
 		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
 
-		//! A lo mejor tiene que ser con semaforos pero es para testear la idea
 		if strings.ToUpper(ConfigJson.Planning_Algorithm) == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 {
 
 			siguientePCB = ListaREADY_PRIORITARIO.Dequeue()
@@ -96,6 +97,8 @@ func Planificador() {
 
 		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
+ 
+		ProcesoExec = structs.PCB{} //Limpia a proceso Exec para listarProcesos
 
 		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
 		if ConfigJson.Planning_Algorithm == "VRR" && motivoDesalojo == "IO" {
@@ -114,13 +117,11 @@ func Planificador() {
 	}
 }
 
-// TODO: TODOS LOS CAMBIOS DE ESTADO QUE SE HACEN EN CPU SE TIENEN QUE HACER ACA EN BASE A EL MOTIVO DE DESALOJO (14/6/24)
+// TODO: Todos los cambios de estado se hacen desde aca (15/7/24: Faltan las funciones de memoria que están en CPU)
 func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
-	// Imprime el motivo de desalojo.
-	fmt.Println("===================================== Proceso", pcb.PID, "desalojado por:", motivoDesalojo)
-
 	switch motivoDesalojo {
+
 	case "Fin de QUANTUM":
 
 		//^ log obligatorio (5/6)
@@ -131,19 +132,31 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		pcb.Estado = "READY"
 
 	case "Finalizar PROCESO":
-
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstadoInverso(*pcb, "EXIT")
 		pcb.Estado = "EXIT"
 
-		//TODO: Se debe indicar qué interfaz se desconectó
 	case "IO":
-
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstadoInverso(*pcb, "BLOCK")
 		pcb.Estado = "BLOCK"
-	}
 
+	case "WAIT":
+		pcb.Estado = "BLOCK"
+
+	case "Finalizar Proceso":
+		pcb.Estado = "EXIT"
+
+	case "ERROR: Recurso no existe":
+		pcb.Estado = "EXIT"
+
+	case "OUT OF MEMORY":
+		pcb.Estado = "EXIT"
+
+	case "EXIT":
+		pcb.Estado = "EXIT"
+
+	}
 }
 
 //----------------------( ROUND ROBIN )----------------------\\
@@ -178,7 +191,7 @@ func AdministrarQueues(pcb structs.PCB) {
 		Bin_hayPCBenREADY <- 0
 
 		//^ log obligatorio (3/6)
-		logueano.PidsReady(ListaREADY.List) //!No se si tengo que sync esto
+		logueano.PidsReady(ListaREADY.List)
 
 	case "READY_PRIORITARIO":
 		ListaREADY_PRIORITARIO.Append(pcb)
@@ -201,8 +214,6 @@ func AdministrarQueues(pcb structs.PCB) {
 		LiberarProceso(pcb)
 		<-Cont_producirPCB
 	}
-
-	//TODO: loguear cambios de estado directo desde aca, esto para no llamar a la funcion por todos lados :)
 }
 
 func LiberarProceso(pcb structs.PCB) {
@@ -234,8 +245,61 @@ func LiberarProceso(pcb structs.PCB) {
 	//-------------- Liberar Recursos ------------------------------
 
 	for _, recurso := range pcb.Recursos {
-		MapRecursos[recurso].Instancias++
+		LiberarRecurso(recurso)
 	}
+}
+
+func ExtraerPCB(pid uint32) (structs.PCB, bool) {
+
+	pcb, encontrado := MapBLOCK.Delete(pid)
+	if encontrado {
+		//Retornar PCB
+		return pcb, true
+	}
+
+	pcb, encontrado = ListaREADY.Extract(pid)
+	if encontrado {
+		//Retornar PCB
+		return pcb, true
+	}
+
+	pcb, encontrado = ListaNEW.Extract(pid)
+	if encontrado {
+		//Retornar PCB
+		return pcb, true
+	}
+
+	return structs.PCB{}, false
+}
+
+func BuscarPCB(pid uint32) (structs.PCB, bool) {
+
+	pcb, encontrado := MapBLOCK.Get(pid)
+	if encontrado {
+		//Retornar PCB
+		return pcb, true
+	}
+
+	pcb, encontrado = ListaREADY.Search(pid)
+	if encontrado {
+		//Retornar PCB
+		return pcb, true
+	}
+
+	pcb, encontrado = ListaNEW.Search(pid)
+	if encontrado {
+		//Retornar PCB
+		return pcb, true
+	}
+
+	if ProcesoExec.PID == pid {
+		//Eliminar proceso exec
+
+		//Retornar PCB
+		return ProcesoExec, true
+	}
+
+	return structs.PCB{}, false
 }
 
 //----------------------( EJECUTAR PROCESOS EN CPU )----------------------\\
@@ -343,7 +407,7 @@ func ValidarInstruccionIO(tipo string, instruccion string) bool {
 
 // Toma un pid del map general de BLOCK y manda un proceso a EXIT.
 func DesalojarProcesoIO(pid uint32) {
-	pcbDesalojado := MapBLOCK.Delete(pid)
+	pcbDesalojado, _ := MapBLOCK.Delete(pid)
 	pcbDesalojado.Estado = "EXIT"
 
 	//^ log obligatorio (2/6)
@@ -357,6 +421,27 @@ func LeerRecursos(recursos []string, instancia_recursos []int) {
 	//Tomo de resources y resource_instances los recursos y sus instancias y los guardo en Recursos
 	for i, recurso := range recursos {
 		MapRecursos[recurso] = &structs.Recurso{Instancias: instancia_recursos[i]}
+	}
+}
+
+func LiberarRecurso(nombreRecurso string) {
+
+	recurso := MapRecursos[nombreRecurso]
+
+	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
+	if len(recurso.ListaBlock.List) != 0 {
+
+		// Tomo el primer PID de la lista de BLOCK (del recurso)
+		pid := recurso.ListaBlock.Dequeue()
+
+		pcbDesbloqueado, _ := MapBLOCK.Delete(pid)
+		//Se agrega el recurso a la lista de recursos del proceso
+		pcbDesbloqueado.Recursos = append(pcbDesbloqueado.Recursos, nombreRecurso)
+		//Se pasa el proceso a de BOLCK -> READY
+		pcbDesbloqueado.Estado = "READY"
+		AdministrarQueues(pcbDesbloqueado)
+	} else {
+		recurso.Instancias++
 	}
 }
 
@@ -374,7 +459,6 @@ func (sList *ListaSegura) Append(value structs.PCB) {
 	sList.Mx.Unlock()
 }
 
-// TODO: Manejar el error en caso de que la lista esté vacía (18/5/24)
 func (sList *ListaSegura) Dequeue() structs.PCB {
 	sList.Mx.Lock()
 	var pcb = sList.List[0]
@@ -395,6 +479,46 @@ func AppendListaProceso(listadoProcesos []structs.ResponseListarProceso, listaEs
 	return listadoProcesos
 }
 
+func AppendMapProceso(listadoProcesos []structs.ResponseListarProceso, mapEspecifico *MapSeguroPCB) []structs.ResponseListarProceso {
+	mapEspecifico.mx.Lock()
+	for _, value := range mapEspecifico.m {
+		elemento := structs.ResponseListarProceso{PID: value.PID, Estado: value.Estado}
+		listadoProcesos = append(listadoProcesos, elemento)
+	}
+	mapEspecifico.mx.Unlock()
+
+	return listadoProcesos
+}
+
+// Busca un PCB en la lista segura y lo elimina si lo encuentra
+func (sList *ListaSegura) Extract(pcbID uint32) (structs.PCB, bool) {
+	sList.Mx.Lock()
+	defer sList.Mx.Unlock()
+
+	for i, pcb := range sList.List {
+		if pcb.PID == pcbID {
+			// Elimina el PCB de la lista
+			sList.List = append(sList.List[:i], sList.List[i+1:]...)
+			return pcb, true
+		}
+	}
+
+	return structs.PCB{}, false
+}
+
+func (sList *ListaSegura) Search(pcbID uint32) (structs.PCB, bool) {
+	sList.Mx.Lock()
+	defer sList.Mx.Unlock()
+
+	for _, pcb := range sList.List {
+		if pcb.PID == pcbID {
+			return pcb, true
+		}
+	}
+
+	return structs.PCB{}, false
+}
+
 // ----------------------( MAP PCB )----------------------\\
 type MapSeguroPCB struct {
 	mx sync.Mutex
@@ -407,13 +531,23 @@ func (sMap *MapSeguroPCB) Set(key uint32, value structs.PCB) {
 	sMap.mx.Unlock()
 }
 
-func (sMap *MapSeguroPCB) Delete(key uint32) structs.PCB {
+func (sMap *MapSeguroPCB) Delete(key uint32) (structs.PCB, bool) {
 	sMap.mx.Lock()
-	var pcb = sMap.m[key]
+	var pcb, find = sMap.m[key]
+	if find {
 	delete(sMap.m, key)
+	}
 	sMap.mx.Unlock()
 
-	return pcb
+	return pcb, find
+}
+
+func (sMap *MapSeguroPCB) Get(key uint32) (structs.PCB, bool) {
+	sMap.mx.Lock()
+	var pcb, find = sMap.m[key]
+	sMap.mx.Unlock()
+
+	return pcb, find
 }
 
 // ----------------------( MAP Interfaz )----------------------\\
@@ -444,3 +578,5 @@ func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
 
 	return interfaz, find
 }
+
+
