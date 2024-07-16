@@ -68,10 +68,10 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
-
+ 
 // TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
-
+	
 	fmt.Printf("DetenerPlanificacion-------------------------")
 
 	funciones.TogglePlanificador = false
@@ -172,19 +172,20 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	funciones.Interrupt(uint32(pid), "Finalizar PROCESO") // Interrumpe el proceso
-
 	//--------- EJECUTA ---------
 
-	var pcb structs.PCB
-	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar pcb por el encontrado
-	funciones.LiberarProceso(pcb)
+	funciones.Interrupt(uint32(pid), "Finalizar Proceso") // Interrumpe el proceso
+
+	pcb, encontrado := funciones.ExtraerPCB(uint32(pid))
+	if encontrado {
+		pcb.Estado = "EXIT"
+		funciones.AdministrarQueues(pcb)
+	}
 
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: Testear Listar procesos
 func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("ListarProceso-------------------------")
@@ -195,11 +196,16 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
+	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
-	listaDeProcesos = append(listaDeProcesos, procesoExec)
+	if procesoExec.Estado == "EXEC"{
+		listaDeProcesos = append(listaDeProcesos, procesoExec)
+	}
 
 	//----------- DEVUELVE -----------
+
+	fmt.Println(listaDeProcesos)
 
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
@@ -230,8 +236,13 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar "ANASHE" por el estado del proceso
-	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
+	pcb, encontrado := funciones.BuscarPCB(uint32(pid))
+	if !encontrado {
+		fmt.Println("Proceso no encontrado")
+		return
+	}
+
+	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: pcb.Estado}
 
 	//--------- DEVUELVE ---------
 
@@ -264,13 +275,13 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	respAsignaiconRecurso := "OK: Recurso asignado"
+	respAsignacionRecurso := "OK: Recurso asignado"
 
 	//Busco el recurso solicitado
 	var recurso, find = funciones.MapRecursos[recursoSolicitado.NombreRecurso]
 	if !find {
 		//Si no existe el recurso
-		respAsignaiconRecurso = "ERROR: Recurso no existe"
+		respAsignacionRecurso = "ERROR: Recurso no existe"
 	} else {
 
 		//Resto uno al la cantidad de instancias del recurso
@@ -280,14 +291,14 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 			//Agrego PID a su lista de bloqueados
 			recurso.ListaBlock.Append(recursoSolicitado.PidSolicitante)
 
-			respAsignaiconRecurso = "BLOQUEAR: Recurso no disponible"
+			respAsignacionRecurso = "BLOQUEAR: Recurso no disponible"
 		}
 
 	}
 
 	//--------- DEVUELVE ---------
 
-	respuesta, err := json.Marshal(respAsignaiconRecurso)
+	respuesta, err := json.Marshal(respAsignacionRecurso)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -313,7 +324,6 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	var _, find = funciones.MapRecursos[recursoLiberado]
 	if !find {
-		//TODO Si no existe el recurso Mandar a EXIT (en base a la respuesta al igual que wait)
 		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
 		return
 	}
@@ -407,7 +417,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//--- VUELVE DE IO
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado, _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 	pcbDesalojado.Estado = "READY"
 
 	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR
