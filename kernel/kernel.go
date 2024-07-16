@@ -68,10 +68,10 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
-
+ 
 // TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
-
+	
 	fmt.Printf("DetenerPlanificacion-------------------------")
 
 	funciones.TogglePlanificador = false
@@ -172,25 +172,20 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	funciones.Interrupt(uint32(pid), "Finalizar PROCESO") // Interrumpe el proceso
-
 	//--------- EJECUTA ---------
 
-	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar pcb por el encontrado --- falta testear
-	pcbPuntero, found := funciones.MapBLOCK.ObtenerPCB(uint32(pid))
-	if found {
-		funciones.LiberarProceso(*pcbPuntero)
-		pcbPuntero.Estado = "EXIT"
-		funciones.MapBLOCK.ActualizarPCB(*pcbPuntero)
-	} else {
-		fmt.Println("Error: PCB no encontrado.")
+	funciones.Interrupt(uint32(pid), "Finalizar Proceso") // Interrumpe el proceso
+
+	pcb, encontrado := funciones.ExtraerPCB(uint32(pid))
+	if encontrado {
+		pcb.Estado = "EXIT"
+		funciones.AdministrarQueues(pcb)
 	}
 
 	// Envía respuesta (con estatus como header) al cliente
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: Testear Listar procesos
 func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("ListarProceso-------------------------")
@@ -201,11 +196,16 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
+	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
-	listaDeProcesos = append(listaDeProcesos, procesoExec)
+	if procesoExec.Estado == "EXEC"{
+		listaDeProcesos = append(listaDeProcesos, procesoExec)
+	}
 
 	//----------- DEVUELVE -----------
+
+	fmt.Println(listaDeProcesos)
 
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
@@ -236,8 +236,13 @@ func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	// TODO: Crear la funcion que Busca el PCB (a partir del PID) y remplazar "ANASHE" por el estado del proceso
-	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: "ANASHE"}
+	pcb, encontrado := funciones.BuscarPCB(uint32(pid))
+	if !encontrado {
+		fmt.Println("Proceso no encontrado")
+		return
+	}
+
+	var respEstadoProceso structs.ResponseEstadoProceso = structs.ResponseEstadoProceso{State: pcb.Estado}
 
 	//--------- DEVUELVE ---------
 
@@ -412,7 +417,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//--- VUELVE DE IO
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-	pcbDesalojado := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado, _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 	pcbDesalojado.Estado = "READY"
 
 	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR
