@@ -30,7 +30,7 @@ func ExtractInstructions(path string) []byte {
 	// Lee el archivo
 	file, err := os.ReadFile(path)
 	if err != nil {
-		logueano.Mensaje(Auxlogger, "Error: no se pudo leer el archivo de instrucciones")
+		logueano.Error(Auxlogger, err)
 		return nil
 	}
 
@@ -166,7 +166,7 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 	var dato []byte
 
 	//^ log obligatorio (5/5)
-	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize) 
+	logueano.AccesoEspacioUsuario(pid, "LEER", direccionFisica, byteArraySize)
 
 	// Itera sobre los bytes del dato recibido.
 	for ; byteArraySize > 0; byteArraySize-- {
@@ -180,7 +180,7 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
 		if endOfPage(direccionFisica) {
 			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
-			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, pagina) {
+			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, &pagina) {
 				return dato, "OUT OF MEMORY"
 			}
 		}
@@ -206,7 +206,7 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
 		if endOfPage(direccionFisica) {
 			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
-			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, pagina) {
+			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, &pagina) {
 				return "OUT OF MEMORY"
 			}
 		}
@@ -215,11 +215,12 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 	return "OK"
 }
 
-func cambioDePagina(direccionFisica *uint32, pid uint32, tablasDePaginas map[uint32]structs.Tabla, pagina uint32) bool {
+func cambioDePagina(direccionFisica *uint32, pid uint32, tablasDePaginas map[uint32]structs.Tabla, pagina *uint32) bool {
 
-	if tableHasNext(pid, pagina, tablasDePaginas) {
+	if tableHasNext(pid, *pagina, tablasDePaginas) {
 		// Cambio la direccion fisica a la primera del siguitabla
-		*direccionFisica = uint32(((tablasDePaginas)[pid][pagina+1]) * int(ConfigJson.Page_Size))
+		*pagina++
+		*direccionFisica = uint32(((tablasDePaginas)[pid][*pagina]) * int(ConfigJson.Page_Size))
 		return true
 	}
 	return false

@@ -55,7 +55,7 @@ func main() {
 	// Levanta el server de la nuevaInterfazIO
 	serverErr := iniciarServidorInterfaz(&cantBloquesDisponiblesTotal)
 	if serverErr != nil {
-		logueano.MensajeConFormato(Auxlogger, "Error al iniciar servidor de interfaz: %s", serverErr.Error())
+		logueano.Error(Auxlogger, serverErr)
 		return
 	}
 }
@@ -69,14 +69,14 @@ func conectarInterfazIO(nombre string) {
 
 	// Crea y codifica la request de conexion a Kernel
 	var requestConectarIO = structs.RequestConectarInterfazIO{NombreInterfaz: nombre, Interfaz: nuevaInterfazIO}
-	body, marshalErr := json.Marshal(requestConectarIO)
-	if marshalErr != nil {
-		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", marshalErr.Error())
+	body, err := json.Marshal(requestConectarIO)
+	if err != nil {
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
 	// Envia la request de conexion a Kernel
-	_, err := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
+	_, err = config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
 		return
@@ -222,14 +222,13 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	//--------- REQUEST A MEMORIA ---------
 	//^ log obligatorio (1/6)
 	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDOUT_WRITE")
@@ -505,14 +504,9 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	mx_interfaz.Lock()
 	defer mx_interfaz.Unlock()
+
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
-
-	//^ log obligatorio (1/6)
-	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_WRITE")
-
-	//^ log obligatorio (6/6)
-	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "ESCRIBIR", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
 
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
@@ -522,6 +516,11 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------- REQUEST A MEMORIA ---------
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_WRITE")
+
+	//^ log obligatorio (6/6)
+	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "ESCRIBIR", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
 
 	// Crea un cliente HTTP
 	cliente := &http.Client{}

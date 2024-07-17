@@ -360,13 +360,13 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		set(variable[1], variable[2], registrosMap8, registrosMap32, PC)
 
 	case "SUM":
-		sum(variable[1], variable[2], registrosMap8)
+		sum(variable[1], variable[2], registrosMap8, registrosMap32) //TODO: Preparar para uint32
 
 	case "SUB":
-		sub(variable[1], variable[2], registrosMap8)
+		sub(variable[1], variable[2], registrosMap8, registrosMap32) //TODO: Preparar para uint32
 
 	case "JNZ":
-		jnz(variable[1], variable[2], PC, registrosMap8)
+		jnz(variable[1], variable[2], PC, registrosMap8, registrosMap32) //TODO: Preparar para uint32
 
 	case "MOV_IN":
 		estado, valor, dirF := movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)
@@ -480,7 +480,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		// Convierte el valor a un entero sin signo de 32 bits
 		valorInt64, err := strconv.ParseUint(dato, 10, 32)
 		if err != nil {
-			logueano.Mensaje(Auxlogger, "Dato no valido")
+			logueano.Error(Auxlogger, err)
 		}
 
 		// Asigna el valor al PC (resta 1 ya que el PC se incrementará después de esta instrucción)
@@ -501,7 +501,7 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 		valor, err := strconv.Atoi(dato)
 
 		if err != nil {
-			logueano.Mensaje(Auxlogger, "Dato no valido")
+			logueano.Error(Auxlogger, err)
 		}
 
 		// Asigna el nuevo valor al registro
@@ -528,54 +528,46 @@ func set(reg string, dato string, registroMap8 map[string]*uint8, registroMap32 
 }
 
 // Suma al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
-func sum(reg1 string, reg2 string, registroMap map[string]*uint8) {
+func sum(reg1 string, reg2 string, registroMap map[string]*uint8, registroMap32 map[string]*uint32) {
 
 	// Verifica si existen los registros especificados en la instrucción.
-	registro1, encontrado := registroMap[reg1]
-	if !encontrado {
-		logueano.Mensaje(Auxlogger, "Registro no encontrado")
-		return
-	}
 
-	registro2, encontrado := registroMap[reg2]
-	if !encontrado {
-		logueano.Mensaje(Auxlogger, "Registro no encontrado")
-		return
-	}
+	registro1 := extraerDatosDelRegistro(reg1, registroMap, registroMap32)
+	registro2 := extraerDatosDelRegistro(reg2, registroMap, registroMap32)
 
 	// Suma el valor del Registro Origen al Registro Destino.
-	*registro1 += *registro2
+	registro1 += registro2
+
+	// Escribe el resultado en el Registro Destino.
+	if reg1 == "AX" || reg1 == "BX" || reg1 == "CX" || reg1 == "DX" {
+		*registroMap[reg1] = uint8(registro1)
+	} else {
+		*registroMap32[reg1] = registro1
+	}
 }
 
 // Resta al Registro Destino el Registro Origen y deja el resultado en el Registro Destino.
-func sub(reg1 string, reg2 string, registroMap map[string]*uint8) {
+func sub(reg1 string, reg2 string, registroMap map[string]*uint8, registroMap32 map[string]*uint32) {
 
-	// Verifica si existen los registros especificados en la instrucción.
-	registro1, encontrado := registroMap[reg1]
-	if !encontrado {
-		logueano.Mensaje(Auxlogger, "Registro no encontrado")
-		return
-	}
-
-	registro2, encontrado := registroMap[reg2]
-	if !encontrado {
-		logueano.Mensaje(Auxlogger, "Registro no encontrado")
-		return
-	}
+	registro1 := extraerDatosDelRegistro(reg1, registroMap, registroMap32)
+	registro2 := extraerDatosDelRegistro(reg2, registroMap, registroMap32)
 
 	// Resta el valor del Registro Origen al Registro Destino.
-	*registro1 -= *registro2
+	registro1 -= registro2
+
+	// Escribe el resultado en el Registro Destino.
+	if reg1 == "AX" || reg1 == "BX" || reg1 == "CX" || reg1 == "DX" {
+		*registroMap[reg1] = uint8(registro1)
+	} else {
+		*registroMap32[reg1] = registro1
+	}
 }
 
 // Si el valor del registro es distinto de cero, actualiza el PC al numero de instruccion pasada por parametro.
-func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
+func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8, registroMap32 map[string]*uint32) {
 
 	// Verifica si existe el registro especificado en la instrucción.
-	registro, encontrado := registroMap[reg]
-	if !encontrado {
-		logueano.Mensaje(Auxlogger, "Registro no encontrado")
-		return
-	}
+	registro := extraerDatosDelRegistro(reg, registroMap, registroMap32)
 
 	// Convierte el valor de la instrucción a un uint64 bits.
 	valorInt64, err := strconv.ParseUint(valor, 10, 32)
@@ -584,11 +576,11 @@ func jnz(reg string, valor string, PC *uint32, registroMap map[string]*uint8) {
 		return
 	}
 
-	// Disminuye el valor de la instrucción en uno para ajustarlo al índice del slice de instrucciones.
+	// Le resto uno al valor de la instrucción porque después se incrementa el PC al salir del switch.
 	nuevoValor := uint32(valorInt64) - 1
 
 	// Si el valor del registro es distinto de cero, actualiza el PC al nuevo valor.
-	if *registro != 0 {
+	if registro != 0 {
 		*PC = nuevoValor
 	}
 }
@@ -718,6 +710,16 @@ func escribirEnRegistro(registroDato string, data []byte, registrosMap8 map[stri
 	}
 }
 
+func extraerBytesDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) []byte {
+	if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
+		return []byte{*registrosMap8[registroDato]}
+	} else {
+		data := make([]byte, 4)
+		binary.BigEndian.PutUint32(data, *registrosMap32[registroDato])
+		return data
+	}
+}
+
 func extraerDatosDelRegistro(registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32) uint32 {
 	if registroDato == "AX" || registroDato == "BX" || registroDato == "CX" || registroDato == "DX" {
 		return uint32(*registrosMap8[registroDato])
@@ -741,13 +743,10 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Page Fault")
-		return "PAGE FAULT", "", "" 
+		return "PAGE FAULT", "", ""
 	}
 
-	regData := extraerDatosDelRegistro(registroDato, registrosMap8, registrosMap32)
-
-	valor := make([]byte, 4)
-	binary.BigEndian.PutUint32(valor, regData)
+	valor := extraerBytesDelRegistro(registroDato, registrosMap8, registrosMap32)
 
 	var valorStr string = string(valor)
 
@@ -936,14 +935,14 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (
 
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
-		return "PAGE FAULT", "", "", "" 
+		return "PAGE FAULT", "", "", ""
 	}
 
 	direccionLectura, encontrado := TraduccionMMU(PidEnEjecucion, int(RegistrosCPU.SI), TLB, prioridadesTLB)
 
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
-		return "PAGE FAULT", "", "", "" 
+		return "PAGE FAULT", "", "", ""
 	}
 
 	// Crea un cliente HTTP

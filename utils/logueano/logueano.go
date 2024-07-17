@@ -35,6 +35,9 @@ func NewLogger(modulo string) (*log.Logger, error) {
 	// Logger auxiliar
 	auxLogger := log.New(auxLogFile, "", log.LstdFlags)
 
+	mw := io.MultiWriter(os.Stdout, auxLogFile)
+	auxLogger.SetOutput(mw)
+
 	return auxLogger, nil
 
 }
@@ -143,16 +146,9 @@ func NuevoProceso(nuevoPCB structs.PCB) {
 	log.Printf("Se crea el proceso %d en estado %s", nuevoPCB.PID, nuevoPCB.Estado)
 }
 
-// log obligatorio (2/6)
-func CambioDeEstado(pcb_estado_viejo string, pcb structs.PCB) {
+func CambioDeEstado(pcb_estado_anterior string, pcb_estado_nuevo string, pid uint32) {
 
-	log.Printf("PID: %d - Estado anterior: %s - Estado actual: %s", pcb.PID, pcb_estado_viejo, pcb.Estado)
-
-}
-
-func CambioDeEstadoInverso(pcb structs.PCB, pcb_estado_nuevo string) {
-
-	log.Printf("PID: %d - Estado anterior: %s - Estado actual: %s", pcb.PID, pcb.Estado, pcb_estado_nuevo)
+	log.Printf("PID: %d - Estado anterior: %s - Estado actual: %s", pid, pcb_estado_anterior, pcb_estado_nuevo)
 
 }
 

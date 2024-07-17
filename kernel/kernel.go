@@ -69,10 +69,10 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
- 
+
 // TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
-	
+
 	fmt.Printf("DetenerPlanificacion-------------------------")
 
 	funciones.TogglePlanificador = false
@@ -148,7 +148,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	funciones.AdministrarQueues(nuevoPCB)
 
 	//^ log obligatorio (2/6)
-	logueano.CambioDeEstado("NEW", nuevoPCB)
+	logueano.CambioDeEstado("NEW", nuevoPCB.Estado, nuevoPCB.PID)
 
 	// ----------- DEVUELVE -----------
 
@@ -200,7 +200,7 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
-	if procesoExec.Estado == "EXEC"{
+	if procesoExec.Estado == "EXEC" {
 		listaDeProcesos = append(listaDeProcesos, procesoExec)
 	}
 
@@ -367,7 +367,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	//^log obligatorio (6/6)
 	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
-  
+
 	//--------- EJECUTA ---------
 
 	//--- VALIDA
@@ -421,10 +421,10 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//--- VUELVE DE IO
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-	pcbDesalojado , _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado, _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 
 	//^ log obligatorio (2/6)
-	logueano.CambioDeEstadoInverso(pcbDesalojado, "READY")
+	logueano.CambioDeEstado(pcbDesalojado.Estado, "READY", pcbDesalojado.PID)
 	pcbDesalojado.Estado = "READY"
 
 	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR

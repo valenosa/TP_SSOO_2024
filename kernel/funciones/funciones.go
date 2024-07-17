@@ -93,11 +93,11 @@ func Planificador() {
 		ProcesoExec = siguientePCB
 
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado("READY", siguientePCB)
+		logueano.CambioDeEstado("READY", siguientePCB.Estado, siguientePCB.PID)
 
 		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
- 
+
 		ProcesoExec = structs.PCB{} //Limpia a proceso Exec para listarProcesos
 
 		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
@@ -128,17 +128,17 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.FinDeQuantum(*pcb)
 
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(*pcb, "READY")
+		logueano.CambioDeEstado(pcb.Estado, "READY", pcb.PID)
 		pcb.Estado = "READY"
 
 	case "Finalizar PROCESO":
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(*pcb, "EXIT")
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 		pcb.Estado = "EXIT"
 
 	case "IO":
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(*pcb, "BLOCK")
+		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
 		pcb.Estado = "BLOCK"
 
 	case "WAIT":
@@ -259,7 +259,8 @@ func ExtraerPCB(pid uint32) (structs.PCB, bool) {
 
 	pcb, encontrado = ListaREADY.Extract(pid)
 	if encontrado {
-		//Retornar PCB
+		//Retornar PCB y declarar que hay un proceso menos en READY
+		<-Bin_hayPCBenREADY
 		return pcb, true
 	}
 
@@ -411,7 +412,7 @@ func DesalojarProcesoIO(pid uint32) {
 	pcbDesalojado.Estado = "EXIT"
 
 	//^ log obligatorio (2/6)
-	logueano.CambioDeEstado("BLOCK", pcbDesalojado)
+	logueano.CambioDeEstado("BLOCK", pcbDesalojado.Estado, pcbDesalojado.PID)
 	AdministrarQueues(pcbDesalojado)
 }
 
@@ -535,7 +536,7 @@ func (sMap *MapSeguroPCB) Delete(key uint32) (structs.PCB, bool) {
 	sMap.mx.Lock()
 	var pcb, find = sMap.m[key]
 	if find {
-	delete(sMap.m, key)
+		delete(sMap.m, key)
 	}
 	sMap.mx.Unlock()
 
@@ -578,5 +579,3 @@ func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
 
 	return interfaz, find
 }
-
-
