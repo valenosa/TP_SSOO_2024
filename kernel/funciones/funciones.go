@@ -49,8 +49,6 @@ var Bin_hayPCBenREADY chan int //Se inicializa con el buffer = grado de multipro
 var mx_CPUOcupado sync.Mutex
 
 var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz)}
-var Mx_ConterPID sync.Mutex
-var CounterPID uint32 = 0
 
 //*=======================================| PLANIFICADOR |=======================================\\
 
