@@ -65,7 +65,7 @@ func main() {
 func conectarInterfazIO(nombre string) {
 
 	// Crea Interfaz base
-	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configInterfaz.Type, PuertoInterfaz: configInterfaz.Port}
+	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configInterfaz.Type, PuertoInterfaz: configInterfaz.Port, IpInterfaz: configInterfaz.Ip}
 
 	// Crea y codifica la request de conexion a Kernel
 	var requestConectarIO = structs.RequestConectarInterfazIO{NombreInterfaz: nombre, Interfaz: nuevaInterfazIO}

@@ -407,7 +407,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
 	query := interfazSolicitada.TipoInterfaz + "/" + requestInstruccionIO.Instruccion
 
-	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body) //TODO: Cambiar localhost por IP de la interfaz (agregar ip interfaz)
+	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, interfazSolicitada.IpInterfaz, "POST", query, body)
 	if err != nil {
 		logueano.Error(funciones.Auxlogger, err)
 		return

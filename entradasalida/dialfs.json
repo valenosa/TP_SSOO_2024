@@ -1,5 +1,6 @@
 {
     "port": 8008,
+    "ip" : "localhost",
     "type": "DIALFS",
     "unit_work_time": 2000,
     "ip_kernel": "127.0.0.1",

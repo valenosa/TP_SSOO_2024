@@ -83,6 +83,7 @@ type Recurso struct {
 type Interfaz struct {
 	TipoInterfaz   string
 	PuertoInterfaz int
+	IpInterfaz     string
 }
 
 // Estructura de comunicacion al conectar una interfaz (Contiene su nombre/identificador y lo necesario para validar en Kernel)

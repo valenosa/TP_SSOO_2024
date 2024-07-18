@@ -24,6 +24,7 @@ type Cpu struct {
 
 type IO struct {
 	Port               int    `json:"port"`
+	Ip                 string `json:"ip"`
 	Type               string `json:"type"`
 	Unit_Work_Time     int    `json:"unit_work_time"`
 	Ip_Kernel          string `json:"ip_kernel"`
@@ -86,23 +87,6 @@ func Iniciar(filePath string, configJson interface{}) {
 	if err != nil {
 		fmt.Println("Error al iniciar configuración: ", err)
 	}
-}
-
-//*======================================| TESTEO |=======================================\\
-
-// Utilizado para testear "IniciarConfiguracion()"
-func printConfig(configJson Kernel) {
-
-	fmt.Println("port: ", configJson.Port)
-	fmt.Println("ip_memory: ", configJson.Ip_Memory)
-	fmt.Println("port_memory: ", configJson.Port_Memory)
-	fmt.Println("ip_cpu: ", configJson.Ip_CPU)
-	fmt.Println("port_cpu: ", configJson.Port_CPU)
-	fmt.Println("planning_algorithm: ", configJson.Planning_Algorithm)
-	fmt.Println("quantum: ", configJson.Quantum)
-	fmt.Println("resources: ", configJson.Resources)
-	fmt.Println("resource_instances: ", configJson.Resource_Instances)
-	fmt.Println("multiprogramming: ", configJson.Multiprogramming)
 }
 
 //*======================================| FUNC GLOBALES |=======================================\\
