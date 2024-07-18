@@ -263,7 +263,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		if estado == "OK" {
 			w.WriteHeader(http.StatusOK)
 		}
-		if estado == "OUT OF MEMORY" {
+		if estado == "OUT_OF_MEMORY" {
 			w.WriteHeader(http.StatusNotFound)
 		}
 
@@ -339,7 +339,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		// Devuelve un status code dependiendo de si se encontró o no el marco
 		if estadoLectura == "OK" && estadoEscritura == "OK" {
 			w.WriteHeader(http.StatusOK)
-		} else if estadoLectura == "OUT OF MEMORY" || estadoEscritura == "OUT OF MEMORY" {
+		} else if estadoLectura == "OUT_OF_MEMORY" || estadoEscritura == "OUT_OF_MEMORY" {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)

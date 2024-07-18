@@ -323,7 +323,7 @@ func handlerSignal(w http.ResponseWriter, r *http.Request) {
 
 	var _, find = funciones.MapRecursos[recursoLiberado]
 	if !find {
-		http.Error(w, "ERROR: Recurso no existe", http.StatusNotFound)
+		http.Error(w, "INVALID_RESOURCE", http.StatusNotFound)
 		return
 	}
 

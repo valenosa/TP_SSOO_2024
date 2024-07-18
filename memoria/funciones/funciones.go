@@ -118,7 +118,7 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 	// Itera n cantidad de veces, siendo n la cantidad de paginas a agregar
 	for len((*tablaDePaginas)[pid]) < cantidadDePaginas {
 
-		// Por cada página a agregar, si no hay marcos disponibles, se devuelve un error OUT OF MEMORY
+		// Por cada página a agregar, si no hay marcos disponibles, se devuelve un error OUT_OF_MEMORY
 		outOfMemory := true
 
 		// Recorre el bitMap buscando un marco desocupado
@@ -130,14 +130,14 @@ func ReasignarPaginas(pid uint32, tablaDePaginas *map[uint32]structs.Tabla, bitM
 				// Marca el marco como ocupado
 				bitMap[marco] = true
 
-				// Notifica que por ahora no está OUT OF MEMORY
+				// Notifica que por ahora no está OUT_OF_MEMORY
 				outOfMemory = false
 			}
 		}
 
-		//Si no hubo ningun marco desocupado para la página anterior, devuelve OUT OF MEMORY
+		//Si no hubo ningun marco desocupado para la página anterior, devuelve OUT_OF_MEMORY
 		if outOfMemory {
-			return "OUT OF MEMORY"
+			return "OUT_OF_MEMORY"
 		}
 	}
 
@@ -179,9 +179,9 @@ func LeerEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagina u
 
 		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
 		if endOfPage(direccionFisica) {
-			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
+			// Si no se puede hacer el cambio de página, es OUT_OF_MEMORY
 			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, &pagina) {
-				return dato, "OUT OF MEMORY"
+				return dato, "OUT_OF_MEMORY"
 			}
 		}
 	}
@@ -205,9 +205,9 @@ func EscribirEnMemoria(pid uint32, tablaDePaginas map[uint32]structs.Tabla, pagi
 
 		// Si la siguiente direccion fisica es endOfPage (ya no pertenece al marco en el que estamos escribiendo), hace cambio de página
 		if endOfPage(direccionFisica) {
-			// Si no se puede hacer el cambio de página, es OUT OF MEMORY
+			// Si no se puede hacer el cambio de página, es OUT_OF_MEMORY
 			if !cambioDePagina(&direccionFisica, pid, tablaDePaginas, &pagina) {
-				return "OUT OF MEMORY"
+				return "OUT_OF_MEMORY"
 			}
 		}
 	}

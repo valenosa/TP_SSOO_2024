@@ -433,7 +433,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "EXIT":
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "EXIT"
+		MotivoDeDesalojo = "SUCCESS"
 		return
 
 	default:
@@ -577,7 +577,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -620,7 +620,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 
 	if respuesta.StatusCode == http.StatusNotFound {
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "OUT OF MEMORY"
+		MotivoDeDesalojo = "OUT_OF_MEMORY"
 		return
 	}
 
@@ -647,7 +647,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -689,7 +689,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, P
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -698,7 +698,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, P
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -795,9 +795,9 @@ func resize(tamañoEnBytes string, cicloFinalizado *bool) {
 		return
 	}
 
-	if string(bodyBytes) == "OUT OF MEMORY" {
+	if string(bodyBytes) == "OUT_OF_MEMORY" {
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "OUT OF MEMORY"
+		MotivoDeDesalojo = "OUT_OF_MEMORY"
 	}
 }
 
@@ -884,7 +884,7 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	case "ERROR: Recurso no existe":
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "ERROR: Recurso no existe"
+		MotivoDeDesalojo = "INVALID_RESOURCE"
 		return
 	}
 }
@@ -907,7 +907,7 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	if respuesta.StatusCode != http.StatusOK {
 
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "ERROR: Recurso no existe"
+		MotivoDeDesalojo = "INVALID_RESOURCE"
 		return
 	}
 

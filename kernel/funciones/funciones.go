@@ -131,65 +131,19 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.CambioDeEstado(pcb.Estado, "READY", pcb.PID)
 		pcb.Estado = "READY"
 
-	case "IO":
+	case "IO", "WAIT":
 
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
 		pcb.Estado = "BLOCK"
 
-	case "WAIT":
-
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
-
-		pcb.Estado = "BLOCK"
-
-	case "INTERRUPTED_BY_USER":
-		//^ log obligatorio (2/6)
-		logueano.FinDeProceso(pcb.PID, "INTERRUPTED_BY_USER")
-		pcb.Estado = "EXIT"
-
-	case "ERROR: Recurso no existe":
+	case "INTERRUPTED_BY_USER", "INVALID_RESOURCE", "OUT_OF_MEMORY", "PAGE_FAULT", "INVALID_WRITE", "INVALID_READ", "SUCCESS":
 
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "INVALID_RESOURCE")
-
-		pcb.Estado = "EXIT"
-
-	case "OUT OF MEMORY":
-
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "OUT OF MEMORY")
-
-		pcb.Estado = "EXIT"
-
-	case "INVALID_WRITE":
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "INVALID_WRITE")
-
-		pcb.Estado = "EXIT"
-
-	case "PAGE FAULT":
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		logueano.FinDeProceso(pcb.PID, "")
-
-		pcb.Estado = "EXIT"
-
-	case "EXIT":
-
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "SUCCESS")
+		logueano.FinDeProceso(pcb.PID, motivoDesalojo)
 
 		pcb.Estado = "EXIT"
 
