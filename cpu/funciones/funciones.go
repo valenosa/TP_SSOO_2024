@@ -267,7 +267,6 @@ func EjecutarCiclosDeInstruccion(PCB *structs.PCB, TLB *TLB, prioridadesTLB *[]E
 		// Obtiene la próxima instrucción a ejecutar.
 		instruccion := Fetch(PCB.PID, RegistrosCPU.PC)
 
-		//TODO: Probar
 		//^log obligatorio (1/6)
 		logueano.FetchInstruccion(*PCB)
 
@@ -360,13 +359,13 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		set(variable[1], variable[2], registrosMap8, registrosMap32, PC)
 
 	case "SUM":
-		sum(variable[1], variable[2], registrosMap8, registrosMap32) //TODO: Preparar para uint32
+		sum(variable[1], variable[2], registrosMap8, registrosMap32)
 
 	case "SUB":
-		sub(variable[1], variable[2], registrosMap8, registrosMap32) //TODO: Preparar para uint32
+		sub(variable[1], variable[2], registrosMap8, registrosMap32)
 
 	case "JNZ":
-		jnz(variable[1], variable[2], PC, registrosMap8, registrosMap32) //TODO: Preparar para uint32
+		jnz(variable[1], variable[2], PC, registrosMap8, registrosMap32)
 
 	case "MOV_IN":
 		estado, valor, dirF := movIN(variable[1], variable[2], registrosMap8, registrosMap32, TLB, prioridadesTLB)

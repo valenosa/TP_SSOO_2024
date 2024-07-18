@@ -260,7 +260,6 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("Content-Type", "text/plain")
 
 	// Realiza la solicitud al servidor de memoria
-	//TODO: Testear que retorne badRequest.
 	respuesta, err := cliente.Do(req)
 	if err != nil {
 		logueano.Error(Auxlogger, err)

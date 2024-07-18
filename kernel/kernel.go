@@ -30,6 +30,11 @@ func main() {
 
 	funciones.Auxlogger = logueano.InitAuxLog("kernel")
 
+	// ======== Iniciamos Planificador ========
+
+	funciones.TogglePlanificador.Lock()
+	go funciones.Planificador()
+
 	// ======== HandleFunctions ========
 
 	//PLANIFICACION
@@ -51,7 +56,7 @@ func main() {
 	http.HandleFunc("POST /wait", handlerWait)
 	http.HandleFunc("POST /signal", handlerSignal)
 
-	//Inicio el servidor de Kernel
+	// ======== Inicio Serivor de Kernel ========
 	config.IniciarServidor(funciones.ConfigJson.Port)
 
 }
@@ -62,21 +67,14 @@ func main() {
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	funciones.TogglePlanificador = true
-
-	funciones.OnePlani.Lock()
-	go funciones.Planificador()
+	funciones.TogglePlanificador.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Printf("DetenerPlanificacion-------------------------")
-
-	funciones.TogglePlanificador = false
-	funciones.OnePlani.Unlock()
+	funciones.TogglePlanificador.Lock()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -109,6 +107,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	funciones.Mx_ConterPID.Unlock()
 
 	nuevoPCB.Estado = "NEW"
+	funciones.AdministrarQueues(nuevoPCB)
 
 	//----------- Va a memoria ---------
 	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
@@ -140,6 +139,9 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//Verifica si puede producir un PCB (por Multiprogramacion)
 	funciones.Cont_producirPCB <- 0
+
+	//Lo Elimino de la lista de NEW
+	funciones.ListaNEW.Extract(nuevoPCB.PID)
 
 	// Si todo es correcto agregamos el PID al PCB
 	nuevoPCB.Estado = "READY"
@@ -197,12 +199,12 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
-	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
-	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
 	if procesoExec.Estado == "EXEC" {
 		listaDeProcesos = append(listaDeProcesos, procesoExec)
 	}
+	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
+	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 
 	//----------- DEVUELVE -----------
 

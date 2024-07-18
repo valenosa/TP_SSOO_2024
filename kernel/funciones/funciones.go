@@ -39,8 +39,7 @@ var ListaREADY_PRIORITARIO = ListaSegura{}
 // ---------------------------- Semaforos PLANIFICADORES
 
 // Iniciar/Detener
-var OnePlani sync.Mutex
-var TogglePlanificador bool
+var TogglePlanificador sync.Mutex
 
 // Largo Plazo
 var Cont_producirPCB chan int
@@ -60,13 +59,15 @@ var CounterPID uint32 = 0
 func Planificador() {
 
 	//Espero a que se active el planificador
-	for TogglePlanificador {
+	for {
 
 		//Espero a que el CPU este libre
 		mx_CPUOcupado.Lock()
 
 		// Espero que exista PCB en READY (Tanto en READY como en READY_PRIORITARIO)
 		<-Bin_hayPCBenREADY
+
+		TogglePlanificador.Lock()
 
 		var siguientePCB structs.PCB      // PCB a enviar al CPU
 		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
@@ -105,6 +106,8 @@ func Planificador() {
 			tiempoCorteQuantum := time.Now()
 			pcbActualizado.Quantum = uint16(tiempoCorteQuantum.Sub(tiempoInicioQuantum))
 		}
+
+		TogglePlanificador.Unlock()
 
 		//Aviso que esta libre el CPU
 		mx_CPUOcupado.Unlock()

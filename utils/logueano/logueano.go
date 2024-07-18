@@ -163,7 +163,6 @@ func PidsReady(readyQueue []structs.PCB) {
 	log.Printf("Cola Ready 'ListaREADY' : %v", pids)
 }
 
-// TODO: Sin usar
 // log obligatorio (4/6)
 func FinDeProceso(pid uint32, motivoDeFinalizacion string) {
 
