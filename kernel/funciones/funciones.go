@@ -132,28 +132,64 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		pcb.Estado = "READY"
 
 	case "Finalizar PROCESO":
+
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 		pcb.Estado = "EXIT"
 
 	case "IO":
+
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
 		pcb.Estado = "BLOCK"
 
 	case "WAIT":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
+
 		pcb.Estado = "BLOCK"
 
 	case "Finalizar Proceso":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 		pcb.Estado = "EXIT"
 
 	case "ERROR: Recurso no existe":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(*pcb, "INVALID_RESOURCE")
+
 		pcb.Estado = "EXIT"
 
 	case "OUT OF MEMORY":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		pcb.Estado = "EXIT"
+
+	case "INVALID_WRITE":
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(*pcb, "INVALID_WRITE")
+
 		pcb.Estado = "EXIT"
 
 	case "EXIT":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(*pcb, "SUCCESS")
+
 		pcb.Estado = "EXIT"
 
 	}
@@ -436,9 +472,13 @@ func LiberarRecurso(nombreRecurso string) {
 		pid := recurso.ListaBlock.Dequeue()
 
 		pcbDesbloqueado, _ := MapBLOCK.Delete(pid)
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcbDesbloqueado.Estado, "READY", pcbDesbloqueado.PID)
+
 		//Se agrega el recurso a la lista de recursos del proceso
 		pcbDesbloqueado.Recursos = append(pcbDesbloqueado.Recursos, nombreRecurso)
-		//Se pasa el proceso a de BOLCK -> READY
+		//Se pasa el proceso a de BLOCK -> READY
 		pcbDesbloqueado.Estado = "READY"
 		AdministrarQueues(pcbDesbloqueado)
 	} else {

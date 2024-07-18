@@ -764,7 +764,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	}
 
 	if respuesta.StatusCode == http.StatusNotFound {
-		return "OUT OF MEMORY", "", ""
+		return "INVALID_WRITE", "", ""
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
@@ -919,6 +919,11 @@ func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8
 		return
 	}
 
+	//Implementado para que exista el logueano de INVALID_WRITE.
+	if respuesta.StatusCode == http.StatusBadRequest {
+		MotivoDeDesalojo = "INVALID_WRITE"
+	}
+
 	respuestaBody, err := io.ReadAll(respuesta.Body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
@@ -979,7 +984,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad) (
 	}
 
 	if respuesta.StatusCode == http.StatusNotFound {
-		return "OUT OF MEMORY", "", "", ""
+		return "INVALID_WRITE", "", "", ""
 	}
 
 	if respuesta.StatusCode != http.StatusOK {

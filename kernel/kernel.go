@@ -292,6 +292,9 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 			//Agrego PID a su lista de bloqueados
 			recurso.ListaBlock.Append(recursoSolicitado.PidSolicitante)
 
+			//^log obligatorio (6/6)
+			logueano.MotivoBloqueo(recursoSolicitado.PidSolicitante, recursoSolicitado.NombreRecurso)
+
 			respAsignacionRecurso = "BLOQUEAR: Recurso no disponible"
 		}
 
@@ -406,6 +409,11 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logueano.Error(funciones.Auxlogger, err)
 		return
+	}
+
+	//Si es IO_STDOUT_WRITE, devolver badRequest (implementado para los logueanos).
+	if requestInstruccionIO.Instruccion == "IO_STDOUT_WRITE" && respuesta.StatusCode == http.StatusBadRequest {
+		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 	}
 
 	if respuesta.StatusCode != http.StatusOK {
