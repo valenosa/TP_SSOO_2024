@@ -25,7 +25,7 @@ var Auxlogger *log.Logger
 
 var listaArchivos []string
 
-// *======================================| MAIN |======================================\\
+// *=====================================| MAIN |=====================================\\
 func main() {
 
 	// Configura el logger
@@ -675,9 +675,9 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//--------------- FUNCIONES DIALFS ---------------
+// ------ AUXILIARES DE DIALFS ------
 
-// --------------- METADATA
+// ------ METADATA ------
 
 func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
 	file, err := os.Open(configInterfaz.Dialfs_Path + "/" + nombreArchivo)
@@ -732,7 +732,7 @@ func calcularTamañoEnBloques(tamañoEnBytes int) int {
 	}
 }
 
-//--------------- IO_FS_CREATE
+// ------ IO_FS_CREATE ------
 
 // En base al bitmap devuelve la cantidad de bloques libres.
 func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
@@ -778,7 +778,7 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 	return -1
 }
 
-// --------------- IO_FS_TRUNCATE
+// ------ IO_FS_TRUNCATE ------
 
 // ----- Agrandar Archivo
 func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, tamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) {
@@ -990,8 +990,9 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	return punteroUltimoBloqueLibre
 }
 
-//----- Achicar Archivo
+// Agrandar Archivo -----
 
+// ----- Achicar Archivo
 func achicarArchivo(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata structs.MetadataFS, cantBloquesDisponiblesTotal *int) {
 	liberarBloques(tamañoEnBloques, nuevoTamañoEnBloques, metadata.InitialBlock, cantBloquesDisponiblesTotal)
 }
@@ -1021,3 +1022,5 @@ func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, bloqueInici
 		pos++
 	}
 }
+
+// Achicar Archivo -----

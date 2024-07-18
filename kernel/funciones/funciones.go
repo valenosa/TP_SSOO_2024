@@ -36,7 +36,7 @@ var ProcesoExec structs.PCB
 // ---------------------------- VRR
 var ListaREADY_PRIORITARIO = ListaSegura{}
 
-// ---------------------------- Semaforos PLANIFICADORES
+// ---------------------------- Semáforos PLANIFICADORES
 
 // Iniciar/Detener
 var TogglePlanificador sync.Mutex
@@ -120,7 +120,6 @@ func Planificador() {
 	}
 }
 
-// TODO: Todos los cambios de estado se hacen desde aca (15/7/24: Faltan las funciones de memoria que están en CPU)
 func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 	switch motivoDesalojo {
@@ -176,6 +175,12 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 		//^ log obligatorio (4/6)
 		logueano.FinDeProceso(pcb.PID, "INVALID_WRITE")
+
+		pcb.Estado = "EXIT"
+
+	case "PAGE FAULT":
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 
 		pcb.Estado = "EXIT"
 
