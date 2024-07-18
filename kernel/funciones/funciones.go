@@ -50,8 +50,6 @@ var Bin_hayPCBenREADY chan int //Se inicializa con el buffer = grado de multipro
 var mx_CPUOcupado sync.Mutex
 
 var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz)}
-var Mx_ConterPID sync.Mutex
-var CounterPID uint32 = 0
 
 //*=======================================| PLANIFICADOR |=======================================\\
 
@@ -97,7 +95,7 @@ func Planificador() {
 
 		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
- 
+
 		ProcesoExec = structs.PCB{} //Limpia a proceso Exec para listarProcesos
 
 		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
@@ -535,7 +533,7 @@ func (sMap *MapSeguroPCB) Delete(key uint32) (structs.PCB, bool) {
 	sMap.mx.Lock()
 	var pcb, find = sMap.m[key]
 	if find {
-	delete(sMap.m, key)
+		delete(sMap.m, key)
 	}
 	sMap.mx.Unlock()
 
@@ -578,5 +576,3 @@ func (sMap *MapSeguroInterfaz) Get(key string) (structs.Interfaz, bool) {
 
 	return interfaz, find
 }
-
-

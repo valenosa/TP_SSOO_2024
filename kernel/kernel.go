@@ -69,10 +69,10 @@ func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
- 
+
 // TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
-	
+
 	fmt.Printf("DetenerPlanificacion-------------------------")
 
 	funciones.TogglePlanificador = false
@@ -87,7 +87,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//----------- RECIBE ---------
 	//variable que recibirá la request.
-	var request structs.RequestIniciarProceso
+	var request structs.IniciarProceso
 
 	// Decodifica en formato JSON la request.
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -104,14 +104,12 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	// Se crea un nuevo PCB en estado NEW
 	var nuevoPCB structs.PCB
 
-	funciones.Mx_ConterPID.Lock()
-	nuevoPCB.PID = funciones.CounterPID
-	funciones.Mx_ConterPID.Unlock()
+	nuevoPCB.PID = request.PID
 
 	nuevoPCB.Estado = "NEW"
 
 	//----------- Va a memoria ---------
-	bodyIniciarProceso, err := json.Marshal(structs.BodyIniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
+	bodyIniciarProceso, err := json.Marshal(structs.IniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
 	if err != nil {
 		return
 	}
@@ -123,7 +121,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var respMemoIniciarProceso structs.BodyIniciarProceso
+	var respMemoIniciarProceso structs.IniciarProceso
 	// Decodifica en formato JSON la request.
 	err = json.NewDecoder(respuesta.Body).Decode(&respMemoIniciarProceso)
 	if err != nil {
@@ -132,11 +130,6 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//----------------------------
-
-	//Asigna un nuevo valor pid para la proxima response.
-	funciones.Mx_ConterPID.Lock()
-	funciones.CounterPID++
-	funciones.Mx_ConterPID.Unlock()
 
 	//Verifica si puede producir un PCB (por Multiprogramacion)
 	funciones.Cont_producirPCB <- 0
@@ -200,7 +193,7 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
-	if procesoExec.Estado == "EXEC"{
+	if procesoExec.Estado == "EXEC" {
 		listaDeProcesos = append(listaDeProcesos, procesoExec)
 	}
 
@@ -367,7 +360,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	//^log obligatorio (6/6)
 	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
-  
+
 	//--------- EJECUTA ---------
 
 	//--- VALIDA
@@ -421,7 +414,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	//--- VUELVE DE IO
 
 	// Pasa el proceso a READY y lo quita de la lista de bloqueados.
-	pcbDesalojado , _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
+	pcbDesalojado, _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 
 	//^ log obligatorio (2/6)
 	logueano.CambioDeEstadoInverso(pcbDesalojado, "READY")

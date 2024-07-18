@@ -61,7 +61,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		//--------- REQUEST ---------
 
 		//variable que recibirá la request.
-		var request structs.BodyIniciarProceso
+		var request structs.IniciarProceso
 
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)

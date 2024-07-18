@@ -2,28 +2,8 @@ package structs
 
 import "sync"
 
-// =====================================| PROCESO |========================================================\\
+//*=====================================| PCB |========================================================\\
 
-//	Kernel -> Cliente
-
-// Estructura que contiene el path del archivo que se utilizará como base para ejecutar un nuevo proceso y su PID asociado.
-type BodyIniciarProceso struct {
-	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
-	PID  uint32 `json:"pid"`
-	Path string `json:"path"`
-}
-
-type RequestIniciarProceso struct {
-	Path string `json:"path"`
-}
-
-// Kernel -> Cliente
-type ResponseEstadoProceso struct {
-	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
-	State string `json:"state"`
-}
-
-// CPU, Kernel.
 // Estructura base de un proceso.
 type PCB struct {
 	PID      uint32
@@ -33,7 +13,6 @@ type PCB struct {
 	RegistrosUsoGeneral
 }
 
-// CPU
 // Estructura de los registros de uso general (para tener info del contexto de ejecución de cada PCB)
 type RegistrosUsoGeneral struct {
 	PC  uint32
@@ -49,23 +28,33 @@ type RegistrosUsoGeneral struct {
 	DI  uint32
 }
 
-//=====================================| KERNEL |=====================================\\
+//*=====================================| KERNEL |=====================================\\
 
-// Kernel, Memoria
+// Estructura que contiene el path del archivo que se utilizará como base para ejecutar un nuevo proceso y su PID asociado.
+type IniciarProceso struct {
+	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
+	PID  uint32 `json:"pid"`
+	Path string `json:"path"`
+}
+
+type ResponseEstadoProceso struct {
+	// Path del archivo que se utilizará como base para ejecutar un nuevo proceso
+	State string `json:"state"`
+}
+
 // Estructura de respuesta al iniciar un proceso
 type ResponseListarProceso struct {
 	PID    uint32 `json:"pid"`
 	Estado string `json:"estado"`
 }
 
-// CPU, Kernel
 // Estructura de comunicacion al desalojar un proceso
 type RespuestaDispatch struct {
 	MotivoDeDesalojo string
 	PCB              PCB
 }
 
-// ====================================| RECURSOS | ====================================\\
+//*====================================| RECURSOS | ====================================\\
 
 type RequestRecurso struct {
 	PidSolicitante uint32
@@ -77,7 +66,7 @@ type Recurso struct {
 	ListaBlock ListaSegura
 }
 
-//=====================================| I/O |=====================================\\
+//*=====================================| I/O |=====================================\\
 
 // Estructura basica de InterfazIO que se guardara Kernel
 type Interfaz struct {
@@ -116,9 +105,7 @@ type MetadataFS struct {
 	Size         int `json:"size"`
 }
 
-//=====================================| MEMORIA DE USUARIO |=====================================\\
-
-// Memoria
+//*=====================================| MEMORIA DE USUARIO |=====================================\\
 
 // Tabla de páginas. Es un slice de marcos que contiene solamente las páginas validadas.
 type Tabla []int
@@ -129,7 +116,7 @@ type RequestMovOUT struct {
 	Data []byte
 }
 
-//=====================================| TADs SINCRONIZACION |=====================================|
+//*=====================================| TADs SINCRONIZACION |=====================================|
 
 // ----------------------( LISTA )----------------------\\
 type ListaSegura struct {
