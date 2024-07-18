@@ -171,7 +171,7 @@ func AdministrarQueues(pcb structs.PCB) {
 		//PCB --> cola de NEW
 		ListaNEW.Append(pcb)
 
-		logueano.PidsNew(Auxlogger, ListaNEW.List)
+		//logueano.PidsNew(Auxlogger, ListaNEW.List)
 
 	case "READY":
 
@@ -195,13 +195,13 @@ func AdministrarQueues(pcb structs.PCB) {
 		MapBLOCK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
-		logueano.PidsBlock(Auxlogger, MapBLOCK.m)
+		//logueano.PidsBlock(Auxlogger, MapBLOCK.m)
 
 	case "EXIT":
 
 		//PCB --> cola de EXIT
 		ListaEXIT.Append(pcb)
-		logueano.PidsExit(Auxlogger, ListaEXIT.List)
+		//logueano.PidsExit(Auxlogger, ListaEXIT.List)
 		LiberarProceso(pcb)
 		<-Cont_producirPCB
 	}

@@ -39,7 +39,6 @@ func NewLogger(modulo string) (*log.Logger, error) {
 	auxLogger.SetOutput(mw)
 
 	return auxLogger, nil
-
 }
 
 func InitAuxLog(modulo string) *log.Logger {
@@ -101,7 +100,6 @@ func ObtenerMarcolg(pid uint32, encontrado bool, pagina uint32, marco uint32) {
 func LecturaEscritura(pcb structs.PCB, accion string, direccionFisica string, valor string) {
 
 	log.Printf("PID: %d - Accion: %s - Direccion Fisica: %s - Valor: %s", pcb.PID, accion, direccionFisica, valor)
-
 }
 
 //log´s auxiliares------------------------------------------------------
@@ -136,8 +134,6 @@ func LeerEscribirArchivo(pid uint32, accion string, nombre string, tamaño int, 
 	}
 }
 
-//log´s auxiliares------------------------------------------------------
-
 // -------------------------- == LOG's KERNEL == -----------------------------------------------------------
 // log obligatorio (1/6)
 func NuevoProceso(nuevoPCB structs.PCB) {
@@ -148,7 +144,6 @@ func NuevoProceso(nuevoPCB structs.PCB) {
 func CambioDeEstado(pcb_estado_anterior string, pcb_estado_nuevo string, pid uint32) {
 
 	log.Printf("PID: %d - Estado anterior: %s - Estado actual: %s", pid, pcb_estado_anterior, pcb_estado_nuevo)
-
 }
 
 // log obligatorio (3/6)
@@ -166,7 +161,6 @@ func PidsReady(readyQueue []structs.PCB) {
 func FinDeProceso(pid uint32, motivoDeFinalizacion string) {
 
 	log.Printf("Finaliza el proceso: %d - Motivo: %s", pid, motivoDeFinalizacion)
-
 }
 
 // log obligatorio (5/6)
@@ -221,7 +215,7 @@ func PidsReadyPrioritarios(auxLog *log.Logger, pcb structs.PCB) {
 	auxLog.Println("Se agregó el proceso", pcb.PID, "a la cola de READY_PRIORITARIO")
 }
 
-// -------------------------- == LOG's MEMORIA == -----------------------------------------------------------
+//* ==================================| LOG's MEMORIA |==================================\\
 
 // log obligatorio (1/5)
 func OperoConTablaDePaginas(pid uint32, tablaDePaginas map[uint32]structs.Tabla) {
