@@ -201,6 +201,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
+		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 		return
 	}
 
@@ -263,7 +264,6 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	respuesta, err := cliente.Do(req)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
-		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 		return
 	}
 
@@ -281,7 +281,6 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	var inputTruncado = string(data)
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
-	//! Considerar borrar, pues todos los datos leidos/escritos forman parte de los logs obligatorios
 	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.
 
 	//--------- RESPUESTA ---------
@@ -667,7 +666,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	// Envía la request a memoria
 	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
-		logueano.Error(Auxlogger, err)
+		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 		return
 	}
 	//--------- RESPUESTA ---------

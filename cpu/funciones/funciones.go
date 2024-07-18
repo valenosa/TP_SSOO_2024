@@ -441,6 +441,8 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		MotivoDeDesalojo = "IO"
 		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_CREATE")
 
+		//!manejar el case de IO_FS_READ
+
 	case "IO_FS_DELETE":
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
@@ -454,7 +456,12 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 	case "IO_FS_WRITE":
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
-		go ioFSWrite(variable[1], variable[2], variable[3], variable[4], variable[5], PCB.PID, registrosMap8, registrosMap32, TLB, prioridadesTLB)
+		go ioFSRW(variable[1], variable[2], variable[3], variable[4], variable[5], PCB.PID, registrosMap8, registrosMap32, TLB, prioridadesTLB, "IO_FS_WRITE")
+
+	case "IO_FS_READ":
+		*cicloFinalizado = true
+		MotivoDeDesalojo = "IO"
+		go ioFSRW(variable[1], variable[2], variable[3], variable[4], variable[5], PCB.PID, registrosMap8, registrosMap32, TLB, prioridadesTLB, "IO_FS_READ")
 
 	case "EXIT":
 		*cicloFinalizado = true
@@ -919,11 +926,6 @@ func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8
 		return
 	}
 
-	//Implementado para que exista el logueano de INVALID_WRITE.
-	if respuesta.StatusCode == http.StatusBadRequest {
-		MotivoDeDesalojo = "INVALID_WRITE"
-	}
-
 	respuestaBody, err := io.ReadAll(respuesta.Body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
@@ -1043,8 +1045,8 @@ func ioFSTruncate(nombreInterfaz string, nombreArchivo string, registroTamaño s
 	config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 }
 
-func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTamaño string,
-	regPuntero string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+func ioFSRW(nombreInterfaz string, nombreArchivo string, regDir string, regTamaño string,
+	regPuntero string, PID uint32, registroMap8 map[string]*uint8, registroMap32 map[string]*uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad, instruccionIO string) {
 
 	//Extrae el tamaño de la instrucción
 	tamaño := extraerDatosDelRegistro(regTamaño, registroMap8, registroMap32)
@@ -1063,7 +1065,7 @@ func ioFSWrite(nombreInterfaz string, nombreArchivo string, regDir string, regTa
 		PidDesalojado:  PID,
 		NombreInterfaz: nombreInterfaz,
 		NombreArchivo:  nombreArchivo,
-		Instruccion:    "IO_FS_WRITE",
+		Instruccion:    instruccionIO,
 		Direccion:      direccion,
 		Tamaño:         tamaño,
 		PunteroArchivo: puntero,

@@ -411,9 +411,13 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Si es IO_STDOUT_WRITE, devolver badRequest (implementado para los logueanos).
-	if requestInstruccionIO.Instruccion == "IO_STDOUT_WRITE" && respuesta.StatusCode == http.StatusBadRequest {
+	//Si es IO_STDIN_READ, devolver badRequest (implementado para los logueanos).
+	if (requestInstruccionIO.Instruccion == "IO_STDIN_READ" || requestInstruccionIO.Instruccion == "IO_FS_READ") && respuesta.StatusCode == http.StatusBadRequest {
+
+		//^log obligatorio (6/6)
+		logueano.FinDeProceso(requestInstruccionIO.PidDesalojado, "INVALID_WRITE")
 		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
+		return
 	}
 
 	if respuesta.StatusCode != http.StatusOK {

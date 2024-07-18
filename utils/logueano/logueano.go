@@ -165,9 +165,9 @@ func PidsReady(readyQueue []structs.PCB) {
 
 // TODO: Sin usar
 // log obligatorio (4/6)
-func FinDeProceso(pcb structs.PCB, motivoDeFinalizacion string) {
+func FinDeProceso(pid uint32, motivoDeFinalizacion string) {
 
-	log.Printf("Finaliza el proceso: %d - Motivo: %s", pcb.PID, motivoDeFinalizacion)
+	log.Printf("Finaliza el proceso: %d - Motivo: %s", pid, motivoDeFinalizacion)
 
 }
 

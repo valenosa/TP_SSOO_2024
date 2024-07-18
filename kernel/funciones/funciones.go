@@ -131,12 +131,6 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.CambioDeEstado(pcb.Estado, "READY", pcb.PID)
 		pcb.Estado = "READY"
 
-	case "Finalizar PROCESO":
-
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		pcb.Estado = "EXIT"
-
 	case "IO":
 
 		//^ log obligatorio (2/6)
@@ -162,7 +156,7 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 
 		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(*pcb, "INVALID_RESOURCE")
+		logueano.FinDeProceso(pcb.PID, "INVALID_RESOURCE")
 
 		pcb.Estado = "EXIT"
 
@@ -178,7 +172,7 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 
 		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(*pcb, "INVALID_WRITE")
+		logueano.FinDeProceso(pcb.PID, "INVALID_WRITE")
 
 		pcb.Estado = "EXIT"
 
@@ -188,7 +182,7 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 
 		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(*pcb, "SUCCESS")
+		logueano.FinDeProceso(pcb.PID, "SUCCESS")
 
 		pcb.Estado = "EXIT"
 
