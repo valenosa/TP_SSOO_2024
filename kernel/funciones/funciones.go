@@ -299,15 +299,10 @@ func BuscarPCB(pid uint32) (structs.PCB, bool) {
 // Envía un PCB (indicado por el planificador) al CPU para su ejecución, Tras volver lo devuelve al planificador
 func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
-	//Envia PCB al CPU.
-	fmt.Println("===================================== Proceso", pcb.PID, " enviado al CPU.")
-
 	//-------------------Request al CPU------------------------
 
 	// Codifica el cuerpo en un arreglo de bytes (formato JSON).
 	body, err := json.Marshal(pcb)
-
-	// Maneja los errores para la codificación.
 	if err != nil {
 		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", err.Error())
 		return structs.PCB{}, "ERROR"
