@@ -1,5 +1,6 @@
 {
     "port": 8006,
+    "ip" : "localhost",
     "type": "STDOUT",
     "unit_work_time": 1000,
     "ip_kernel": "127.0.0.1",

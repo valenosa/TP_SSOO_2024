@@ -25,7 +25,7 @@ var Auxlogger *log.Logger
 
 var listaArchivos []string
 
-// *======================================| MAIN |======================================\\
+// *=====================================| MAIN |=====================================\\
 func main() {
 
 	// Configura el logger
@@ -55,7 +55,7 @@ func main() {
 	// Levanta el server de la nuevaInterfazIO
 	serverErr := iniciarServidorInterfaz(&cantBloquesDisponiblesTotal)
 	if serverErr != nil {
-		logueano.MensajeConFormato(Auxlogger, "Error al iniciar servidor de interfaz: %s", serverErr.Error())
+		logueano.Error(Auxlogger, serverErr)
 		return
 	}
 }
@@ -65,18 +65,18 @@ func main() {
 func conectarInterfazIO(nombre string) {
 
 	// Crea Interfaz base
-	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configInterfaz.Type, PuertoInterfaz: configInterfaz.Port}
+	var nuevaInterfazIO = structs.Interfaz{TipoInterfaz: configInterfaz.Type, PuertoInterfaz: configInterfaz.Port, IpInterfaz: configInterfaz.Ip}
 
 	// Crea y codifica la request de conexion a Kernel
 	var requestConectarIO = structs.RequestConectarInterfazIO{NombreInterfaz: nombre, Interfaz: nuevaInterfazIO}
-	body, marshalErr := json.Marshal(requestConectarIO)
-	if marshalErr != nil {
-		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", marshalErr.Error())
+	body, err := json.Marshal(requestConectarIO)
+	if err != nil {
+		logueano.Error(Auxlogger, err)
 		return
 	}
 
 	// Envia la request de conexion a Kernel
-	_, err := config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
+	_, err = config.Request(configInterfaz.Port_Kernel, configInterfaz.Ip_Kernel, "POST", "interfazConectada", body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
 		return
@@ -201,6 +201,7 @@ func handlerIO_STDIN_READ(w http.ResponseWriter, r *http.Request) {
 	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
+		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 		return
 	}
 
@@ -222,14 +223,13 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
 
-	
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	//--------- REQUEST A MEMORIA ---------
 	//^ log obligatorio (1/6)
 	logueano.Operacion(instruccionIO.PidDesalojado, "IO_STDOUT_WRITE")
@@ -280,7 +280,6 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	var inputTruncado = string(data)
 
 	// Muestra por la terminal el dato que se encontraba en la dirección enviada a memoria.
-	//! Considerar borrar, pues todos los datos leidos/escritos forman parte de los logs obligatorios
 	fmt.Println(inputTruncado) //* No borrar, es parte de STDOUT.
 
 	//--------- RESPUESTA ---------
@@ -505,14 +504,9 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 
 	mx_interfaz.Lock()
 	defer mx_interfaz.Unlock()
+
 	//--------- RECIBE ---------
 	var instruccionIO structs.RequestEjecutarInstruccionIO
-
-	//^ log obligatorio (1/6)
-	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_WRITE")
-
-	//^ log obligatorio (6/6)
-	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "ESCRIBIR", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
 
 	err := json.NewDecoder(r.Body).Decode(&instruccionIO)
 	if err != nil {
@@ -522,6 +516,11 @@ func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------- REQUEST A MEMORIA ---------
+	//^ log obligatorio (1/6)
+	logueano.Operacion(instruccionIO.PidDesalojado, "IO_FS_WRITE")
+
+	//^ log obligatorio (6/6)
+	logueano.LeerEscribirArchivo(instruccionIO.PidDesalojado, "ESCRIBIR", instruccionIO.NombreArchivo, int(instruccionIO.Tamaño), instruccionIO.PunteroArchivo)
 
 	// Crea un cliente HTTP
 	cliente := &http.Client{}
@@ -666,7 +665,7 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 	// Envía la request a memoria
 	_, err = config.Request(configInterfaz.Port_Memory, configInterfaz.Ip_Memory, "POST", "memoria/movout", body)
 	if err != nil {
-		logueano.Error(Auxlogger, err)
+		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 		return
 	}
 	//--------- RESPUESTA ---------
@@ -676,9 +675,9 @@ func handlerIO_FS_READ(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//--------------- FUNCIONES DIALFS ---------------
+// ------ AUXILIARES DE DIALFS ------
 
-// --------------- METADATA
+// ------ METADATA ------
 
 func extraerMetadata(nombreArchivo string) (structs.MetadataFS, error) {
 	file, err := os.Open(configInterfaz.Dialfs_Path + "/" + nombreArchivo)
@@ -733,7 +732,7 @@ func calcularTamañoEnBloques(tamañoEnBytes int) int {
 	}
 }
 
-//--------------- IO_FS_CREATE
+// ------ IO_FS_CREATE ------
 
 // En base al bitmap devuelve la cantidad de bloques libres.
 func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
@@ -779,7 +778,7 @@ func asignarEspacio(cantBloquesDisponiblesTotal *int) int {
 	return -1
 }
 
-// --------------- IO_FS_TRUNCATE
+// ------ IO_FS_TRUNCATE ------
 
 // ----- Agrandar Archivo
 func agrandarArchivo(nuevoTamañoEnBloques int, metadata *structs.MetadataFS, tamañoEnBloques int, cantBloquesDisponiblesTotal *int, nombreArchivo string) {
@@ -991,8 +990,9 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	return punteroUltimoBloqueLibre
 }
 
-//----- Achicar Archivo
+// Agrandar Archivo -----
 
+// ----- Achicar Archivo
 func achicarArchivo(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata structs.MetadataFS, cantBloquesDisponiblesTotal *int) {
 	liberarBloques(tamañoEnBloques, nuevoTamañoEnBloques, metadata.InitialBlock, cantBloquesDisponiblesTotal)
 }
@@ -1022,3 +1022,5 @@ func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, bloqueInici
 		pos++
 	}
 }
+
+// Achicar Archivo -----

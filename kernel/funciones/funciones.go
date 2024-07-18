@@ -36,11 +36,10 @@ var ProcesoExec structs.PCB
 // ---------------------------- VRR
 var ListaREADY_PRIORITARIO = ListaSegura{}
 
-// ---------------------------- Semaforos PLANIFICADORES
+// ---------------------------- Semáforos PLANIFICADORES
 
 // Iniciar/Detener
-var OnePlani sync.Mutex
-var TogglePlanificador bool
+var TogglePlanificador sync.Mutex
 
 // Largo Plazo
 var Cont_producirPCB chan int
@@ -58,13 +57,15 @@ var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz
 func Planificador() {
 
 	//Espero a que se active el planificador
-	for TogglePlanificador {
+	for {
 
 		//Espero a que el CPU este libre
 		mx_CPUOcupado.Lock()
 
 		// Espero que exista PCB en READY (Tanto en READY como en READY_PRIORITARIO)
 		<-Bin_hayPCBenREADY
+
+		TogglePlanificador.Lock()
 
 		var siguientePCB structs.PCB      // PCB a enviar al CPU
 		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
@@ -91,7 +92,7 @@ func Planificador() {
 		ProcesoExec = siguientePCB
 
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado("READY", siguientePCB)
+		logueano.CambioDeEstado("READY", siguientePCB.Estado, siguientePCB.PID)
 
 		// Se envía el proceso al CPU para su ejecución y espera a que se lo devuelva actualizado
 		pcbActualizado, motivoDesalojo := dispatch(siguientePCB, ConfigJson)
@@ -104,6 +105,8 @@ func Planificador() {
 			pcbActualizado.Quantum = uint16(tiempoCorteQuantum.Sub(tiempoInicioQuantum))
 		}
 
+		TogglePlanificador.Unlock()
+
 		//Aviso que esta libre el CPU
 		mx_CPUOcupado.Unlock()
 
@@ -115,7 +118,6 @@ func Planificador() {
 	}
 }
 
-// TODO: Todos los cambios de estado se hacen desde aca (15/7/24: Faltan las funciones de memoria que están en CPU)
 func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 	switch motivoDesalojo {
@@ -126,32 +128,68 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.FinDeQuantum(*pcb)
 
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(*pcb, "READY")
+		logueano.CambioDeEstado(pcb.Estado, "READY", pcb.PID)
 		pcb.Estado = "READY"
 
-	case "Finalizar PROCESO":
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(*pcb, "EXIT")
-		pcb.Estado = "EXIT"
-
 	case "IO":
+
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstadoInverso(*pcb, "BLOCK")
+		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
 		pcb.Estado = "BLOCK"
 
 	case "WAIT":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
+
 		pcb.Estado = "BLOCK"
 
 	case "Finalizar Proceso":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 		pcb.Estado = "EXIT"
 
 	case "ERROR: Recurso no existe":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(pcb.PID, "INVALID_RESOURCE")
+
 		pcb.Estado = "EXIT"
 
 	case "OUT OF MEMORY":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		pcb.Estado = "EXIT"
+
+	case "INVALID_WRITE":
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(pcb.PID, "INVALID_WRITE")
+
+		pcb.Estado = "EXIT"
+
+	case "PAGE FAULT":
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
 		pcb.Estado = "EXIT"
 
 	case "EXIT":
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(pcb.PID, "SUCCESS")
+
 		pcb.Estado = "EXIT"
 
 	}
@@ -257,7 +295,8 @@ func ExtraerPCB(pid uint32) (structs.PCB, bool) {
 
 	pcb, encontrado = ListaREADY.Extract(pid)
 	if encontrado {
-		//Retornar PCB
+		//Retornar PCB y declarar que hay un proceso menos en READY
+		<-Bin_hayPCBenREADY
 		return pcb, true
 	}
 
@@ -409,7 +448,7 @@ func DesalojarProcesoIO(pid uint32) {
 	pcbDesalojado.Estado = "EXIT"
 
 	//^ log obligatorio (2/6)
-	logueano.CambioDeEstado("BLOCK", pcbDesalojado)
+	logueano.CambioDeEstado("BLOCK", pcbDesalojado.Estado, pcbDesalojado.PID)
 	AdministrarQueues(pcbDesalojado)
 }
 
@@ -433,9 +472,13 @@ func LiberarRecurso(nombreRecurso string) {
 		pid := recurso.ListaBlock.Dequeue()
 
 		pcbDesbloqueado, _ := MapBLOCK.Delete(pid)
+
+		//^ log obligatorio (2/6)
+		logueano.CambioDeEstado(pcbDesbloqueado.Estado, "READY", pcbDesbloqueado.PID)
+
 		//Se agrega el recurso a la lista de recursos del proceso
 		pcbDesbloqueado.Recursos = append(pcbDesbloqueado.Recursos, nombreRecurso)
-		//Se pasa el proceso a de BOLCK -> READY
+		//Se pasa el proceso a de BLOCK -> READY
 		pcbDesbloqueado.Estado = "READY"
 		AdministrarQueues(pcbDesbloqueado)
 	} else {

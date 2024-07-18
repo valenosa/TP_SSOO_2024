@@ -30,6 +30,11 @@ func main() {
 
 	funciones.Auxlogger = logueano.InitAuxLog("kernel")
 
+	// ======== Iniciamos Planificador ========
+
+	funciones.TogglePlanificador.Lock()
+	go funciones.Planificador()
+
 	// ======== HandleFunctions ========
 
 	//PLANIFICACION
@@ -51,7 +56,7 @@ func main() {
 	http.HandleFunc("POST /wait", handlerWait)
 	http.HandleFunc("POST /signal", handlerSignal)
 
-	//Inicio el servidor de Kernel
+	// ======== Inicio Serivor de Kernel ========
 	config.IniciarServidor(funciones.ConfigJson.Port)
 
 }
@@ -62,21 +67,14 @@ func main() {
 
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	funciones.TogglePlanificador = true
-
-	funciones.OnePlani.Lock()
-	go funciones.Planificador()
+	funciones.TogglePlanificador.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// TODO: Solucionar - No esta en funcionamiento
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Printf("DetenerPlanificacion-------------------------")
-
-	funciones.TogglePlanificador = false
-	funciones.OnePlani.Unlock()
+	funciones.TogglePlanificador.Lock()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -107,6 +105,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	nuevoPCB.PID = request.PID
 
 	nuevoPCB.Estado = "NEW"
+	funciones.AdministrarQueues(nuevoPCB)
 
 	//----------- Va a memoria ---------
 	bodyIniciarProceso, err := json.Marshal(structs.IniciarProceso{PID: nuevoPCB.PID, Path: request.Path})
@@ -134,6 +133,9 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	//Verifica si puede producir un PCB (por Multiprogramacion)
 	funciones.Cont_producirPCB <- 0
 
+	//Lo Elimino de la lista de NEW
+	funciones.ListaNEW.Extract(nuevoPCB.PID)
+
 	// Si todo es correcto agregamos el PID al PCB
 	nuevoPCB.Estado = "READY"
 
@@ -141,7 +143,7 @@ func handlerIniciarProceso(w http.ResponseWriter, r *http.Request) {
 	funciones.AdministrarQueues(nuevoPCB)
 
 	//^ log obligatorio (2/6)
-	logueano.CambioDeEstado("NEW", nuevoPCB)
+	logueano.CambioDeEstado("NEW", nuevoPCB.Estado, nuevoPCB.PID)
 
 	// ----------- DEVUELVE -----------
 
@@ -190,12 +192,12 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaNEW)
 	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaREADY)
-	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
-	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 	var procesoExec = structs.ResponseListarProceso{PID: funciones.ProcesoExec.PID, Estado: funciones.ProcesoExec.Estado}
 	if procesoExec.Estado == "EXEC" {
 		listaDeProcesos = append(listaDeProcesos, procesoExec)
 	}
+	listaDeProcesos = funciones.AppendMapProceso(listaDeProcesos, &funciones.MapBLOCK)
+	listaDeProcesos = funciones.AppendListaProceso(listaDeProcesos, &funciones.ListaEXIT)
 
 	//----------- DEVUELVE -----------
 
@@ -284,6 +286,9 @@ func handlerWait(w http.ResponseWriter, r *http.Request) {
 
 			//Agrego PID a su lista de bloqueados
 			recurso.ListaBlock.Append(recursoSolicitado.PidSolicitante)
+
+			//^log obligatorio (6/6)
+			logueano.MotivoBloqueo(recursoSolicitado.PidSolicitante, recursoSolicitado.NombreRecurso)
 
 			respAsignacionRecurso = "BLOQUEAR: Recurso no disponible"
 		}
@@ -395,9 +400,18 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	// Envía la instrucción a ejecutar a la interfazConectada (Puerto)
 	query := interfazSolicitada.TipoInterfaz + "/" + requestInstruccionIO.Instruccion
 
-	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, "localhost", "POST", query, body) //TODO: Cambiar localhost por IP de la interfaz (agregar ip interfaz)
+	respuesta, err := config.Request(interfazSolicitada.PuertoInterfaz, interfazSolicitada.IpInterfaz, "POST", query, body)
 	if err != nil {
 		logueano.Error(funciones.Auxlogger, err)
+		return
+	}
+
+	//Si es IO_STDIN_READ, devolver badRequest (implementado para los logueanos).
+	if (requestInstruccionIO.Instruccion == "IO_STDIN_READ" || requestInstruccionIO.Instruccion == "IO_FS_READ") && respuesta.StatusCode == http.StatusBadRequest {
+
+		//^log obligatorio (6/6)
+		logueano.FinDeProceso(requestInstruccionIO.PidDesalojado, "INVALID_WRITE")
+		http.Error(w, "INVALID_WRITE", http.StatusBadRequest)
 		return
 	}
 
@@ -417,7 +431,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 	pcbDesalojado, _ := funciones.MapBLOCK.Delete(requestInstruccionIO.PidDesalojado)
 
 	//^ log obligatorio (2/6)
-	logueano.CambioDeEstadoInverso(pcbDesalojado, "READY")
+	logueano.CambioDeEstado(pcbDesalojado.Estado, "READY", pcbDesalojado.PID)
 	pcbDesalojado.Estado = "READY"
 
 	// Pasa el proceso a READY_PRIORITARIO si el algoritmo de planificacion es VRR

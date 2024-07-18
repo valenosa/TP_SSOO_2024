@@ -15,8 +15,6 @@ import (
 
 //================================| MAIN |================================\\
 
-//================================| MAIN |================================\\
-
 func main() {
 
 	// Extrae info de config.json
@@ -66,7 +64,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			logueano.Error(funciones.Auxlogger, err) //log
+			logueano.Error(funciones.Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -84,7 +82,7 @@ func handlerMemIniciarProceso(memoriaInstrucciones map[uint32][]string, tablaDeP
 		var respBody structs.ResponseListarProceso = structs.ResponseListarProceso{PID: request.PID}
 		respuesta, err := json.Marshal(respBody)
 		if err != nil {
-			logueano.Error(funciones.Auxlogger, err) //log
+			logueano.Error(funciones.Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -240,7 +238,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		// Decodifica en formato JSON la request.
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
-			logueano.Error(funciones.Auxlogger, err) // log
+			logueano.Error(funciones.Auxlogger, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
