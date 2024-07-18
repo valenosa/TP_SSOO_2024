@@ -117,6 +117,11 @@ type RequestMovOUT struct {
 	Data []byte
 }
 
+type Fetch struct {
+	Page_Size   uint
+	Instruccion string
+}
+
 //*=====================================| TADs SINCRONIZACION |=====================================|
 
 // ----------------------( LISTA )----------------------\\

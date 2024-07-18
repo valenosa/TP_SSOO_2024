@@ -19,7 +19,7 @@ var Auxlogger *log.Logger
 // Funciones auxiliares
 // Toma de a un archivo a la vez y guarda las instrucciones en un map l
 func GuardarInstrucciones(pid uint32, path string, memoriaInstrucciones map[uint32][]string) {
-	path = ConfigJson.Instructions_Path + "/" + path
+	path = ConfigJson.Instructions_Path + path
 	data := ExtractInstructions(path)
 	InsertData(pid, memoriaInstrucciones, data)
 }

@@ -170,7 +170,7 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//--------- EJECUTA ---------
 
-	funciones.Interrupt(uint32(pid), "Finalizar Proceso") // Interrumpe el proceso
+	funciones.Interrupt(uint32(pid), "INTERRUPTED_BY_USER") // Interrumpe el proceso
 
 	pcb, encontrado := funciones.ExtraerPCB(uint32(pid))
 	if encontrado {

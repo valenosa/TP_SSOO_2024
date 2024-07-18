@@ -111,8 +111,15 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 		//--------- EJECUTA ---------
 
-		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
-		fmt.Println(instruccion)
+		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: memoriaInstrucciones[uint32(pid)][uint32(pc)]}
+		fmt.Println(fetch.Instruccion)
+
+		respuesta, err := json.Marshal(fetch)
+		if err != nil {
+			logueano.Error(funciones.Auxlogger, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		// Esperar un tiempo determinado a tiempo de retardo
 		time.Sleep(time.Duration(funciones.ConfigJson.Delay_Response) * time.Millisecond)
@@ -120,7 +127,7 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 		//--------- RESPUESTA ---------
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(instruccion))
+		w.Write(respuesta)
 	}
 }
 

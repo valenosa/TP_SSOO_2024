@@ -27,6 +27,8 @@ var RegistrosCPU structs.RegistrosUsoGeneral
 
 var ConfigJson config.Cpu
 
+var Page_Size uint
+
 // Es global porque la uso para "depositar" el motivo de desalojo del proceso (que a excepción de EXIT, es traído por una interrupción)
 var MotivoDeDesalojo string
 
@@ -164,7 +166,7 @@ func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]
 
 	// Calcula la dirección física
 
-	pageSize := uint32(ConfigJson.Page_Size)
+	pageSize := uint32(Page_Size)
 
 	desp := uint32(desplazamiento)
 
@@ -175,8 +177,8 @@ func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]
 
 func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
 
-	numeroDePagina := int(math.Floor(float64(direccionLogica) / float64(ConfigJson.Page_Size)))
-	desplazamiento := direccionLogica - numeroDePagina*int(ConfigJson.Page_Size)
+	numeroDePagina := int(math.Floor(float64(direccionLogica) / float64(Page_Size)))
+	desplazamiento := direccionLogica - numeroDePagina*int(Page_Size)
 
 	return numeroDePagina, desplazamiento
 }
@@ -269,7 +271,7 @@ func EjecutarCiclosDeInstruccion(PCB *structs.PCB, TLB *TLB, prioridadesTLB *[]E
 		instruccion := Fetch(PCB.PID, RegistrosCPU.PC)
 
 		//^log obligatorio (1/6)
-		logueano.FetchInstruccion(*PCB)
+		logueano.FetchInstruccion(PCB.PID, RegistrosCPU.PC)
 
 		// Decodifica y ejecuta la instrucción.
 		DecodeAndExecute(PCB, instruccion, &RegistrosCPU.PC, &cicloFinalizado, TLB, prioridadesTLB)
@@ -304,7 +306,7 @@ func Fetch(PID uint32, PC uint32) string {
 	req.URL.RawQuery = q.Encode()
 
 	// Establece el tipo de contenido de la solicitud
-	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("Content-Type", "application/json")
 
 	// Realiza la solicitud al servidor de memoria
 	respuesta, err := cliente.Do(req)
@@ -317,14 +319,18 @@ func Fetch(PID uint32, PC uint32) string {
 		return ""
 	}
 
-	// Lee el cuerpo de la respuesta
-	bodyBytes, err := io.ReadAll(respuesta.Body)
+	// Deserializa los bytes a la estructura Metadata
+	var fetch structs.Fetch
+
+	err = json.NewDecoder(respuesta.Body).Decode(&fetch)
 	if err != nil {
 		return ""
 	}
 
-	// Retorna las instrucciones obtenidas como una cadena de texto
-	return string(bodyBytes)
+	Page_Size = fetch.Page_Size
+
+	// Retorna la instruccion obtenida como una cadena de texto
+	return fetch.Instruccion
 }
 
 // Ejecuta las instrucciones traidas de memoria.
@@ -404,8 +410,6 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 		*cicloFinalizado = true
 		MotivoDeDesalojo = "IO"
 		go ioFSCreateOrDelete(variable[1], variable[2], PCB.PID, "IO_FS_CREATE")
-
-		//!manejar el case de IO_FS_READ
 
 	case "IO_FS_DELETE":
 		*cicloFinalizado = true

@@ -70,9 +70,8 @@ func MensajeConFormato(auxLog *log.Logger, mensaje string, args ...interface{}) 
 
 // -------------------------- == LOG's CPU == -----------------------------------------------------------
 // log obligatorio (1/6)
-func FetchInstruccion(pcb structs.PCB) {
-
-	log.Printf("PID: %d - FETCH - Program Counter: %d", pcb.PID, pcb.PC)
+func FetchInstruccion(PID uint32, PC uint32) {
+	log.Printf("PID: %d - FETCH - Program Counter: %d", PID, PC)
 }
 
 // log obligatorio (2/6)

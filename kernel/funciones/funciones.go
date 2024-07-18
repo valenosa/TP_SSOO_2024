@@ -144,10 +144,9 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 		pcb.Estado = "BLOCK"
 
-	case "Finalizar Proceso":
-
+	case "INTERRUPTED_BY_USER":
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+		logueano.FinDeProceso(pcb.PID, "INTERRUPTED_BY_USER")
 		pcb.Estado = "EXIT"
 
 	case "ERROR: Recurso no existe":
@@ -164,13 +163,14 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+		//^ log obligatorio (4/6)
+		logueano.FinDeProceso(pcb.PID, "OUT OF MEMORY")
 
 		pcb.Estado = "EXIT"
 
 	case "INVALID_WRITE":
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-
 		//^ log obligatorio (4/6)
 		logueano.FinDeProceso(pcb.PID, "INVALID_WRITE")
 
@@ -179,6 +179,7 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 	case "PAGE FAULT":
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
+		logueano.FinDeProceso(pcb.PID, "")
 
 		pcb.Estado = "EXIT"
 

@@ -13,13 +13,12 @@ import (
 // ----------------------( STRUCTS Config.json )---------------------------\\
 type Cpu struct {
 	Port               int    `json:"port"`
+	Ip_Kernel          string `json:"ip_kernel"`
+	Port_Kernel        int    `json:"port_kernel"`
 	Ip_Memory          string `json:"ip_memory"`
 	Port_Memory        int    `json:"port_memory"`
 	Number_Felling_tlb int    `json:"number_felling_tlb"`
 	Algorithm_tlb      string `json:"algorithm_tlb"`
-	Ip_Kernel          string `json:"ip_kernel"`
-	Port_Kernel        int    `json:"port_kernel"`
-	Page_Size          int    `json:"page_size"`
 }
 
 type IO struct {
