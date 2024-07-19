@@ -65,13 +65,16 @@ func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridades
 }
 
 func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
-	switch ConfigJson.Algorithm_tlb {
 
-	case "FIFO":
-		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
+	if ConfigJson.Number_Felling_tlb != 0 {
+		switch ConfigJson.Algorithm_tlb {
 
-	case "LRU":
-		algoritmoLru(pid, pagina, marco, tlb, prioridadesTLB)
+		case "FIFO":
+			algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
+
+		case "LRU":
+			algoritmoLru(pid, pagina, marco, tlb, prioridadesTLB)
+		}
 	}
 }
 
