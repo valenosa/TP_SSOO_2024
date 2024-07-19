@@ -4,9 +4,9 @@
     "port_memory": 8002,
     "ip_cpu": "127.0.0.1",
     "port_cpu": 8003,
-    "planning_algorithm": "FIFO",
-    "quantum": 2000,
-    "resources": ["RECURSO"],
+    "planning_algorithm": "RR",
+    "quantum": 5000,
+    "resources": ["REC1"],
     "resource_instances": [1],
     "multiprogramming": 10
-    }
+}

@@ -36,8 +36,8 @@ func main() {
 	Auxlogger = logueano.InitAuxLog("IO")
 
 	//Toma los parametros pasados por argumento
-	nombreInterfaz := os.Args[1]
-	configPath := os.Args[2]
+	nombreInterfaz := "FS"  //os.Args[1]
+	configPath := "FS.json" //os.Args[2]
 
 	config.Iniciar(configPath, &configInterfaz)
 
