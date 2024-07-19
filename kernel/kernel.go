@@ -363,9 +363,6 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//^log obligatorio (6/6)
-	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
-
 	//--------- EJECUTA ---------
 
 	//--- VALIDA
@@ -387,6 +384,9 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Instruccion incompatible.", http.StatusBadRequest)
 		return
 	}
+
+	//^log obligatorio (6/6)
+	logueano.MotivoBloqueo(requestInstruccionIO.PidDesalojado, requestInstruccionIO.NombreInterfaz)
 
 	//--- ENVIA A EJECUTAR A IO
 

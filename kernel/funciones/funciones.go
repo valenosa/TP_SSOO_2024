@@ -70,6 +70,7 @@ func Planificador() {
 		var siguientePCB structs.PCB      // PCB a enviar al CPU
 		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
 
+		//Ejecuta VRR si hay procesos priotirarios.
 		if strings.ToUpper(ConfigJson.Planning_Algorithm) == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 {
 
 			siguientePCB = ListaREADY_PRIORITARIO.Dequeue()
@@ -82,10 +83,10 @@ func Planificador() {
 			if strings.ToUpper(ConfigJson.Planning_Algorithm) != "FIFO" {
 				go roundRobin(siguientePCB.PID, ConfigJson.Quantum)
 			}
-
-			//Guardo tiempo de inicio para Virtual RR
-			tiempoInicioQuantum = time.Now()
 		}
+
+		//Guardo tiempo de inicio para Virtual RR
+		tiempoInicioQuantum = time.Now()
 
 		// Proceso READY -> EXEC
 		siguientePCB.Estado = "EXEC"
@@ -101,8 +102,12 @@ func Planificador() {
 
 		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
 		if ConfigJson.Planning_Algorithm == "VRR" && motivoDesalojo == "IO" {
+			
 			tiempoCorteQuantum := time.Now()
-			pcbActualizado.Quantum = uint16(tiempoCorteQuantum.Sub(tiempoInicioQuantum))
+
+			tiempoUsado := tiempoCorteQuantum.Sub(tiempoInicioQuantum)
+
+			pcbActualizado.Quantum = uint16(ConfigJson.Quantum) - uint16(tiempoUsado.Milliseconds())
 		}
 
 		TogglePlanificador.Unlock()
@@ -368,8 +373,6 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 		logueano.Mensaje(Auxlogger, "Error en la respuesta del CPU.")
 		return
 	}
-
-	logueano.MensajeConFormato(Auxlogger, "Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 //*======================================| ENTRADA SALIDA (I/O) |=======================================\\
@@ -416,13 +419,17 @@ func LiberarRecurso(nombreRecurso string) {
 	recurso := MapRecursos[nombreRecurso]
 
 	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
-	if len(recurso.ListaBlock.List) != 0 {
+	if len(recurso.ListaBlock.List) > 0 {
 
 		// Tomo el primer PID de la lista de BLOCK (del recurso)
 		pid := recurso.ListaBlock.Dequeue()
 
-		pcbDesbloqueado, _ := MapBLOCK.Delete(pid)
-
+		pcbDesbloqueado, find := MapBLOCK.Delete(pid)
+		if !find {
+			LiberarRecurso(nombreRecurso)
+			return
+		}
+		
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcbDesbloqueado.Estado, "READY", pcbDesbloqueado.PID)
 
@@ -431,6 +438,7 @@ func LiberarRecurso(nombreRecurso string) {
 		//Se pasa el proceso a de BLOCK -> READY
 		pcbDesbloqueado.Estado = "READY"
 		AdministrarQueues(pcbDesbloqueado)
+
 	} else {
 		recurso.Instancias++
 	}
