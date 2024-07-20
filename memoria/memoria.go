@@ -110,9 +110,9 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 		}
 
 		//--------- EJECUTA ---------
-		instruccion:= memoriaInstrucciones[uint32(pid)][uint32(pc)]
-		
- 		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: instruccion}
+		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
+
+		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: instruccion}
 		fmt.Println(fetch.Instruccion)
 
 		respuesta, err := json.Marshal(fetch)
