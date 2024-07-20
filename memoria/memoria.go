@@ -110,7 +110,17 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 		}
 
 		//--------- EJECUTA ---------
-		instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
+
+		listaInst, existe := memoriaInstrucciones[uint32(pid)]
+		if !existe || uint32(pc) >= uint32(len(listaInst)) {
+
+			// Manejar el error aquí
+			logueano.MensajeConFormato(funciones.Auxlogger, "¡ERROR! PID: %d - PC: %d - LEN: %d", pid, pc, len(listaInst))
+		}
+
+		instruccion := listaInst[uint32(pc)]
+
+		//instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
 
 		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: instruccion}
 		fmt.Println(fetch.Instruccion)

@@ -240,6 +240,8 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	// Crea una nueva solicitud GET
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		logueano.Error(Auxlogger, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -262,6 +264,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	respuesta, err := cliente.Do(req)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -270,6 +273,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(respuesta.Body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -287,7 +291,6 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(inputTruncado))
 
 	mx_interfaz.Unlock()
-
 }
 
 //*======================( DIALFS )======================
@@ -534,7 +537,6 @@ func handlerIO_FS_DELETE(w http.ResponseWriter, r *http.Request) {
 	// Envía el status al Kernel
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(":/"))
-
 }
 
 func handlerIO_FS_WRITE(w http.ResponseWriter, r *http.Request) {
@@ -1026,8 +1028,6 @@ func compactar(fDataBloques *os.File, nombreArchivo string, bufferTruncate []byt
 	return punteroUltimoBloqueLibre
 }
 
-// Agrandar Archivo -----
-
 // ----- Achicar Archivo
 func achicarArchivo(nuevoTamañoEnBloques int, tamañoEnBloques int, metadata structs.MetadataFS) {
 	liberarBloques(tamañoEnBloques, nuevoTamañoEnBloques, metadata.InitialBlock)
@@ -1058,5 +1058,3 @@ func liberarBloques(tamañoEnBloques int, nuevoTamañoEnBloques int, bloqueInici
 		pos++
 	}
 }
-
-// Achicar Archivo -----
