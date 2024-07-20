@@ -1,7 +1,7 @@
 {
-    "port": 8006,
+    "port": 8009,
     "ip": "localhost",
-    "type": "GENERICA",
+    "type": "STDOUT",
     "unit_work_time": 50,
     "ip_kernel": "127.0.0.1",
     "port_kernel": 8001,

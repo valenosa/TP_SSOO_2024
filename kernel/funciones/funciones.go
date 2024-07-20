@@ -53,7 +53,6 @@ var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz
 //*=======================================| PLANIFICADOR |=======================================\\
 
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
-// TODO: Testear VRR mas a fondo
 func Planificador() {
 
 	//Espero a que se active el planificador
@@ -70,6 +69,7 @@ func Planificador() {
 		var siguientePCB structs.PCB      // PCB a enviar al CPU
 		var tiempoInicioQuantum time.Time // Tiempo de inicio del Quantum
 
+		//Ejecuta VRR si hay procesos priotirarios.
 		if strings.ToUpper(ConfigJson.Planning_Algorithm) == "VRR" && len(ListaREADY_PRIORITARIO.List) > 0 {
 
 			siguientePCB = ListaREADY_PRIORITARIO.Dequeue()
@@ -82,10 +82,10 @@ func Planificador() {
 			if strings.ToUpper(ConfigJson.Planning_Algorithm) != "FIFO" {
 				go roundRobin(siguientePCB.PID, ConfigJson.Quantum)
 			}
-
-			//Guardo tiempo de inicio para Virtual RR
-			tiempoInicioQuantum = time.Now()
 		}
+
+		//Guardo tiempo de inicio para Virtual RR
+		tiempoInicioQuantum = time.Now()
 
 		// Proceso READY -> EXEC
 		siguientePCB.Estado = "EXEC"
@@ -101,8 +101,12 @@ func Planificador() {
 
 		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
 		if ConfigJson.Planning_Algorithm == "VRR" && motivoDesalojo == "IO" {
+
 			tiempoCorteQuantum := time.Now()
-			pcbActualizado.Quantum = uint16(tiempoCorteQuantum.Sub(tiempoInicioQuantum))
+
+			tiempoUsado := tiempoCorteQuantum.Sub(tiempoInicioQuantum)
+
+			pcbActualizado.Quantum = uint16(ConfigJson.Quantum) - uint16(tiempoUsado.Milliseconds())
 		}
 
 		TogglePlanificador.Unlock()
@@ -131,65 +135,19 @@ func administrarMotivoDesalojo(pcb *structs.PCB, motivoDesalojo string) {
 		logueano.CambioDeEstado(pcb.Estado, "READY", pcb.PID)
 		pcb.Estado = "READY"
 
-	case "IO":
+	case "IO", "WAIT":
 
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
 		pcb.Estado = "BLOCK"
 
-	case "WAIT":
-
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "BLOCK", pcb.PID)
-
-		pcb.Estado = "BLOCK"
-
-	case "INTERRUPTED_BY_USER":
-		//^ log obligatorio (2/6)
-		logueano.FinDeProceso(pcb.PID, "INTERRUPTED_BY_USER")
-		pcb.Estado = "EXIT"
-
-	case "ERROR: Recurso no existe":
+	case "INTERRUPTED_BY_USER", "INVALID_RESOURCE", "OUT_OF_MEMORY", "PAGE_FAULT", "INVALID_WRITE", "INVALID_READ", "SUCCESS":
 
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
 
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "INVALID_RESOURCE")
-
-		pcb.Estado = "EXIT"
-
-	case "OUT OF MEMORY":
-
 		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "OUT OF MEMORY")
-
-		pcb.Estado = "EXIT"
-
-	case "INVALID_WRITE":
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "INVALID_WRITE")
-
-		pcb.Estado = "EXIT"
-
-	case "PAGE FAULT":
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-		logueano.FinDeProceso(pcb.PID, "")
-
-		pcb.Estado = "EXIT"
-
-	case "EXIT":
-
-		//^ log obligatorio (2/6)
-		logueano.CambioDeEstado(pcb.Estado, "EXIT", pcb.PID)
-
-		//^ log obligatorio (4/6)
-		logueano.FinDeProceso(pcb.PID, "SUCCESS")
+		logueano.FinDeProceso(pcb.PID, motivoDesalojo)
 
 		pcb.Estado = "EXIT"
 
@@ -217,7 +175,7 @@ func AdministrarQueues(pcb structs.PCB) {
 		//PCB --> cola de NEW
 		ListaNEW.Append(pcb)
 
-		logueano.PidsNew(Auxlogger, ListaNEW.List)
+		//logueano.PidsNew(Auxlogger, ListaNEW.List)
 
 	case "READY":
 
@@ -241,13 +199,13 @@ func AdministrarQueues(pcb structs.PCB) {
 		MapBLOCK.Set(pcb.PID, pcb)
 
 		//logPidsBlock(blockedMap)
-		logueano.PidsBlock(Auxlogger, MapBLOCK.m)
+		//logueano.PidsBlock(Auxlogger, MapBLOCK.m)
 
 	case "EXIT":
 
 		//PCB --> cola de EXIT
 		ListaEXIT.Append(pcb)
-		logueano.PidsExit(Auxlogger, ListaEXIT.List)
+		//logueano.PidsExit(Auxlogger, ListaEXIT.List)
 		LiberarProceso(pcb)
 		<-Cont_producirPCB
 	}
@@ -345,15 +303,10 @@ func BuscarPCB(pid uint32) (structs.PCB, bool) {
 // Envía un PCB (indicado por el planificador) al CPU para su ejecución, Tras volver lo devuelve al planificador
 func dispatch(pcb structs.PCB, configJson config.Kernel) (structs.PCB, string) {
 
-	//Envia PCB al CPU.
-	fmt.Println("===================================== Proceso", pcb.PID, " enviado al CPU.")
-
 	//-------------------Request al CPU------------------------
 
 	// Codifica el cuerpo en un arreglo de bytes (formato JSON).
 	body, err := json.Marshal(pcb)
-
-	// Maneja los errores para la codificación.
 	if err != nil {
 		logueano.MensajeConFormato(Auxlogger, "error codificando body: %s", err.Error())
 		return structs.PCB{}, "ERROR"
@@ -419,8 +372,6 @@ func Interrupt(PID uint32, tipoDeInterrupcion string) {
 		logueano.Mensaje(Auxlogger, "Error en la respuesta del CPU.")
 		return
 	}
-
-	logueano.MensajeConFormato(Auxlogger, "Interrupción tipo %s enviada correctamente.\n", tipoDeInterrupcion)
 }
 
 //*======================================| ENTRADA SALIDA (I/O) |=======================================\\
@@ -467,12 +418,16 @@ func LiberarRecurso(nombreRecurso string) {
 	recurso := MapRecursos[nombreRecurso]
 
 	// Si hay procesos bloqueados por el recurso, se desbloquea al primero
-	if len(recurso.ListaBlock.List) != 0 {
+	if len(recurso.ListaBlock.List) > 0 {
 
 		// Tomo el primer PID de la lista de BLOCK (del recurso)
 		pid := recurso.ListaBlock.Dequeue()
 
-		pcbDesbloqueado, _ := MapBLOCK.Delete(pid)
+		pcbDesbloqueado, find := MapBLOCK.Delete(pid)
+		if !find {
+			LiberarRecurso(nombreRecurso)
+			return
+		}
 
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcbDesbloqueado.Estado, "READY", pcbDesbloqueado.PID)
@@ -482,6 +437,7 @@ func LiberarRecurso(nombreRecurso string) {
 		//Se pasa el proceso a de BLOCK -> READY
 		pcbDesbloqueado.Estado = "READY"
 		AdministrarQueues(pcbDesbloqueado)
+
 	} else {
 		recurso.Instancias++
 	}

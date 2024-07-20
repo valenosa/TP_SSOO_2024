@@ -49,13 +49,11 @@ type ElementoPrioridad struct {
 	Pagina uint32
 }
 
-// TODO: Probar TLB, especificamente los algoritmos de remplazo
 func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	if tlb.Full() {
 		planificarTLB(pid, pagina, marco, tlb, prioridadesTLB)
 
 	} else {
-		(*tlb).initPID(pid)
 
 		// agregar marco al TLB
 		(*tlb)[pid][pagina] = marco
@@ -65,55 +63,22 @@ func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridades
 }
 
 func planificarTLB(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
-	switch ConfigJson.Algorithm_tlb {
 
-	case "FIFO":
-		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
+	if ConfigJson.Number_Felling_tlb != 0 {
+		_, paginaEncontrada := (*tlb)[pid][pagina]
 
-	case "LRU":
-		algoritmoLru(pid, pagina, marco, tlb, prioridadesTLB)
-	}
-}
+		if !paginaEncontrada {
+			// Elimina el primer elemento de la lista de prioridades
+			delete((*tlb)[(*prioridadesTLB)[0].Pid], (*prioridadesTLB)[0].Pagina)
+			(*prioridadesTLB) = (*prioridadesTLB)[1:]
 
-func algoritmoFifo(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
-	_, paginaEncontrada := (*tlb)[pid][pagina]
-
-	if !paginaEncontrada {
-		// Elimina el primer elemento de la lista de prioridades
-		delete((*tlb)[(*prioridadesTLB)[0].Pid], (*prioridadesTLB)[0].Pagina)
-		(*prioridadesTLB) = (*prioridadesTLB)[1:]
-
-		// Agrega el marco a la TLB
-		(*tlb)[pid][pagina] = marco
-		(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
-
-	} else {
-
-		(*tlb)[pid][pagina] = marco
-	}
-}
-
-func algoritmoLru(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
-	encontrado := false
-	for posicion, entrada := range *prioridadesTLB {
-		//si encuentro un elemento con el mismo pid y pagina
-		if entrada.Pid == pid && entrada.Pagina == pagina {
-
-			//Se elimina el elemento en la lista de prioridades
-			(*prioridadesTLB) = append((*prioridadesTLB)[:posicion], (*prioridadesTLB)[posicion+1:]...)
-
-			//Lo paso al final
-			(*prioridadesTLB) = append((*prioridadesTLB), entrada)
-
-			//Cambio el marco de la página en el TLB
+			// Agrega el marco a la TLB
 			(*tlb)[pid][pagina] = marco
+			(*prioridadesTLB) = append((*prioridadesTLB), ElementoPrioridad{Pid: pid, Pagina: pagina})
 
-			encontrado = true
-			break
+		} else {
+			(*tlb)[pid][pagina] = marco
 		}
-	}
-	if !encontrado {
-		algoritmoFifo(pid, pagina, marco, tlb, prioridadesTLB)
 	}
 }
 
@@ -186,6 +151,8 @@ func ObtenerPaginayDesplazamiento(direccionLogica int) (int, int) {
 // obtiene el marco de la pagina
 func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) (uint32, bool) {
 
+	(*tlb).initPID(pid)
+
 	// Busca en la TLB
 	marco, encontrado := (*tlb).Hit(pid, pagina)
 
@@ -201,9 +168,33 @@ func ObtenerMarco(pid uint32, pagina uint32, tlb *TLB, prioridadesTLB *[]Element
 
 		agregarEnTLB(pagina, marco, pid, tlb, prioridadesTLB)
 
+	} else {
+		// Si el algoritmo de reemplazo es LRU, se actualiza la lista de prioridades
+		if ConfigJson.Algorithm_tlb == "LRU" {
+			actualizarPrioridades(pid, pagina, marco, tlb, prioridadesTLB)
+		}
 	}
 	// No se toma en cuenta el caso en el que no existe el marco
 	return marco, encontrado
+}
+
+func actualizarPrioridades(pid uint32, pagina uint32, marco uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
+
+	for posicion, entrada := range *prioridadesTLB {
+		//si encuentro un elemento con el mismo pid y pagina
+		if entrada.Pid == pid && entrada.Pagina == pagina {
+
+			//Se elimina el elemento en la lista de prioridades
+			(*prioridadesTLB) = append((*prioridadesTLB)[:posicion], (*prioridadesTLB)[posicion+1:]...)
+
+			//Lo paso al final
+			(*prioridadesTLB) = append((*prioridadesTLB), entrada)
+
+			//Cambio el marco de la página en el TLB
+			(*tlb)[pid][pagina] = marco
+			break
+		}
+	}
 }
 
 func buscarEnMemoria(pid uint32, pagina uint32) (uint32, bool) {
@@ -433,7 +424,7 @@ func DecodeAndExecute(PCB *structs.PCB, instruccion string, PC *uint32, cicloFin
 
 	case "EXIT":
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "EXIT"
+		MotivoDeDesalojo = "SUCCESS"
 		return
 
 	default:
@@ -577,7 +568,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -620,7 +611,7 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 
 	if respuesta.StatusCode == http.StatusNotFound {
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "OUT OF MEMORY"
+		MotivoDeDesalojo = "OUT_OF_MEMORY"
 		return
 	}
 
@@ -647,7 +638,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -689,7 +680,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, P
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -698,7 +689,7 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, P
 	if !encontrado {
 		logueano.Mensaje(Auxlogger, "Error: Page Fault")
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "PAGE FAULT"
+		MotivoDeDesalojo = "PAGE_FAULT"
 		return
 	}
 
@@ -795,9 +786,9 @@ func resize(tamañoEnBytes string, cicloFinalizado *bool) {
 		return
 	}
 
-	if string(bodyBytes) == "OUT OF MEMORY" {
+	if string(bodyBytes) == "OUT_OF_MEMORY" {
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "OUT OF MEMORY"
+		MotivoDeDesalojo = "OUT_OF_MEMORY"
 	}
 }
 
@@ -884,7 +875,7 @@ func wait(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 
 	case "ERROR: Recurso no existe":
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "ERROR: Recurso no existe"
+		MotivoDeDesalojo = "INVALID_RESOURCE"
 		return
 	}
 }
@@ -907,7 +898,7 @@ func signal(nombreRecurso string, PCB *structs.PCB, cicloFinalizado *bool) {
 	if respuesta.StatusCode != http.StatusOK {
 
 		*cicloFinalizado = true
-		MotivoDeDesalojo = "ERROR: Recurso no existe"
+		MotivoDeDesalojo = "INVALID_RESOURCE"
 		return
 	}
 

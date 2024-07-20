@@ -111,7 +111,18 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 		//--------- EJECUTA ---------
 
-		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: memoriaInstrucciones[uint32(pid)][uint32(pc)]}
+		listaInst, existe := memoriaInstrucciones[uint32(pid)]
+		if !existe || uint32(pc) >= uint32(len(listaInst)) {
+
+			// Manejar el error aquí
+			logueano.MensajeConFormato(funciones.Auxlogger, "¡ERROR! PID: %d - PC: %d - LEN: %d", pid, pc, len(listaInst))
+		}
+
+		instruccion := listaInst[uint32(pc)]
+
+		//instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
+
+		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: instruccion}
 		fmt.Println(fetch.Instruccion)
 
 		respuesta, err := json.Marshal(fetch)
@@ -263,7 +274,7 @@ func handlerMovOut(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs.Tab
 		if estado == "OK" {
 			w.WriteHeader(http.StatusOK)
 		}
-		if estado == "OUT OF MEMORY" {
+		if estado == "OUT_OF_MEMORY" {
 			w.WriteHeader(http.StatusNotFound)
 		}
 
@@ -339,7 +350,7 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 		// Devuelve un status code dependiendo de si se encontró o no el marco
 		if estadoLectura == "OK" && estadoEscritura == "OK" {
 			w.WriteHeader(http.StatusOK)
-		} else if estadoLectura == "OUT OF MEMORY" || estadoEscritura == "OUT OF MEMORY" {
+		} else if estadoLectura == "OUT_OF_MEMORY" || estadoEscritura == "OUT_OF_MEMORY" {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
