@@ -36,8 +36,8 @@ func main() {
 	Auxlogger = logueano.InitAuxLog("IO")
 
 	//Toma los parametros pasados por argumento
-	nombreInterfaz := "FS"  //os.Args[1]
-	configPath := "FS.json" //os.Args[2]
+	nombreInterfaz := os.Args[1]
+	configPath := os.Args[2]
 
 	config.Iniciar(configPath, &configInterfaz)
 
@@ -292,7 +292,7 @@ func handlerIO_STDOUT_WRITE(w http.ResponseWriter, r *http.Request) {
 
 //*======================( DIALFS )======================
 
-// Crea y trunca el archivo de bloques y de bitmap de bloques.
+// Crea/Analiza los archivos necesarios para el FS
 func levantarFS(configInterfaz config.IO) {
 
 	//-------- BLOQUES.DAT ---------
@@ -319,7 +319,9 @@ func levantarFS(configInterfaz config.IO) {
 
 	_, err = os.Stat(configInterfaz.Dialfs_Path + "/bitmap.dat")
 	if err == nil {
-		//Cuento la cantidad de bloques libres
+
+		//-------------- Cuento la cantidad de bloques libres
+
 		bitmap, err := os.ReadFile(configInterfaz.Dialfs_Path + "/bitmap.dat")
 		if err != nil {
 			logueano.Error(Auxlogger, err)
@@ -331,6 +333,21 @@ func levantarFS(configInterfaz config.IO) {
 				FS_totalBloquesDisponibles++
 			}
 		}
+
+		//-------------- Agrego a la lista de archivos los archivos existentes
+
+		archivos, err := os.ReadDir(configInterfaz.Dialfs_Path)
+		if err != nil {
+			logueano.Error(Auxlogger, err)
+		}
+
+		for _, archivo := range archivos {
+			if archivo.Name() == "bitmap.dat" || archivo.Name() == "bloques.dat" {
+				continue
+			}
+			listaArchivos = append(listaArchivos, archivo.Name())
+		}
+
 		return
 	}
 
