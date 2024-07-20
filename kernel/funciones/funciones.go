@@ -53,7 +53,6 @@ var InterfacesConectadas = MapSeguroInterfaz{m: make(map[string]structs.Interfaz
 //*=======================================| PLANIFICADOR |=======================================\\
 
 // Envía continuamente Procesos al CPU mientras que el bool planificadorActivo sea TRUE y el CPU esté esperando un structs.
-// TODO: Testear VRR mas a fondo
 func Planificador() {
 
 	//Espero a que se active el planificador
@@ -102,7 +101,7 @@ func Planificador() {
 
 		// Si se usa VRR y el proceso se desalojo por IO se guarda el Quantum no usado por el proceso
 		if ConfigJson.Planning_Algorithm == "VRR" && motivoDesalojo == "IO" {
-			
+
 			tiempoCorteQuantum := time.Now()
 
 			tiempoUsado := tiempoCorteQuantum.Sub(tiempoInicioQuantum)
@@ -429,7 +428,7 @@ func LiberarRecurso(nombreRecurso string) {
 			LiberarRecurso(nombreRecurso)
 			return
 		}
-		
+
 		//^ log obligatorio (2/6)
 		logueano.CambioDeEstado(pcbDesbloqueado.Estado, "READY", pcbDesbloqueado.PID)
 

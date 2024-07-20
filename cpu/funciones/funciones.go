@@ -49,7 +49,6 @@ type ElementoPrioridad struct {
 	Pagina uint32
 }
 
-// TODO: Probar TLB, especificamente los algoritmos de remplazo
 func agregarEnTLB(pagina uint32, marco uint32, pid uint32, tlb *TLB, prioridadesTLB *[]ElementoPrioridad) {
 	if tlb.Full() {
 		planificarTLB(pid, pagina, marco, tlb, prioridadesTLB)

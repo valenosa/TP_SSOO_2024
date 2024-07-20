@@ -169,7 +169,6 @@ func FinDeQuantum(pcb structs.PCB) {
 	log.Printf("PID: %d - Desalojado por fin de Quantum", pcb.PID)
 }
 
-// TODO : usado solo para interfaz (falta usarlo para recursos)
 // log obligatorio (6/6)
 func MotivoBloqueo(pid uint32, motivo string) {
 
@@ -178,7 +177,6 @@ func MotivoBloqueo(pid uint32, motivo string) {
 
 //log´s auxiliares------------------------------------------------------
 
-// TODO: Implementar para blockedMap.
 func PidsBlock(auxLog *log.Logger, blockedQueue map[uint32]structs.PCB) {
 	var pids []uint32
 	//Recorre la lista BLOCKED y guarda sus PIDs
