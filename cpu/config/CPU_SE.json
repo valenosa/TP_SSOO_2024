@@ -1,0 +1,9 @@
+{
+    "port": 8003,
+    "ip_kernel": "localhost",
+    "port_kernel": 8001,
+    "ip_memory": "localhost",
+    "port_memory": 8002,
+    "number_felling_tlb": 16,
+    "algorithm_tlb": "LRU"
+}

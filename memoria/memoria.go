@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -18,7 +19,8 @@ import (
 func main() {
 
 	// Extrae info de config.json
-	config.Iniciar("config.json", &funciones.ConfigJson)
+	configPath := os.Args[1]
+	config.Iniciar(configPath, &funciones.ConfigJson)
 
 	// Crea e inicializa la memoria de instrucciones
 	memoriaInstrucciones := make(map[uint32][]string) // Contiene las instrucciones de cada proceso (pid = key). Almacena las instrucciones por separado en un slice de strings.
