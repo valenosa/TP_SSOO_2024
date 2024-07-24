@@ -3,8 +3,8 @@
 # Check and set INST_PATH (if needed)
 if [ -z "$INST_PATH" ]; then
   echo "The INST_PATH is not set"
-  echo "Using default path (/home/utnso/mappa-pruebas)"
-  INST_PATH=/home/utnso/mappa-prueba
+  echo "Using default path (../../algo-pruebas)"
+  INST_PATH=../../algo-pruebas
 fi
 
 # Update parametro en archivo Memoria_IO-FS.json
