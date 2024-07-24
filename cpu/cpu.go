@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/funciones"
@@ -32,7 +33,8 @@ func main() {
 	http.HandleFunc("POST /interrupciones", handlerInterrupcion)
 
 	// Extrae info de config.json
-	config.Iniciar("config.json", &funciones.ConfigJson)
+	configPath := os.Args[1]
+	config.Iniciar(configPath, &funciones.ConfigJson)
 
 	//inicio el servidor de CPU
 	config.IniciarServidor(funciones.ConfigJson.Port)

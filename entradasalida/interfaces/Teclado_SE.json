@@ -1,0 +1,13 @@
+{
+    "port": 8008,
+    "ip": "localhost",
+    "type": "STDIN",
+    "unit_work_time": 50,
+    "ip_kernel": "127.0.0.1",
+    "port_kernel": 8001,
+    "ip_memory": "127.0.0.1",
+    "port_memory": 8002,
+    "dialfs_path": "",
+    "dialfs_block_size": 0,
+    "dialfs_block_count": 0
+}

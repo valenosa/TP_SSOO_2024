@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/funciones"
@@ -18,7 +19,9 @@ import (
 
 func main() {
 
-	config.Iniciar("config.json", &funciones.ConfigJson)
+	configPath := os.Args[1]
+	config.Iniciar(configPath, &funciones.ConfigJson)
+
 	funciones.Cont_producirPCB = make(chan int, funciones.ConfigJson.Multiprogramming)
 	funciones.Bin_hayPCBenREADY = make(chan int, funciones.ConfigJson.Multiprogramming+1)
 
