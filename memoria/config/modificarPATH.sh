@@ -41,18 +41,15 @@ modificar() {
     eval export $var_name=$new_value
 }
 
-# Lo hice para que con un comando se escriba todo, pero se podria hacer que se vaya escribiendo mientras vas ejecutando los comandos
-escribir() {
-  # Update parametro en archivo Memoria_IO-FS.json
+escribirMEM_PORT() {
   sed -i "s/\"port\": .*,/\"port\": $MEM_PORT,/" Memoria_IO-FS.json
-  sed -i "s|\"instructions_path\": .*,|\"instructions_path\": \"$INST_PATH\",|" Memoria_IO-FS.json
-
-  # Update parametro en archivo Memoria_Plani-DL-Mem.json
   sed -i "s/\"port\": .*,/\"port\": $MEM_PORT,/" Memoria_Plani-DL-Mem.json
-  sed -i "s|\"instructions_path\": .*,|\"instructions_path\": \"$INST_PATH\",|" Memoria_Plani-DL-Mem.json
-
-  # Update parametro en archivo Memoria_SE.json
   sed -i "s/\"port\": .*,/\"port\": $MEM_PORT,/" Memoria_SE.json
+}
+
+escribirINST_PATH() {
+  sed -i "s|\"instructions_path\": .*,|\"instructions_path\": \"$INST_PATH\",|" Memoria_IO-FS.json
+  sed -i "s|\"instructions_path\": .*,|\"instructions_path\": \"$INST_PATH\",|" Memoria_Plani-DL-Mem.json
   sed -i "s|\"instructions_path\": .*,|\"instructions_path\": \"$INST_PATH\",|" Memoria_SE.json
 }
 
@@ -64,19 +61,21 @@ while true; do
     echo -e "${AMARILLO}5.${NC} Modificar Puerto Memoria"
     echo -e "${AMARILLO}p.${NC} Print Settings"
     echo -e "${AMARILLO}d.${NC} Default Settings"
-    echo -e "${AMARILLO}e.${NC} Escribir Archivos"
     echo -e "${ROJO}s.${NC} Salir"
     echo 
     read -p "$(echo -e ${AMARILLO}Opción:${NC} )" opcion
 
     case $opcion in
-        1) modificar "PATH" "INST_PATH" ;;
-        2) modificar "Puerto" "MEM_PORT" ;;
+        1) modificar "PATH" "INST_PATH"
+           escribirINST_PATH ;;
+        2) modificar "Puerto" "MEM_PORT"
+           escribirMEM_PORT ;;
         p) echo -e "${GRIS_OSCURO}INST_PATH:${NC} $INST_PATH"
            echo -e "${GRIS_OSCURO}MEM_PORT:${NC} $MEM_PORT" ;;
         d) export INST_PATH=../../algo-pruebas;
-           export MEM_PORT=8002; ;;
-        e) escribir ;;
+           export MEM_PORT=8002; 
+           escribirINST_PATH
+           escribirMEM_PORT;;
         s) echo -e "${ROJO}Saliendo...${NC}"; break ;;
         *) echo -e "${ROJO}Opción no válida${NC}" ;;
     esac
