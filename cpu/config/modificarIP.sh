@@ -41,43 +41,42 @@ modificar() {
     eval export $var_name=$new_value
 }
 
-# Lo hice para que con un comando se escriba todo, pero se podria hacer que se vaya escribiendo mientras vas ejecutando los comandos
-escribir() {
-  # Update parametro in archivo CPU_DL-IO.json 
+# Funciones que escriben/modifican las variables en los archivos
+
+escribirKERNEL_HOST(){
   sed -i "s/\"ip_kernel\": .*,/\"ip_kernel\": \"$KERNEL_HOST\",/" CPU_DL-IO-FS.json
-  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_DL-IO-FS.json
-  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_DL-IO-FS.json
-  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_DL-IO-FS.json
-  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_DL-IO-FS.json
-
-
-  # Update parametro in archivo CPU_Mem.json 
   sed -i "s/\"ip_kernel\": .*,/\"ip_kernel\": \"$KERNEL_HOST\",/" CPU_Mem.json
-  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_Mem.json
-  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_Mem.json
-  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_Mem.json
-  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_Mem.json
-
-  # Update parametro in archivo CPU_Plani.json
   sed -i "s/\"ip_kernel\": .*,/\"ip_kernel\": \"$KERNEL_HOST\",/" CPU_Plani.json
-  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_Plani.json
-  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_Plani.json
-  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_Plani.json
-  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_Plani.json
-
-  # Update parametro in archivo CPU_SE.json
   sed -i "s/\"ip_kernel\": .*,/\"ip_kernel\": \"$KERNEL_HOST\",/" CPU_SE.json
-  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_SE.json
-  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_SE.json
-  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_SE.json
-  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_SE.json
 }
 
-export KERNEL_HOST=localhost; 
-export MEM_HOST=localhost; 
-export CPU_PORT=8003; 
-export KERNEL_PORT=8001; 
-export MEM_PORT=8002;
+escribirMEM_HOST(){
+  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_DL-IO-FS.json
+  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_Mem.json
+  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_Plani.json
+  sed -i "s/\"ip_memory\": .*,/\"ip_memory\": \"$MEM_HOST\",/" CPU_SE.json
+}
+
+escribirCPU_PORT(){
+  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_DL-IO-FS.json
+  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_Mem.json
+  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_Plani.json
+  sed -i "s/\"port\": .*,/\"port\": $CPU_PORT,/" CPU_SE.json
+}
+
+escribirKERNEL_PORT(){
+  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_DL-IO-FS.json
+  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_Mem.json
+  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_Plani.json
+  sed -i "s/\"port_kernel\": .*,/\"port_kernel\": $KERNEL_PORT,/" CPU_SE.json
+}
+
+escribirMEM_PORT(){
+  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_DL-IO-FS.json
+  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_Mem.json
+  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_Plani.json
+  sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_SE.json
+}
 
 while true; do
     echo -e "${AMARILLO}1.${NC} Modificar IP Kernel"
@@ -85,30 +84,32 @@ while true; do
     echo -e "${AMARILLO}3.${NC} Modificar Puerto CPU"
     echo -e "${AMARILLO}4.${NC} Modificar Puerto Kernel"
     echo -e "${AMARILLO}5.${NC} Modificar Puerto Memoria"
-    echo -e "${AMARILLO}p.${NC} Print Settings"
     echo -e "${AMARILLO}d.${NC} Default Settings"
-    echo -e "${AMARILLO}e.${NC} Escribir Archivos"
     echo -e "${ROJO}s.${NC} Salir"
     echo 
     read -p "$(echo -e ${AMARILLO}Opción:${NC} )" opcion
 
     case $opcion in
-        1) modificar "IP" "KERNEL_HOST" ;;
-        2) modificar "IP" "MEM_HOST" ;;
-        3) modificar "Puerto" "CPU_PORT" ;;
-        4) modificar "Puerto" "KERNEL_PORT" ;;
-        5) modificar "Puerto" "MEM_PORT" ;;
-        p) echo -e "${GRIS_OSCURO}KERNEL_HOST:${NC} $KERNEL_HOST"
-           echo -e "${GRIS_OSCURO}MEM_HOST:${NC} $MEM_HOST"
-           echo -e "${GRIS_OSCURO}CPU_PORT:${NC} $CPU_PORT"
-           echo -e "${GRIS_OSCURO}KERNEL_PORT:${NC} $KERNEL_PORT"
-           echo -e "${GRIS_OSCURO}MEM_PORT:${NC} $MEM_PORT";;
+        1) modificar "IP" "KERNEL_HOST" 
+           escribirKERNEL_HOST;;
+        2) modificar "IP" "MEM_HOST"
+            escribirMEM_HOST;;
+        3) modificar "Puerto" "CPU_PORT"
+            escribirCPU_PORT;;
+        4) modificar "Puerto" "KERNEL_PORT"
+            escribirKERNEL_PORT;;
+        5) modificar "Puerto" "MEM_PORT"
+            escribirMEM_PORT;;
         d) export KERNEL_HOST=localhost; 
            export MEM_HOST=localhost; 
            export CPU_PORT=8003; 
            export KERNEL_PORT=8001; 
-           export MEM_PORT=8002; ;;
-        e) escribir;;
+           export MEM_PORT=8002; 
+           escribirKERNEL_HOST
+           escribirMEM_HOST
+           escribirCPU_PORT
+           escribirKERNEL_PORT
+           escribirMEM_PORT;;
         s) echo -e "${ROJO}Saliendo...${NC}"; break ;;
         *) echo -e "${ROJO}Opción no válida${NC}" ;;
     esac
