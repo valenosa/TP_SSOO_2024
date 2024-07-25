@@ -73,6 +73,12 @@ escribir() {
   sed -i "s/\"port_memory\": .*,/\"port_memory\": $MEM_PORT,/" CPU_SE.json
 }
 
+export KERNEL_HOST=localhost; 
+export MEM_HOST=localhost; 
+export CPU_PORT=8003; 
+export KERNEL_PORT=8001; 
+export MEM_PORT=8002;
+
 while true; do
     echo -e "${AMARILLO}1.${NC} Modificar IP Kernel"
     echo -e "${AMARILLO}2.${NC} Modificar IP Memoria"
@@ -87,7 +93,7 @@ while true; do
     read -p "$(echo -e ${AMARILLO}Opción:${NC} )" opcion
 
     case $opcion in
-        1) modificar "IP" "KERNEL_HOST";;
+        1) modificar "IP" "KERNEL_HOST" ;;
         2) modificar "IP" "MEM_HOST" ;;
         3) modificar "Puerto" "CPU_PORT" ;;
         4) modificar "Puerto" "KERNEL_PORT" ;;
@@ -97,7 +103,11 @@ while true; do
            echo -e "${GRIS_OSCURO}CPU_PORT:${NC} $CPU_PORT"
            echo -e "${GRIS_OSCURO}KERNEL_PORT:${NC} $KERNEL_PORT"
            echo -e "${GRIS_OSCURO}MEM_PORT:${NC} $MEM_PORT";;
-        d) export KERNEL_HOST=localhost; export MEM_HOST=localhost; export CPU_PORT=8003; export KERNEL_PORT=8001; export MEM_PORT=8002; echo -e "${VERDE}Configuración por defecto${NC}";;
+        d) export KERNEL_HOST=localhost; 
+           export MEM_HOST=localhost; 
+           export CPU_PORT=8003; 
+           export KERNEL_PORT=8001; 
+           export MEM_PORT=8002; ;;
         e) escribir;;
         s) echo -e "${ROJO}Saliendo...${NC}"; break ;;
         *) echo -e "${ROJO}Opción no válida${NC}" ;;

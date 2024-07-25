@@ -56,6 +56,9 @@ escribir() {
   sed -i "s|\"instructions_path\": .*,|\"instructions_path\": \"$INST_PATH\",|" Memoria_SE.json
 }
 
+export INST_PATH=../../algo-pruebas;
+export MEM_PORT=8002;
+
 while true; do
     echo -e "${AMARILLO}1.${NC} Modificar PATH"
     echo -e "${AMARILLO}5.${NC} Modificar Puerto Memoria"
@@ -73,7 +76,7 @@ while true; do
            echo -e "${GRIS_OSCURO}MEM_PORT:${NC} $MEM_PORT" ;;
         d) export INST_PATH=../../algo-pruebas;
            export MEM_PORT=8002; ;;
-        e) escribir;;
+        e) escribir ;;
         s) echo -e "${ROJO}Saliendo...${NC}"; break ;;
         *) echo -e "${ROJO}Opción no válida${NC}" ;;
     esac

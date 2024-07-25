@@ -87,6 +87,12 @@ sed -i "s/\"ip_cpu\": .*,/\"ip_cpu\": \"$CPU_HOST\",/" Kernel_SE.json
 sed -i "s/\"port_cpu\": .*,/\"port_cpu\": $CPU_PORT,/" Kernel_SE.json
 }
 
+export MEM_HOST=localhost; 
+export CPU_HOST=localhost; 
+export KERNEL_PORT=8001; 
+export MEM_PORT=8002;
+export CPU_PORT=8003;
+
 while true; do
     echo -e "${AMARILLO}1.${NC} Modificar IP Memoria"
     echo -e "${AMARILLO}2.${NC} Modificar IP CPU"
