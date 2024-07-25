@@ -2,6 +2,6 @@
     "port": 8002,
     "memory_size": 1024,
     "page_size": 16,
-    "instructions_path": "/home/utnso/mappa-prueba",
+    "instructions_path": "../../algo-pruebas",
     "delay_response": 100
 }
