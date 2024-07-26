@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -122,10 +121,7 @@ func handlerEnviarInstruccion(memoriaInstrucciones map[uint32][]string) func(htt
 
 		instruccion := listaInst[uint32(pc)]
 
-		//instruccion := memoriaInstrucciones[uint32(pid)][uint32(pc)]
-
 		fetch := structs.Fetch{Page_Size: funciones.ConfigJson.Page_Size, Instruccion: instruccion}
-		fmt.Println(fetch.Instruccion)
 
 		respuesta, err := json.Marshal(fetch)
 		if err != nil {
@@ -315,7 +311,6 @@ func handlerCopyString(espacioUsuario *[]byte, tablaDePaginas map[uint32]structs
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		//--------- REQUEST ---------
-		fmt.Println(funciones.Auxlogger, "Se recibió un request copystr")
 		//Obtengo los query params
 		queryParams := r.URL.Query()
 		pid, errPid := strconv.ParseUint(queryParams.Get("pid"), 10, 32)

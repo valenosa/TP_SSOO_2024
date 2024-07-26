@@ -348,6 +348,7 @@ func handlerConexionInterfazIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("Interfaz conectada: ", interfazConectada)
 	logueano.MensajeConFormato(funciones.Auxlogger, "Interfaz conectada: %s\n", interfazConectada.NombreInterfaz)
 
 	//Guarda la interfazConectada en el map de interfaces conectadas
