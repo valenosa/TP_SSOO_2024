@@ -1,5 +1,6 @@
 {
     "port": 8005,
+    "ip": "localhost",
     "type": "GENERICA",
     "unit_work_time": 500,
     "ip_kernel": "127.0.0.1",
