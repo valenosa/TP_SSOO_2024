@@ -58,7 +58,7 @@ export MEM_PORT=8002;
 
 while true; do
     echo -e "${AMARILLO}1.${NC} Modificar PATH"
-    echo -e "${AMARILLO}5.${NC} Modificar Puerto Memoria"
+    echo -e "${AMARILLO}2.${NC} Modificar Puerto Memoria"
     echo -e "${AMARILLO}p.${NC} Print Settings"
     echo -e "${AMARILLO}d.${NC} Default Settings"
     echo -e "${ROJO}s.${NC} Salir"
