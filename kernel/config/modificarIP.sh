@@ -91,6 +91,7 @@ escribirCPU_HOST(){
 while true; do
     echo -e "${AMARILLO}1.${NC} Modificar IP Memoria"
     echo -e "${AMARILLO}2.${NC} Modificar IP CPU"
+    echo -e "${MAGENTA}-------------------------------------- EXTRAS"
     echo -e "${AMARILLO}3.${NC} Modificar Puerto Kernel"
     echo -e "${AMARILLO}4.${NC} Modificar Puerto Memoria"
     echo -e "${AMARILLO}5.${NC} Modificar Puerto CPU"
