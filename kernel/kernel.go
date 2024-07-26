@@ -187,8 +187,6 @@ func handlerFinalizarProceso(w http.ResponseWriter, r *http.Request) {
 
 func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Printf("ListarProceso-------------------------")
-
 	//----------- EJECUTA -----------
 	//Recorre la lista de NEW
 	var listaDeProcesos []structs.ResponseListarProceso
@@ -204,8 +202,6 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 
 	//----------- DEVUELVE -----------
 
-	fmt.Println(listaDeProcesos)
-
 	//Paso a formato JSON la lista de procesos
 	respuesta, err := json.Marshal(listaDeProcesos)
 	if err != nil {
@@ -220,8 +216,6 @@ func handlerListarProceso(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlerEstadoProceso(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("DetenerEstadoProceso-------------------------")
 
 	//--------- RECIBE ---------
 	pid, err := strconv.Atoi(r.PathValue("pid"))
@@ -447,7 +441,7 @@ func handlerEjecutarInstruccionEnIO(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, err := io.ReadAll(respuesta.Body)
 	if err != nil {
-		fmt.Println(err)
+		//fmt.Println(err)
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(bodyBytes)
