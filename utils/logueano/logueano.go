@@ -35,8 +35,7 @@ func NewLogger(modulo string) (*log.Logger, error) {
 	// Logger auxiliar
 	auxLogger := log.New(auxLogFile, "", log.LstdFlags)
 
-	mw := io.MultiWriter(os.Stdout, auxLogFile)
-	auxLogger.SetOutput(mw)
+	auxLogger.SetOutput(auxLogFile)
 
 	return auxLogger, nil
 }
@@ -97,9 +96,9 @@ func ObtenerMarcolg(pid uint32, encontrado bool, pagina uint32, marco uint32) {
 }
 
 // log obligatorio (6/6)
-func LecturaEscritura(pcb structs.PCB, accion string, direccionFisica string, valor string) {
+func LecturaEscritura(pcb structs.PCB, accion string, direccionFisica string, valor []byte) {
 
-	log.Printf("PID: %d - Accion: %s - Direccion Fisica: %s - Valor: %s", pcb.PID, accion, direccionFisica, valor)
+	log.Printf("PID: %d - Accion: %s - Direccion Fisica: %s - Valor: %v", pcb.PID, accion, direccionFisica, valor)
 }
 
 //log´s auxiliares------------------------------------------------------

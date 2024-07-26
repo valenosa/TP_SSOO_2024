@@ -126,27 +126,27 @@ while true; do
 
     case $opcion in
         1) modificar "IP" "IO_HOST" 
-           escribirIO_HOST;;
+           escribirIO_HOST ;;
         2) modificar "IP" "KERNEL_HOST" 
-           escribirKERNEL_HOST;;
+           escribirKERNEL_HOST ;;
         3) modificar "IP" "MEM_HOST"
-            escribirMEM_HOST;;
+            escribirMEM_HOST ;;
         #3) modificar "Puerto" "IO_PORT" complicado, porque los puertos varian entre todas las IO.. Va a tener que ser a manopla
-        #    escribirIO_PORT;;
+        #    escribirIO_PORT ;;
         4) modificar "Puerto" "KERNEL_PORT"
-            escribirKERNEL_PORT;;
+            escribirKERNEL_PORT ;;
         5) modificar "Puerto" "MEM_PORT"
-            escribirMEM_PORT;;
+            escribirMEM_PORT ;;
         d) export IO_HOST=localhost; 
            export KERNEL_HOST=localhost; 
            export MEM_HOST=localhost; 
            export KERNEL_PORT=8001; 
-           export MEM_PORT=8002; 
+           export MEM_PORT=8002;
            escribirIO_HOST
            escribirKERNEL_HOST
            escribirMEM_HOST
            escribirKERNEL_PORT
-           escribirMEM_PORT;;
+           escribirMEM_PORT ;;
         s) echo -e "${ROJO}Saliendo...${NC}"; break ;;
         *) echo -e "${ROJO}Opción no válida${NC}" ;;
     esac

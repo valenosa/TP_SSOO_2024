@@ -622,11 +622,9 @@ func movIN(registroDato string, registroDireccion string, registrosMap8 map[stri
 		return
 	}
 
-	var dataStr string = string(data)
-
 	escribirEnRegistro(registroDato, data, registrosMap8, registrosMap32)
 
-	logueano.LecturaEscritura(PCB, "LEER", direccionFisicaStr, dataStr)
+	logueano.LecturaEscritura(PCB, "LEER", direccionFisicaStr, data)
 }
 
 func movOUT(registroDireccion string, registroDato string, registrosMap8 map[string]*uint8, registrosMap32 map[string]*uint32, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, cicloFinalizado *bool, PCB structs.PCB) {
@@ -643,8 +641,6 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 	}
 
 	valor := extraerBytesDelRegistro(registroDato, registrosMap8, registrosMap32)
-
-	var valorStr string = string(valor)
 
 	body, err := json.Marshal(structs.RequestMovOUT{Pid: PidEnEjecucion, Dir: direccionFisica, Data: valor})
 	if err != nil {
@@ -670,7 +666,7 @@ func movOUT(registroDireccion string, registroDato string, registrosMap8 map[str
 		return
 	}
 
-	logueano.LecturaEscritura(PCB, "ESCRIBIR", direccionFisicaStr, valorStr)
+	logueano.LecturaEscritura(PCB, "ESCRIBIR", direccionFisicaStr, valor)
 }
 
 func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, PCB structs.PCB, cicloFinalizado *bool) {
@@ -745,8 +741,8 @@ func copyString(tamaño string, TLB *TLB, prioridadesTLB *[]ElementoPrioridad, P
 		return
 	}
 
-	logueano.LecturaEscritura(PCB, "LEER", direccionLecturaStr, string(data))
-	logueano.LecturaEscritura(PCB, "ESCRIBIR", direccionEscrituraStr, string(data))
+	logueano.LecturaEscritura(PCB, "LEER", direccionLecturaStr, data)
+	logueano.LecturaEscritura(PCB, "ESCRIBIR", direccionEscrituraStr, data)
 }
 
 func resize(tamañoEnBytes string, cicloFinalizado *bool) {
