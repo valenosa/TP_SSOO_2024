@@ -125,7 +125,7 @@ func TraduccionMMU(pid uint32, direccionLogica int, tlb *TLB, prioridadesTLB *[]
 
 	// Si no se encontró el marco, se devuelve un error
 	if !encontrado {
-		fmt.Println("ERROR: Page Fault")
+		//fmt.Println("ERROR: Page Fault")
 		return 0, false
 	}
 
@@ -965,20 +965,11 @@ func ioSTD(nombreInterfaz string, regDir string, regTamaño string, registroMap8
 	}
 
 	// Envía la solicitud de ejecucion a Kernel
-	respuesta, err := config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
+	_, err = config.Request(ConfigJson.Port_Kernel, ConfigJson.Ip_Kernel, "POST", "instruccionIO", body)
 	if err != nil {
 		logueano.Error(Auxlogger, err)
 		return
 	}
-
-	respuestaBody, err := io.ReadAll(respuesta.Body)
-	if err != nil {
-		logueano.Error(Auxlogger, err)
-		return
-	}
-	respuestaString := string(respuestaBody)
-
-	fmt.Println(respuestaString)
 }
 
 // ------ DialFS ------
