@@ -39,6 +39,7 @@ var ListaREADY_PRIORITARIO = ListaSegura{}
 // ---------------------------- Semáforos PLANIFICADORES
 
 // Iniciar/Detener
+var PlanificadorIniciado = false
 var TogglePlanificador sync.Mutex
 
 // Largo Plazo

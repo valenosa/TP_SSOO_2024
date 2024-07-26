@@ -66,18 +66,23 @@ func main() {
 
 //*======================================| HANDLERS |======================================\\
 
-//----------------------( PLANIFICACION )----------------------\\
-
+// ----------------------( PLANIFICACION )----------------------\\
 func handlerIniciarPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	funciones.TogglePlanificador.Unlock()
+	if !funciones.PlanificadorIniciado {
+		funciones.PlanificadorIniciado = true
+		funciones.TogglePlanificador.Unlock()
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
 func handlerDetenerPlanificacion(w http.ResponseWriter, r *http.Request) {
 
-	funciones.TogglePlanificador.Lock()
+	if funciones.PlanificadorIniciado {
+		funciones.PlanificadorIniciado = false
+		funciones.TogglePlanificador.Lock()
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
